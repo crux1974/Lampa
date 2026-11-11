@@ -32,15 +32,6 @@
 
         Lampa.SettingsApi.addParam({
             component: PLUGIN,
-            param: { name: PLUGIN + '_flag', type: 'trigger', default: true },
-            field: {
-                name: 'Прапор на обкладинці',
-                description: 'Шукати торенти за назвою фільму й показувати прапор Польщі, якщо знайдено польську озвучку (потрібен налаштований парсер)'
-            }
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: PLUGIN,
             param: { name: PLUGIN + '_badge', type: 'trigger', default: true },
             field: {
                 name: 'Мітка PL у списку торентів',
@@ -315,110 +306,11 @@
         obs.observe(document.body, { childList: true, subtree: true });
     }
 
-    /* ---------- 4. Прапор Польщі на обкладинці картки ---------- */
-    var CACHE_KEY = 'pl_audio_flag_cache';
-    var CACHE_TTL = 24 * 3600 * 1000;
-
-    function cacheGet(id) {
-        try {
-            var all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-            var r = all[id];
-            if (r && Date.now() - r.t < CACHE_TTL) return r.v;
-        } catch (e) {}
-        return null;
-    }
-
-    function cacheSet(id, v) {
-        try {
-            var all = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-            all[id] = { t: Date.now(), v: v };
-            localStorage.setItem(CACHE_KEY, JSON.stringify(all));
-        } catch (e) {}
-    }
-
-    function injectFlagCss() {
-        if (document.getElementById('pl-flag-css')) return;
-        var st = document.createElement('style');
-        st.id = 'pl-flag-css';
-        st.textContent =
-            '.pl-flag{position:absolute;top:.6em;right:.6em;z-index:5;width:2.4em;height:1.6em;' +
-            'border-radius:.25em;overflow:hidden;box-shadow:0 0 .4em rgba(0,0,0,.7);' +
-            'background:linear-gradient(180deg,#fff 0,#fff 50%,#dc143c 50%,#dc143c 100%);' +
-            'border:1px solid rgba(0,0,0,.35)}';
-        document.head.appendChild(st);
-    }
-
-    function addFlag(poster) {
-        if (!poster || poster.querySelector('.pl-flag')) return;
-        if (getComputedStyle(poster).position === 'static') poster.style.position = 'relative';
-        var f = document.createElement('div');
-        f.className = 'pl-flag';
-        f.title = 'Є польська озвучка';
-        poster.appendChild(f);
-    }
-
-    function hasPolishAudio(results) {
-        for (var i = 0; i < (results || []).length; i++) {
-            var r = results[i];
-            if ((r.Seeders === undefined || r.Seeders > 0 || r.seeders > 0) &&
-                detectPolish(r.Title || r.title) === 'audio') return true;
-        }
-        return false;
-    }
-
-    function searchParser(query, movie, done) {
-        try {
-            Lampa.Parser.get({ search: query, movie: movie, page: 1 }, function (json) {
-                done(json && (json.Results || json.results) || []);
-            }, function () { done([]); });
-        } catch (e) { done([]); }
-    }
-
-    function checkCard(movie, poster) {
-        if (!movie || !poster || !opt('flag', true)) return;
-        var key = movie.id + '_' + (movie.name ? 'tv' : 'movie');
-        var cached = cacheGet(key);
-        if (cached === true) return addFlag(poster);
-        if (cached === false) return;
-
-        var base = movie.original_title || movie.original_name || movie.title || movie.name || '';
-        var year = (movie.release_date || movie.first_air_date || '').slice(0, 4);
-        if (!base) return;
-
-        var queries = [(base + ' ' + year).trim(), (base + ' PL').trim()];
-        (function next(i) {
-            if (i >= queries.length) { cacheSet(key, false); return; }
-            searchParser(queries[i], movie, function (results) {
-                if (hasPolishAudio(results)) {
-                    cacheSet(key, true);
-                    addFlag(poster);
-                } else next(i + 1);
-            });
-        })(0);
-    }
-
-    function hookCardFlag() {
-        injectFlagCss();
-        Lampa.Listener.follow('full', function (e) {
-            if (e.type !== 'complite') return;
-            try {
-                var render = e.object.activity.render();
-                var poster = render.find('.full-start-new__poster, .full-start__poster')[0];
-                checkCard(e.data.movie, poster);
-            } catch (err) { console.log(PLUGIN, 'flag error', err); }
-        });
-    }
-
     function start() {
         try {
             hookTorrents();
         } catch (e) {
             console.log(PLUGIN, 'torrent badge error', e);
-        }
-        try {
-            hookCardFlag();
-        } catch (e) {
-            console.log(PLUGIN, 'card flag error', e);
         }
         try {
             initSettings();
