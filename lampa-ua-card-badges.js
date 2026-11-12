@@ -4,32 +4,45 @@
     if (window.plugin_card_badges_ua) return;
     window.plugin_card_badges_ua = true;
 
-    // Словник країн для перекладу кодів на українську
-    const COUNTRIES_UA = {
-        'US': 'США', 'UA': 'Україна', 'GB': 'Велика Британія', 'FR': 'Франція',
-        'DE': 'Німеччина', 'CA': 'Канада', 'RU': 'Росія', 'JP': 'Японія',
-        'KR': 'Південна Корея', 'IT': 'Італія', 'ES': 'Іспанія', 'BR': 'Бразилія',
-        'AU': 'Австралія', 'IN': 'Індія', 'CN': 'Китай', 'PL': 'Польща',
-        'SE': 'Швеція', 'DK': 'Данія', 'NO': 'Норвегія', 'MX': 'Мексика'
+    // Словник країн (українська назва + емодзі прапора)
+    const COUNTRIES_DATA = {
+        'US': { name: 'США', flag: '🇺🇸' },
+        'UA': { name: 'Україна', flag: '🇺🇦' },
+        'GB': { name: 'Велика Британія', flag: '🇬🇧' },
+        'FR': { name: 'Франція', flag: '🇫🇷' },
+        'DE': { name: 'Німеччина', flag: '🇩🇪' },
+        'CA': { name: 'Канада', flag: '🇨🇦' },
+        'RU': { name: 'Росія', flag: '🇷🇺' },
+        'JP': { name: 'Японія', flag: '🇯🇵' },
+        'KR': { name: 'Південна Корея', flag: '🇰🇷' },
+        'IT': { name: 'Італія', flag: '🇮🇹' },
+        'ES': { name: 'Іспанія', flag: '🇪🇸' },
+        'BR': { name: 'Бразилія', flag: '🇧🇷' },
+        'AU': { name: 'Австралія', flag: '🇦🇺' },
+        'IN': { name: 'Індія', flag: '🇮🇳' },
+        'CN': { name: 'Китай', flag: '🇨🇳' },
+        'PL': { name: 'Польща', flag: '🇵🇱' },
+        'SE': { name: 'Швеція', flag: '🇸🇪' },
+        'DK': { name: 'Данія', flag: '🇩🇰' },
+        'NO': { name: 'Норвегія', flag: '🇳🇴' },
+        'MX': { name: 'Мексика', flag: '🇲🇽' }
     };
 
-    const CONFIG_ITEMS = [
-        { key: 'type',    title: 'Тип контенту', desc: 'Мітка Фільм або Серіал' },
-        { key: 'rating',  title: 'Рейтинг', desc: 'Оцінка контенту (TMDB)' },
-        { key: 'quality', title: 'Якість', desc: 'Відображення якості (4K, FHD, SD тощо)' },
-        { key: 'seasons', title: 'Інформація про сезони', desc: 'Кількість сезонів та серій' },
-        { key: 'next_ep', title: 'Дата виходу серії', desc: 'Зворотний відлік днів до епізоду' },
-        { key: 'country', title: 'Країна', desc: 'Країна виробництва контенту' },
-        { key: 'year',    title: 'Рік виходу', desc: 'Рік виходу фільму чи серіалу' }
-    ];
-
-    const POSITION_OPTIONS = {
+    // Стандартні варіанти розташування для решти пунктів
+    const FULL_POSITION_OPTIONS = {
         top_left: 'Вгорі зліва',
         top_center: 'Вгорі по центру',
         top_right: 'Вгорі справа',
         bottom_left: 'Внизу зліва',
         bottom_center: 'Внизу по центру',
         bottom_right: 'Внизу справа',
+        off: 'Вимкнено'
+    };
+
+    // Спеціальні варіанти для Якості та Країни (тільки зліва / справа / вимкнено)
+    const LEFT_RIGHT_OPTIONS = {
+        bottom_left: 'Зліва',
+        bottom_right: 'Справа',
         off: 'Вимкнено'
     };
 
@@ -48,11 +61,16 @@
         bold: 'Кіно (Жирний брусковий)'
     };
 
+    const COUNTRY_DISPLAY_OPTIONS = {
+        text: 'Повна назва (наприклад, США)',
+        flag: 'Емодзі-прапор (наприклад, 🇺🇸)'
+    };
+
     function getSetting(key, def) {
         return Lampa.Storage.get('cb_ua_' + key, def);
     }
 
-    // Ін'єкція стилів та різнокольорових тем
+    // Ін'єкція стилів (вертикальне розташування бейджів один під одним)
     function injectStyles() {
         const styleId = 'card-badges-ua-styles';
         if (document.getElementById(styleId)) return;
@@ -61,18 +79,18 @@
             .cb-ua-zone {
                 position: absolute;
                 display: flex;
-                flex-wrap: wrap;
+                flex-direction: column;
                 gap: 0.25em;
                 z-index: 5;
                 pointer-events: none;
                 max-width: 90%;
             }
-            .cb-ua-zone--top_left { top: 0.4em; left: 0.4em; align-items: flex-start; justify-content: flex-start; }
-            .cb-ua-zone--top_center { top: 0.4em; left: 50%; transform: translateX(-50%); align-items: center; justify-content: center; }
-            .cb-ua-zone--top_right { top: 0.4em; right: 0.4em; align-items: flex-end; justify-content: flex-end; }
-            .cb-ua-zone--bottom_left { bottom: 0.4em; left: 0.4em; align-items: flex-start; justify-content: flex-start; }
-            .cb-ua-zone--bottom_center { bottom: 0.4em; left: 50%; transform: translateX(-50%); align-items: center; justify-content: center; }
-            .cb-ua-zone--bottom_right { bottom: 0.4em; right: 0.4em; align-items: flex-end; justify-content: flex-end; }
+            .cb-ua-zone--top_left { top: 0.4em; left: 0.4em; align-items: flex-start; }
+            .cb-ua-zone--top_center { top: 0.4em; left: 50%; transform: translateX(-50%); align-items: center; }
+            .cb-ua-zone--top_right { top: 0.4em; right: 0.4em; align-items: flex-end; }
+            .cb-ua-zone--bottom_left { bottom: 0.4em; left: 0.4em; align-items: flex-start; }
+            .cb-ua-zone--bottom_center { bottom: 0.4em; left: 50%; transform: translateX(-50%); align-items: center; }
+            .cb-ua-zone--bottom_right { bottom: 0.4em; right: 0.4em; align-items: flex-end; }
 
             .cb-ua-badge {
                 padding: 0.2em 0.5em;
@@ -84,23 +102,16 @@
                 box-shadow: 0 2px 5px rgba(0,0,0,0.4);
             }
 
-            /* Шрифтові кастомні теми */
             .cb-font-sans { font-family: Roboto, sans-serif; font-weight: 500; }
             .cb-font-narrow { font-family: 'Arial Narrow', sans-serif; font-weight: 700; text-transform: uppercase; }
             .cb-font-mono { font-family: monospace; font-weight: 600; }
             .cb-font-bold { font-family: Impact, sans-serif; font-weight: 400; letter-spacing: 0.05em; }
 
-            /* Кольорові теми оформлення */
-            /* 1. Неон */
-            .cb-theme-neon { background: rgba(13, 27, 42, 0.85); color: #48cae4; border: 1px solid rgba(72, 202, 228, 0.3); backdrop-filter: blur(4px); }
-            /* 2. Смарагд */
-            .cb-theme-emerald { background: rgba(15, 32, 26, 0.85); color: #52b788; border: 1px solid rgba(82, 183, 136, 0.3); backdrop-filter: blur(4px); }
-            /* 3. Золото */
-            .cb-theme-gold { background: rgba(33, 27, 18, 0.85); color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.3); backdrop-filter: blur(4px); }
-            /* 4. Кіберпанк */
-            .cb-theme-cyberpunk { background: rgba(36, 15, 36, 0.85); color: #f72585; border: 1px solid rgba(247, 37, 133, 0.3); backdrop-filter: blur(4px); }
-            /* 5. Мінімалізм */
-            .cb-theme-minimal { background: rgba(30, 30, 30, 0.85); color: #e5e5e5; border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(4px); }
+            .cb-theme-neon { background: rgba(13, 27, 42, 0.88); color: #48cae4; border: 1px solid rgba(72, 202, 228, 0.3); backdrop-filter: blur(4px); }
+            .cb-theme-emerald { background: rgba(15, 32, 26, 0.88); color: #52b788; border: 1px solid rgba(82, 183, 136, 0.3); backdrop-filter: blur(4px); }
+            .cb-theme-gold { background: rgba(33, 27, 18, 0.88); color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.3); backdrop-filter: blur(4px); }
+            .cb-theme-cyberpunk { background: rgba(36, 15, 36, 0.88); color: #f72585; border: 1px solid rgba(247, 37, 133, 0.3); backdrop-filter: blur(4px); }
+            .cb-theme-minimal { background: rgba(30, 30, 30, 0.88); color: #e5e5e5; border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(4px); }
 
             .card.cb-ua-hover-scale {
                 transition: transform 0.2s ease-out;
@@ -117,7 +128,7 @@
         document.head.appendChild(style);
     }
 
-    // Реєстрація меню налаштувань із вашим порядком: Розташування -> Опція -> Розміщення
+    // Реєстрація меню налаштувань
     function initSettings() {
         if (!Lampa.SettingsApi) return;
 
@@ -131,7 +142,6 @@
                    </svg>`
         });
 
-        // 1. Опція стилю та шрифту
         Lampa.SettingsApi.addParam({
             component: 'card_badges_ua_menu',
             param: {
@@ -142,7 +152,7 @@
             },
             field: {
                 name: 'Колірна тема бейджів',
-                description: 'Оберіть палітру забарвлення'
+                description: 'Оберіть загальну палітру'
             }
         });
 
@@ -156,7 +166,21 @@
             },
             field: {
                 name: 'Стиль шрифту',
-                description: 'Оберіть гарнітуру тексту бейджів'
+                description: 'Гарнітура тексту міток'
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'card_badges_ua_menu',
+            param: {
+                name: 'cb_ua_country_view',
+                type: 'select',
+                values: COUNTRY_DISPLAY_OPTIONS,
+                default: 'text'
+            },
+            field: {
+                name: 'Формат відображення країни',
+                description: 'Показувати назву текстом чи прапором'
             }
         });
 
@@ -173,25 +197,57 @@
             }
         });
 
-        // 2. Опція розміщення (Позиція для кожного елемента окремо)
-        CONFIG_ITEMS.forEach(item => {
-            let defaultPos = 'top_left';
-            if (item.key === 'rating') defaultPos = 'top_right';
-            if (item.key === 'quality') defaultPos = 'bottom_left';
-            if (item.key === 'year' || item.key === 'country') defaultPos = 'bottom_right';
-            if (item.key === 'seasons') defaultPos = 'bottom_left';
+        // 1. Якість (зліва / справа)
+        Lampa.SettingsApi.addParam({
+            component: 'card_badges_ua_menu',
+            param: {
+                name: 'cb_ua_pos_quality',
+                type: 'select',
+                values: LEFT_RIGHT_OPTIONS,
+                default: 'bottom_left'
+            },
+            field: {
+                name: 'Якість',
+                description: 'Виберіть розташування: зліва чи справа'
+            }
+        });
 
+        // 2. Країна (зліва / справа)
+        Lampa.SettingsApi.addParam({
+            component: 'card_badges_ua_menu',
+            param: {
+                name: 'cb_ua_pos_country',
+                type: 'select',
+                values: LEFT_RIGHT_OPTIONS,
+                default: 'bottom_right'
+            },
+            field: {
+                name: 'Країна',
+                description: 'Виберіть розташування: зліва чи справа'
+            }
+        });
+
+        // Решта параметрів зі стандартним повним вибором позицій
+        const otherItems = [
+            { key: 'type',    title: 'Тип контенту (Фільм / Серіал)', def: 'top_left' },
+            { key: 'rating',  title: 'Рейтинг', def: 'top_right' },
+            { key: 'seasons', title: 'Інформація про сезони', def: 'bottom_left' },
+            { key: 'next_ep', title: 'Дата виходу серії', def: 'off' },
+            { key: 'year',    title: 'Рік виходу', def: 'bottom_right' }
+        ];
+
+        otherItems.forEach(item => {
             Lampa.SettingsApi.addParam({
                 component: 'card_badges_ua_menu',
                 param: {
                     name: 'cb_ua_pos_' + item.key,
                     type: 'select',
-                    values: POSITION_OPTIONS,
-                    default: defaultPos
+                    values: FULL_POSITION_OPTIONS,
+                    default: item.def
                 },
                 field: {
-                    name: item.title + ' — Розташування',
-                    description: item.desc
+                    name: item.title,
+                    description: 'Оберіть місце виведення на картці'
                 }
             });
         });
@@ -204,7 +260,7 @@
         return `<span class="cb-ua-badge cb-theme-${theme} cb-font-${font}">${text}</span>`;
     }
 
-    // Розширений пошук якості (сканує всі поля та текстові назви/торренти)
+    // Розширений екстрактор якості
     function extractQuality(data) {
         if (!data) return '';
         
@@ -212,19 +268,25 @@
         if (data.video_quality) return data.video_quality;
         if (data.max_quality) return data.max_quality;
         if (data.info && data.info.quality) return data.info.quality;
+        if (data.card && data.card.quality) return data.card.quality;
 
-        if (Array.isArray(data.sources) && data.sources.length > 0) {
-            for (let src of data.sources) {
-                if (src.quality) return src.quality;
+        const checkArray = data.sources || data.streams || data.torrents || data.files;
+        if (Array.isArray(checkArray) && checkArray.length > 0) {
+            for (let item of checkArray) {
+                if (item.quality) return item.quality;
+                if (item.name && /(2160p|1080p|720p|4K)/i.test(item.name)) {
+                    let m = item.name.match(/(2160p|1080p|720p|4K)/i);
+                    return m[0].toUpperCase() === '2160P' ? '4K' : m[0].toUpperCase();
+                }
             }
         }
 
-        // Сканування назв та описів на наявність тегів якості
         const rawString = [
             data.title, data.original_title, data.name, 
             data.info_text, data.quality_text, 
-            (data.voice_name || ''), (data.translation || '')
-        ].join(' ');
+            data.voice_name, data.translation,
+            data.card_subtitle
+        ].filter(Boolean).join(' ');
 
         const match = rawString.match(/(2160p|1080p|720p|4K|HDRip|BDRip|WEB-DL|CAMRip)/i);
         if (match) {
@@ -236,7 +298,7 @@
         return '';
     }
 
-    // Переклад країни на українську мову
+    // Форматування країни
     function formatCountry(data) {
         let countries = [];
         if (Array.isArray(data.origin_country)) {
@@ -249,10 +311,15 @@
 
         if (countries.length === 0) return '';
         const code = String(countries[0]).toUpperCase();
-        return COUNTRIES_UA[code] || code; // Якщо немає в словнику — виведе код, як є
+        const countryInfo = COUNTRIES_DATA[code];
+        const viewMode = getSetting('country_view', 'text');
+
+        if (!countryInfo) return code;
+
+        return viewMode === 'flag' ? countryInfo.flag : countryInfo.name;
     }
 
-    // Рендеринг бейджів на картку
+    // Рендеринг бейджів
     function renderCardBadges(cardElement) {
         if (!cardElement || cardElement.dataset.cbUaProcessed === 'true') return;
 
@@ -314,7 +381,7 @@
             })(),
 
             country: (() => {
-                const mode = getSetting('pos_country', 'off');
+                const mode = getSetting('pos_country', 'bottom_right');
                 if (mode === 'off') return null;
                 const countryText = formatCountry(data);
                 if (!countryText) return null;
