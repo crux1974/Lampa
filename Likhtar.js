@@ -1,8 +1,8 @@
 /**
  * Likhtar Marks Only — плагін (Likhtar Team).
- * Залишено вивід міток (якість, озвучка (UA, EN, PL), рейтинг) на постери та сторінку опису.
- * Додано кольорові мітки типів: Фільм (синій), Серіал (зелений), TV (червоний).
- * Оптимізовано: миттєвий рендер збережених міток, додано Storage кеш для UaFix, прибрано анімацію.
+ * 1. Типи карток: Фільм (синій), Серіал (зелений), TV (червоний).
+ * 2. Мовні мітки (UA, EN, PL, тощо) у вигляді прапорців-бейджиків.
+ * 3. Повна підтримка польської озвучки та джерел з торрентів.
  */
 (function () {
     'use strict';
@@ -68,7 +68,7 @@
     }
 
     // =================================================================
-    // LIKHTAR QUALITY MARKS (Jacred + UaFix)
+    // LIKHTAR QUALITY MARKS (Jacred + UaFix + Polish sources)
     // =================================================================
     function initMarksJacRed() {
         var workingProxy = null;
@@ -130,7 +130,7 @@
         var _jacredCache = {};
 
         function getBestJacred(card, callback) {
-            var cacheKey = 'jacred_v4_' + card.id;
+            var cacheKey = 'jacred_v5_' + card.id;
             if (_jacredCache[cacheKey]) {
                 callback(_jacredCache[cacheKey]);
                 return;
@@ -210,7 +210,11 @@
 
                         if (t.indexOf('ukr') >= 0 || t.indexOf('укр') >= 0 || t.indexOf('ua') >= 0 || t.indexOf('ukrainian') >= 0) best.ukr = true;
                         if (t.indexOf('eng') >= 0 || t.indexOf('english') >= 0 || t.indexOf('multi') >= 0) best.eng = true;
-                        if (t.indexOf('pl') >= 0 || t.indexOf('pol') >= 0 || t.indexOf('polish') >= 0 || t.indexOf('lektor') >= 0 || t.indexOf('dubbing') >= 0) best.pl = true;
+                        
+                        // Пошук польської мови / лектора / дубляжу з польських релізів та трекерів
+                        if (t.indexOf('pl') >= 0 || t.indexOf('pol') >= 0 || t.indexOf('polish') >= 0 || t.indexOf('lektor') >= 0 || t.indexOf('dubbing') >= 0 || t.indexOf('napisy') >= 0) {
+                            best.pl = true;
+                        }
 
                         if (t.indexOf('dolby vision') >= 0 || t.indexOf('dolbyvision') >= 0) {
                             best.hdr = true;
@@ -282,12 +286,12 @@
         }
 
         function processCards() {
-            $('.card:not(.jacred-mark-processed-v3)').each(function () {
+            $('.card:not(.jacred-mark-processed-v4)').each(function () {
                 var card = $(this);
-                card.addClass('jacred-mark-processed-v3');
+                card.addClass('jacred-mark-processed-v4');
                 var movie = card[0].heroMovieData || card.data('item') || (card[0] && (card[0].card_data || card[0].item)) || null;
 
-                // Фарбування типу картки (Фільм - синій, Серіал - зелений, TV - червоний)
+                // 1. Стилізація та фарбування типу картки (Фільм - синій, Серіал - зелений, TV - червоний)
                 var typeEl = card.find('.card__type');
                 if (typeEl.length) {
                     var typeText = (typeEl.text() || '').toLowerCase();
@@ -410,6 +414,7 @@
         function renderBadges(container, data, movie) {
             container.empty();
 
+            // Порядок виведення мовних прапорців-міток
             if (data.ukr && Lampa.Storage.get('likhtar_badge_ua', true)) container.append(createBadge('ua', 'UA'));
             if (data.eng && Lampa.Storage.get('likhtar_badge_en', true)) container.append(createBadge('en', 'EN'));
             if (data.pl && Lampa.Storage.get('likhtar_badge_pl', true)) container.append(createBadge('pl', 'PL'));
@@ -445,7 +450,7 @@
         style.innerHTML = `
             .card .card__type { left: -0.2em !important; }
             
-            /* Кольори типів карток */
+            /* Кольори типів карток (1. Фільм — синій, Серіал — зелений, TV — червоний) */
             .card__type.card__type--custom-movie { background: linear-gradient(135deg, #1565c0, #42a5f5) !important; color: #fff !important; }
             .card__type.card__type--custom-serial { background: linear-gradient(135deg, #1b5e20, #66bb6a) !important; color: #fff !important; }
             .card__type.card__type--custom-tv { background: linear-gradient(135deg, #b71c1c, #ef5350) !important; color: #fff !important; }
@@ -458,12 +463,4 @@
                 flex-direction: column;
                 gap: 0.15em;
                 z-index: 10;
-                pointer-events: none;
-            }
-            .card:not(.card--tv):not(.card--movie) .card-marks,
-            .card--movie .card-marks {
-                top: 1.4em;
-            }
-            .card__mark {
-                padding: 0.35em 0.45em;
-                font-size: 0.8
+                poi
