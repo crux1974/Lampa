@@ -4,7 +4,6 @@
     if (window.plugin_card_badges_ua) return;
     window.plugin_card_badges_ua = true;
 
-    // Словник країн (українська назва + емодзі прапора)
     const COUNTRIES_DATA = {
         'US': { name: 'США', flag: '🇺🇸' },
         'UA': { name: 'Україна', flag: '🇺🇦' },
@@ -28,8 +27,17 @@
         'MX': { name: 'Мексика', flag: '🇲🇽' }
     };
 
-    // Стандартні варіанти розташування для решти пунктів
-    const FULL_POSITION_OPTIONS = {
+    const CONFIG_ITEMS = [
+        { key: 'type',    title: 'Тип контенту (Фільм / Серіал)', def: 'top_left' },
+        { key: 'rating',  title: 'Рейтинг', def: 'top_right' },
+        { key: 'quality', title: 'Якість', def: 'bottom_left' },
+        { key: 'seasons', title: 'Інформація про сезони', def: 'bottom_left' },
+        { key: 'next_ep', title: 'Дата виходу серії', def: 'off' },
+        { key: 'country', title: 'Країна', def: 'bottom_right' },
+        { key: 'year',    title: 'Рік виходу', def: 'bottom_right' }
+    ];
+
+    const POSITION_OPTIONS = {
         top_left: 'Вгорі зліва',
         top_center: 'Вгорі по центру',
         top_right: 'Вгорі справа',
@@ -39,19 +47,13 @@
         off: 'Вимкнено'
     };
 
-    // Спеціальні варіанти для Якості та Країни (тільки зліва / справа / вимкнено)
-    const LEFT_RIGHT_OPTIONS = {
-        bottom_left: 'Зліва',
-        bottom_right: 'Справа',
-        off: 'Вимкнено'
-    };
-
     const THEME_OPTIONS = {
-        neon: 'Неон (Синьо-блакитний)',
+        transparent: 'Прозора (Мінімалізм з розмиттям)',
+        classic: 'Класична (Темно-сіра)',
+        colored: 'Кольорова (Яскраві акценти)',
+        neon: 'Неон (Синьо-блакитне свічення)',
         emerald: 'Смарагд (Зелений)',
-        gold: 'Золото (Бурштиновий)',
-        cyberpunk: 'Кіберпанк (Пурпурово-рожевий)',
-        minimal: 'Мінімалізм (Сірий графіт)'
+        gold: 'Золото (Бурштиновий)'
     };
 
     const FONT_OPTIONS = {
@@ -70,7 +72,6 @@
         return Lampa.Storage.get('cb_ua_' + key, def);
     }
 
-    // Ін'єкція стилів (вертикальне розташування бейджів один під одним)
     function injectStyles() {
         const styleId = 'card-badges-ua-styles';
         if (document.getElementById(styleId)) return;
@@ -107,11 +108,12 @@
             .cb-font-mono { font-family: monospace; font-weight: 600; }
             .cb-font-bold { font-family: Impact, sans-serif; font-weight: 400; letter-spacing: 0.05em; }
 
+            .cb-theme-transparent { background: rgba(15, 15, 20, 0.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); }
+            .cb-theme-classic { background: rgba(35, 35, 40, 0.9); color: #d0d0d0; border: 1px solid rgba(255, 255, 255, 0.08); }
+            .cb-theme-colored { background: rgba(41, 128, 185, 0.9); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); }
             .cb-theme-neon { background: rgba(13, 27, 42, 0.88); color: #48cae4; border: 1px solid rgba(72, 202, 228, 0.3); backdrop-filter: blur(4px); }
             .cb-theme-emerald { background: rgba(15, 32, 26, 0.88); color: #52b788; border: 1px solid rgba(82, 183, 136, 0.3); backdrop-filter: blur(4px); }
             .cb-theme-gold { background: rgba(33, 27, 18, 0.88); color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.3); backdrop-filter: blur(4px); }
-            .cb-theme-cyberpunk { background: rgba(36, 15, 36, 0.88); color: #f72585; border: 1px solid rgba(247, 37, 133, 0.3); backdrop-filter: blur(4px); }
-            .cb-theme-minimal { background: rgba(30, 30, 30, 0.88); color: #e5e5e5; border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(4px); }
 
             .card.cb-ua-hover-scale {
                 transition: transform 0.2s ease-out;
@@ -128,7 +130,6 @@
         document.head.appendChild(style);
     }
 
-    // Реєстрація меню налаштувань
     function initSettings() {
         if (!Lampa.SettingsApi) return;
 
@@ -148,11 +149,11 @@
                 name: 'cb_ua_color_theme',
                 type: 'select',
                 values: THEME_OPTIONS,
-                default: 'neon'
+                default: 'transparent'
             },
             field: {
                 name: 'Колірна тема бейджів',
-                description: 'Оберіть загальну палітру'
+                description: 'Оберіть стиль забарвлення міток'
             }
         });
 
@@ -197,52 +198,13 @@
             }
         });
 
-        // 1. Якість (зліва / справа)
-        Lampa.SettingsApi.addParam({
-            component: 'card_badges_ua_menu',
-            param: {
-                name: 'cb_ua_pos_quality',
-                type: 'select',
-                values: LEFT_RIGHT_OPTIONS,
-                default: 'bottom_left'
-            },
-            field: {
-                name: 'Якість',
-                description: 'Виберіть розташування: зліва чи справа'
-            }
-        });
-
-        // 2. Країна (зліва / справа)
-        Lampa.SettingsApi.addParam({
-            component: 'card_badges_ua_menu',
-            param: {
-                name: 'cb_ua_pos_country',
-                type: 'select',
-                values: LEFT_RIGHT_OPTIONS,
-                default: 'bottom_right'
-            },
-            field: {
-                name: 'Країна',
-                description: 'Виберіть розташування: зліва чи справа'
-            }
-        });
-
-        // Решта параметрів зі стандартним повним вибором позицій
-        const otherItems = [
-            { key: 'type',    title: 'Тип контенту (Фільм / Серіал)', def: 'top_left' },
-            { key: 'rating',  title: 'Рейтинг', def: 'top_right' },
-            { key: 'seasons', title: 'Інформація про сезони', def: 'bottom_left' },
-            { key: 'next_ep', title: 'Дата виходу серії', def: 'off' },
-            { key: 'year',    title: 'Рік виходу', def: 'bottom_right' }
-        ];
-
-        otherItems.forEach(item => {
+        CONFIG_ITEMS.forEach(item => {
             Lampa.SettingsApi.addParam({
                 component: 'card_badges_ua_menu',
                 param: {
                     name: 'cb_ua_pos_' + item.key,
                     type: 'select',
-                    values: FULL_POSITION_OPTIONS,
+                    values: POSITION_OPTIONS,
                     default: item.def
                 },
                 field: {
@@ -255,37 +217,70 @@
 
     function createBadge(text) {
         if (!text) return '';
-        const theme = getSetting('color_theme', 'neon');
+        const theme = getSetting('color_theme', 'transparent');
         const font = getSetting('font_style', 'sans');
         return `<span class="cb-ua-badge cb-theme-${theme} cb-font-${font}">${text}</span>`;
     }
 
-    // Розширений екстрактор якості
+    // Пошук якості через прямі дані та порівняння з кешем торрентів (Lampac / TorrServer / Jackett)
     function extractQuality(data) {
         if (!data) return '';
         
+        // 1. Прямі поля
         if (data.quality) return data.quality;
         if (data.video_quality) return data.video_quality;
         if (data.max_quality) return data.max_quality;
         if (data.info && data.info.quality) return data.info.quality;
         if (data.card && data.card.quality) return data.card.quality;
+        if (data.movie && data.movie.quality) return data.movie.quality;
 
-        const checkArray = data.sources || data.streams || data.torrents || data.files;
-        if (Array.isArray(checkArray) && checkArray.length > 0) {
-            for (let item of checkArray) {
-                if (item.quality) return item.quality;
-                if (item.name && /(2160p|1080p|720p|4K)/i.test(item.name)) {
-                    let m = item.name.match(/(2160p|1080p|720p|4K)/i);
-                    return m[0].toUpperCase() === '2160P' ? '4K' : m[0].toUpperCase();
+        // 2. Пошук у сховищах торрентів або кеші Lampa за назвою
+        const checkCollections = [
+            data.sources, data.streams, data.torrents, data.files, 
+            data.results, data.balancers, (data.balancer && data.balancer.results),
+            window.torrents_cache, window.lampac_cache
+        ];
+
+        for (let collection of checkCollections) {
+            if (Array.isArray(collection) && collection.length > 0) {
+                for (let item of collection) {
+                    if (!item) continue;
+                    let textToCheck = (item.quality || item.name || item.title || item.file || item.text || '') + '';
+                    let m = textToCheck.match(/(2160p|1080p|720p|4K|HDRip|WEB-DL|BDRip)/i);
+                    if (m) {
+                        let q = m[0].toUpperCase();
+                        return q === '2160P' ? '4K' : q;
+                    }
                 }
             }
         }
 
+        // 3. Звірка назви фільму з глобальним кешем активних переглядів/торрентів
+        const cardTitle = (data.title || data.original_title || data.name || '').toLowerCase();
+        if (cardTitle && window.Lampa && Lampa.Storage) {
+            // Перевіряємо збережені дані останніх відкритих торрентів чи результатів пошуку
+            let recentTorrents = Lampa.Storage.get('torrents_history') || Lampa.Storage.get('lampac_torrents') || [];
+            if (Array.isArray(recentTorrents)) {
+                for (let t of recentTorrents) {
+                    let tTitle = (t.title || t.name || '').toLowerCase();
+                    if (tTitle && (tTitle.includes(cardTitle) || cardTitle.includes(tTitle))) {
+                        let tStr = (t.quality || t.name || '') + '';
+                        let tm = tStr.match(/(2160p|1080p|720p|4K|HDRip|WEB-DL)/i);
+                        if (tm) {
+                            let q = tm[0].toUpperCase();
+                            return q === '2160P' ? '4K' : q;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Глибоке сканування текстових полів картки
         const rawString = [
             data.title, data.original_title, data.name, 
             data.info_text, data.quality_text, 
             data.voice_name, data.translation,
-            data.card_subtitle
+            data.card_subtitle, data.overview
         ].filter(Boolean).join(' ');
 
         const match = rawString.match(/(2160p|1080p|720p|4K|HDRip|BDRip|WEB-DL|CAMRip)/i);
@@ -298,7 +293,6 @@
         return '';
     }
 
-    // Форматування країни
     function formatCountry(data) {
         let countries = [];
         if (Array.isArray(data.origin_country)) {
@@ -319,7 +313,6 @@
         return viewMode === 'flag' ? countryInfo.flag : countryInfo.name;
     }
 
-    // Рендеринг бейджів
     function renderCardBadges(cardElement) {
         if (!cardElement || cardElement.dataset.cbUaProcessed === 'true') return;
 
