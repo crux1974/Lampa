@@ -1,196 +1,316 @@
-/*
- * Українське оформлення бейджів карток Lampa
- * Налаштування: Lampa → Налаштування → Налаштування карток
- *
- * Плагін змінює лише вигляд наявних бейджів. Він не додає джерел відео
- * та не надсилає дані в інтернет.
- */
 (function () {
     'use strict';
 
-    var pluginKey = 'lampa_ua_card_badges_plugin';
-    if (window[pluginKey]) return;
-    window[pluginKey] = true;
+    if (window.plugin_card_badges_ua) return;
+    window.plugin_card_badges_ua = true;
 
-    var choices = {
-        hidden: 'Прихований',
-        color: 'Кольоровий',
-        transparent: 'Прозорий'
-    };
-    var initialized = false;
-
-    var badges = [
-        {
-            id: 'type',
-            title: 'Картки · Тип контенту',
-            description: 'Позначка «Фільм», «Серіал» та інший тип.',
-            selectors: ['.card__type', '.card__kind', '.card__content-type', '[data-card-badge="type"]']
-        },
-        {
-            id: 'rating',
-            title: 'Картки · Рейтинг',
-            description: 'Оцінка фільму або серіалу.',
-            selectors: ['.card__vote', '.card__rating', '[data-card-badge="rating"]']
-        },
-        {
-            id: 'country',
-            title: 'Картки · Країна',
-            description: 'Прапор або назва країни, якщо їх додає картка чи інший плагін.',
-            selectors: [
-                '.card__country',
-                '.card__countries',
-                '.card__nation',
-                '.card__origin',
-                '[data-card-badge="country"]'
-            ]
-        },
-        {
-            id: 'seasons',
-            title: 'Картки · Сезони та серії',
-            description: 'Кількість сезонів або серій, якщо ці дані є на картці.',
-            selectors: [
-                '.card__season',
-                '.card__seasons',
-                '.card__season-count',
-                '.card__episode',
-                '.card__episodes',
-                '[data-card-badge="seasons"]'
-            ]
-        },
-        {
-            id: 'episode_days',
-            title: 'Картки · До нової серії',
-            description: 'Позначка про дату або кількість днів до наступної серії.',
-            selectors: [
-                '.card__new-episode',
-                '.card__next-episode',
-                '.card__episode-date',
-                '.card__release-countdown',
-                '[data-card-badge="episode-days"]'
-            ]
-        },
-        {
-            id: 'quality',
-            title: 'Картки · Якість',
-            description: 'Позначки на кшталт 4K, UHD або HD.',
-            selectors: ['.card__quality', '[data-card-badge="quality"]']
-        },
-        {
-            id: 'year',
-            title: 'Картки · Рік',
-            description: 'Рік виходу фільму або серіалу.',
-            selectors: [
-                '.card__year',
-                '.card__release-year',
-                '.card__release_year',
-                '[data-card-badge="year"]'
-            ]
-        }
+    // Конфігурація всіх параметрів (як у відео)
+    const CONFIG_ITEMS = [
+        { key: 'seasons', title: 'Інформація про сезони', desc: 'Відображення кількості сезонів та серій' },
+        { key: 'next_ep', title: 'Дата виходу серії', desc: 'Зворотний відлік днів до виходу наступного епізоду' },
+        { key: 'type',    title: 'Тип контенту', desc: 'Мітка Фільм або Серіал' },
+        { key: 'quality', title: 'Якість фільмів та серіалів', desc: 'Відображення якості (4K, FHD, SD тощо)' },
+        { key: 'rating',  title: 'Рейтинг', desc: 'Оцінка контенту (TMDB)' },
+        { key: 'country', title: 'Режим відображення країни', desc: 'Країна виробництва контенту' },
+        { key: 'year',    title: 'Відображення року', desc: 'Рік виходу фільму чи серіалу' }
     ];
 
-    function getMode(badge) {
-        var value = window.Lampa.Storage.field('lampa_ua_card_badge_' + badge.id);
-        return Object.prototype.hasOwnProperty.call(choices, value) ? value : 'color';
+    const STYLE_OPTIONS = {
+        off: 'Вимкнено',
+        color: 'Кольоровий бейдж',
+        transparent: 'Прозорий бейдж'
+    };
+
+    // Отримання значення налаштування
+    function getSetting(key) {
+        return Lampa.Storage.get('cb_ua_' + key, 'transparent');
     }
 
-    function applySettings() {
-        var root = document.documentElement;
-        if (!root) return;
+    // Додавання CSS-стилів для бейджів та карток
+    function injectStyles() {
+        const styleId = 'card-badges-ua-styles';
+        if (document.getElementById(styleId)) return;
 
-        badges.forEach(function (badge) {
-            root.setAttribute('data-lampa-ua-badge-' + badge.id, getMode(badge));
-        });
+        const css = `
+            .cb-ua-top-bar {
+                position: absolute;
+                top: 0.4em;
+                left: 0.4em;
+                right: 0.4em;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 0.25em;
+                z-index: 5;
+                pointer-events: none;
+            }
+            .cb-ua-bottom-bar {
+                position: absolute;
+                bottom: 0.4em;
+                left: 0.4em;
+                right: 0.4em;
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: space-between;
+                align-items: flex-end;
+                gap: 0.25em;
+                z-index: 5;
+                pointer-events: none;
+            }
+            .cb-ua-badge {
+                padding: 0.2em 0.45em;
+                border-radius: 0.3em;
+                font-size: 0.75em;
+                font-weight: 600;
+                line-height: 1.1;
+                letter-spacing: 0.02em;
+                text-transform: uppercase;
+                white-space: nowrap;
+            }
+            /* Прозорий стиль (як у відео) */
+            .cb-ua-badge--transparent {
+                background: rgba(15, 15, 20, 0.65);
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+                color: #ffffff;
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+            /* Кольорові бейджі */
+            .cb-ua-badge--color.cb-type-movie { background: #2b7de9; color: #fff; }
+            .cb-ua-badge--color.cb-type-tv    { background: #8e44ad; color: #fff; }
+            .cb-ua-badge--color.cb-rating     { background: #27ae60; color: #fff; }
+            .cb-ua-badge--color.cb-rating-low { background: #c0392b; color: #fff; }
+            .cb-ua-badge--color.cb-quality    { background: #e67e22; color: #fff; }
+            .cb-ua-badge--color.cb-seasons    { background: #16a085; color: #fff; }
+            .cb-ua-badge--color.cb-next-ep    { background: #d35400; color: #fff; }
+            .cb-ua-badge--color.cb-country    { background: #34495e; color: #fff; }
+            .cb-ua-badge--color.cb-year       { background: #7f8c8d; color: #fff; }
+
+            /* Збільшення картки при наведенні */
+            .card.cb-ua-hover-scale {
+                transition: transform 0.2s ease-out;
+            }
+            .card.cb-ua-hover-scale.focus,
+            .card.cb-ua-hover-scale:hover {
+                transform: scale(1.04);
+            }
+        `;
+
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = css;
+        document.head.appendChild(style);
     }
 
-    function makeStyles() {
-        var rules = [];
-
-        badges.forEach(function (badge) {
-            var hiddenSelectors = badge.selectors.map(function (selector) {
-                return 'html[data-lampa-ua-badge-' + badge.id + '="hidden"] .card ' + selector;
-            });
-            var transparentSelectors = badge.selectors.map(function (selector) {
-                return 'html[data-lampa-ua-badge-' + badge.id + '="transparent"] .card ' + selector;
-            });
-
-            rules.push(
-                hiddenSelectors.join(',\n') +
-                '{display:none!important;}'
-            );
-            rules.push(
-                transparentSelectors.join(',\n') +
-                '{background-color:rgba(14,18,24,.62)!important;' +
-                'color:#fff!important;' +
-                'border:1px solid rgba(255,255,255,.28)!important;' +
-                'border-radius:.38em!important;' +
-                'box-shadow:none!important;' +
-                'backdrop-filter:blur(6px);' +
-                '-webkit-backdrop-filter:blur(6px);}'
-            );
-        });
-
-        return rules.join('\n');
-    }
-
-    function showCompatibilityMessage() {
-        if (window.Lampa && Lampa.Noty && typeof Lampa.Noty.show === 'function') {
-            Lampa.Noty.show('Ця версія Lampa не підтримує налаштування плагінів.');
-        }
-    }
-
-    function init() {
-        if (initialized) return;
-
-        if (!window.Lampa || !Lampa.SettingsApi ||
-            typeof Lampa.SettingsApi.addParam !== 'function' ||
-            typeof Lampa.SettingsApi.addComponent !== 'function' ||
-            !Lampa.Storage || typeof Lampa.Storage.field !== 'function') {
-            showCompatibilityMessage();
-            return;
-        }
-        initialized = true;
-
+    // Реєстрація меню налаштувань
+    function initSettings() {
+        // Створюємо окремий компонент налаштувань "Налаштування карток"
         Lampa.SettingsApi.addComponent({
-            component: 'lampa_ua_cards',
+            component: 'card_badges_ua',
             name: 'Налаштування карток',
-            icon: '<svg width="44" height="44" viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg"><rect x="8" y="5" width="28" height="34" rx="3" stroke="currentColor" stroke-width="2"/><path d="M14 14h16M14 21h16M14 28h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',
-            after: 'interface'
+            icon: `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <rect x="3" y="3" width="18" height="18" rx="3"></rect>
+                    <line x1="7" y1="8" x2="13" y2="8"></line>
+                    <line x1="7" y1="16" x2="17" y2="16"></line>
+                   </svg>`
         });
 
-        if (!document.getElementById('lampa-ua-card-badges-styles')) {
-            var style = document.createElement('style');
-            style.id = 'lampa-ua-card-badges-styles';
-            style.textContent = makeStyles();
-            (document.head || document.documentElement).appendChild(style);
-        }
+        // Швидкий перемикач для всіх бейджів одразу
+        Lampa.SettingsApi.addParam({
+            component: 'card_badges_ua',
+            param: {
+                name: 'cb_ua_master_preset',
+                type: 'select',
+                values: {
+                    custom: 'Індивідуальне налаштування',
+                    all_transparent: 'Увімкнути всі прозорі бейджі',
+                    all_color: 'Увімкнути всі кольорові бейджі',
+                    all_off: 'Вимкнути всі бейджі'
+                },
+                default: 'custom'
+            },
+            field: {
+                name: 'Швидке налаштування всіх бейджів',
+                description: 'Застосувати єдиний стиль до всіх елементів картки одразу'
+            },
+            onChange: function (value) {
+                if (value === 'custom') return;
+                const targetStyle = value.replace('all_', '');
+                CONFIG_ITEMS.forEach(item => {
+                    Lampa.Storage.set('cb_ua_' + item.key, targetStyle);
+                });
+                Lampa.Settings.update();
+                Lampa.Noty.show('Стиль застосовано до всіх бейджів');
+            }
+        });
 
-        badges.forEach(function (badge) {
+        // Окремий перемикач масштабу при наведенні
+        Lampa.SettingsApi.addParam({
+            component: 'card_badges_ua',
+            param: {
+                name: 'cb_ua_hover_scale',
+                type: 'trigger',
+                default: true
+            },
+            field: {
+                name: 'Масштаб при наведенні',
+                description: 'Плавне збільшення картки при фокусі'
+            }
+        });
+
+        // Додаємо індивідуальні налаштування для кожного бейджа
+        CONFIG_ITEMS.forEach(item => {
             Lampa.SettingsApi.addParam({
-                component: 'lampa_ua_cards',
+                component: 'card_badges_ua',
                 param: {
-                    name: 'lampa_ua_card_badge_' + badge.id,
+                    name: 'cb_ua_' + item.key,
                     type: 'select',
-                    values: choices,
-                    default: 'color'
+                    values: STYLE_OPTIONS,
+                    default: 'transparent'
                 },
                 field: {
-                    name: badge.title,
-                    description: badge.description
+                    name: item.title,
+                    description: item.desc
                 },
-                onChange: applySettings
+                onChange: function () {
+                    Lampa.Storage.set('cb_ua_master_preset', 'custom');
+                }
+            });
+        });
+    }
+
+    // Генерація HTML одного бейджа
+    function createBadge(text, styleMode, extraClass) {
+        if (!text || styleMode === 'off') return '';
+        const modeClass = styleMode === 'color' ? 'cb-ua-badge--color' : 'cb-ua-badge--transparent';
+        return `<span class="cb-ua-badge ${modeClass} ${extraClass}">${text}</span>`;
+    }
+
+    // Рендеринг бейджів на конкретній картці
+    function renderCardBadges(cardElement, data) {
+        if (!cardElement || !data) return;
+        const view = cardElement.querySelector('.card__view');
+        if (!view || view.dataset.cbUaProcessed) return;
+        view.dataset.cbUaProcessed = 'true';
+
+        if (Lampa.Storage.get('cb_ua_hover_scale', true)) {
+            cardElement.classList.add('cb-ua-hover-scale');
+        }
+
+        const isTv = Boolean(data.first_air_date || data.number_of_seasons || data.name);
+        let topBadges = '';
+        let bottomLeftBadges = '';
+        let bottomRightBadges = '';
+
+        // 1. Тип контенту (Верхній бар)
+        const typeMode = getSetting('type');
+        if (typeMode !== 'off') {
+            topBadges += createBadge(
+                isTv ? 'Серіал' : 'Фільм',
+                typeMode,
+                isTv ? 'cb-type-tv' : 'cb-type-movie'
+            );
+        }
+
+        // 2. Рейтинг (Верхній бар)
+        const ratingMode = getSetting('rating');
+        const vote = parseFloat(data.vote_average || 0);
+        if (ratingMode !== 'off' && vote > 0) {
+            topBadges += createBadge(
+                '★ ' + vote.toFixed(1),
+                ratingMode,
+                vote >= 6.5 ? 'cb-rating' : 'cb-rating-low'
+            );
+        }
+
+        // 3. Якість (Верхній бар)
+        const qualityMode = getSetting('quality');
+        if (qualityMode !== 'off' && data.quality) {
+            topBadges += createBadge(data.quality, qualityMode, 'cb-quality');
+        }
+
+        // 4. Сезони (Нижній бар)
+        const seasonsMode = getSetting('seasons');
+        if (seasonsMode !== 'off' && isTv && data.number_of_seasons) {
+            bottomLeftBadges += createBadge(`${data.number_of_seasons} сез.`, seasonsMode, 'cb-seasons');
+        }
+
+        // 5. Дата виходу наступної серії (Нижній бар)
+        const nextEpMode = getSetting('next_ep');
+        if (nextEpMode !== 'off' && isTv && data.next_episode_to_air && data.next_episode_to_air.air_date) {
+            const diffDays = Math.ceil((new Date(data.next_episode_to_air.air_date) - new Date()) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0) {
+                const label = diffDays === 0 ? 'Сьогодні' : `Через ${diffDays} дн.`;
+                bottomLeftBadges += createBadge(label, nextEpMode, 'cb-next-ep');
+            }
+        }
+
+        // 6. Країна (Нижній бар праворуч)
+        const countryMode = getSetting('country');
+        const countries = data.origin_country || (data.production_countries ? data.production_countries.map(c => c.iso_3166_1) : []);
+        if (countryMode !== 'off' && countries.length > 0) {
+            bottomRightBadges += createBadge(countries[0], countryMode, 'cb-country');
+        }
+
+        // 7. Рік виходу (Нижній бар праворуч)
+        const yearMode = getSetting('year');
+        const releaseDate = data.release_date || data.first_air_date || '';
+        const year = releaseDate.slice(0, 4);
+        if (yearMode !== 'off' && year) {
+            bottomRightBadges += createBadge(year, yearMode, 'cb-year');
+        }
+
+        // Вставка контейнерів у картку (постер)
+        if (topBadges) {
+            const topDiv = document.createElement('div');
+            topDiv.className = 'cb-ua-top-bar';
+            topDiv.innerHTML = topBadges;
+            view.appendChild(topDiv);
+        }
+
+        if (bottomLeftBadges || bottomRightBadges) {
+            const bottomDiv = document.createElement('div');
+            bottomDiv.className = 'cb-ua-bottom-bar';
+            bottomDiv.innerHTML = `
+                <div style="display:flex;gap:0.25em;flex-wrap:wrap;">${bottomLeftBadges}</div>
+                <div style="display:flex;gap:0.25em;flex-wrap:wrap;">${bottomRightBadges}</div>
+            `;
+            view.appendChild(bottomDiv);
+        }
+    }
+
+    // Відстеження створення карток у DOM
+    function observeCards() {
+        const observer = new MutationObserver(mutations => {
+            mutations.forEach(mutation => {
+                mutation.addedNodes.forEach(node => {
+                    if (node.nodeType !== 1) return;
+                    const cards = node.classList && node.classList.contains('card')
+                        ? [node]
+                        : node.querySelectorAll ? node.querySelectorAll('.card') : [];
+
+                    cards.forEach(card => {
+                        const cardData = card.card_data || $(card).data('item');
+                        if (cardData) renderCardBadges(card, cardData);
+                    });
+                });
             });
         });
 
-        applySettings();
+        observer.observe(document.body, { childList: true, subtree: true });
+    }
+
+    // Запуск плагіна після готовності Lampa
+    function startPlugin() {
+        injectStyles();
+        initSettings();
+        observeCards();
     }
 
     if (window.appready) {
-        init();
-    } else if (window.Lampa && Lampa.Listener && typeof Lampa.Listener.follow === 'function') {
-        Lampa.Listener.follow('app', function (event) {
-            if (event.type === 'ready') init();
-        });
+        startPlugin();
     } else {
-        showCompatibilityMessage();
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') startPlugin();
+        });
     }
 })();
