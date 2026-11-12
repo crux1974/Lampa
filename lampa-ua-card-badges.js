@@ -48,12 +48,8 @@
     };
 
     const THEME_OPTIONS = {
-        transparent: 'Прозора (Мінімалізм з розмиттям)',
-        classic: 'Класична (Темно-сіра)',
-        colored: 'Кольорова (Яскраві акценти)',
-        neon: 'Неон (Синьо-блакитне свічення)',
-        emerald: 'Смарагд (Зелений)',
-        gold: 'Золото (Бурштиновий)'
+        transparent: 'Прозора підкладка (Мінімалізм з розмиттям)',
+        solid: 'Суцільні яскраві кольори (Класика)'
     };
 
     const FONT_OPTIONS = {
@@ -108,12 +104,25 @@
             .cb-font-mono { font-family: monospace; font-weight: 600; }
             .cb-font-bold { font-family: Impact, sans-serif; font-weight: 400; letter-spacing: 0.05em; }
 
-            .cb-theme-transparent { background: rgba(15, 15, 20, 0.65); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.15); }
-            .cb-theme-classic { background: rgba(35, 35, 40, 0.9); color: #d0d0d0; border: 1px solid rgba(255, 255, 255, 0.08); }
-            .cb-theme-colored { background: rgba(41, 128, 185, 0.9); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.2); }
-            .cb-theme-neon { background: rgba(13, 27, 42, 0.88); color: #48cae4; border: 1px solid rgba(72, 202, 228, 0.3); backdrop-filter: blur(4px); }
-            .cb-theme-emerald { background: rgba(15, 32, 26, 0.88); color: #52b788; border: 1px solid rgba(82, 183, 136, 0.3); backdrop-filter: blur(4px); }
-            .cb-theme-gold { background: rgba(33, 27, 18, 0.88); color: #ffb703; border: 1px solid rgba(255, 183, 3, 0.3); backdrop-filter: blur(4px); }
+            /* Унікальні кольори для кожного бейжа (Прозорий режим з розмиттям) */
+            .cb-badge-type.cb-theme-transparent { background: rgba(41, 128, 185, 0.75); color: #ecf0f1; border: 1px solid rgba(41, 128, 185, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-rating-high.cb-theme-transparent { background: rgba(39, 174, 96, 0.75); color: #ecf0f1; border: 1px solid rgba(39, 174, 96, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-rating-low.cb-theme-transparent { background: rgba(192, 57, 43, 0.75); color: #ecf0f1; border: 1px solid rgba(192, 57, 43, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-quality.cb-theme-transparent { background: rgba(230, 126, 34, 0.75); color: #ecf0f1; border: 1px solid rgba(230, 126, 34, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-seasons.cb-theme-transparent { background: rgba(22, 160, 133, 0.75); color: #ecf0f1; border: 1px solid rgba(22, 160, 133, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-nextep.cb-theme-transparent { background: rgba(211, 84, 0, 0.75); color: #ecf0f1; border: 1px solid rgba(211, 84, 0, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-country.cb-theme-transparent { background: rgba(142, 68, 173, 0.75); color: #ecf0f1; border: 1px solid rgba(142, 68, 173, 0.4); backdrop-filter: blur(4px); }
+            .cb-badge-year.cb-theme-transparent { background: rgba(127, 140, 141, 0.75); color: #ecf0f1; border: 1px solid rgba(127, 140, 141, 0.4); backdrop-filter: blur(4px); }
+
+            /* Унікальні кольори для кожного бейжа (Суцільний яскравий режим) */
+            .cb-badge-type.cb-theme-solid { background: #2980b9; color: #ffffff; }
+            .cb-badge-rating-high.cb-theme-solid { background: #27ae60; color: #ffffff; }
+            .cb-badge-rating-low.cb-theme-solid { background: #c0392b; color: #ffffff; }
+            .cb-badge-quality.cb-theme-solid { background: #e67e22; color: #ffffff; }
+            .cb-badge-seasons.cb-theme-solid { background: #16a085; color: #ffffff; }
+            .cb-badge-nextep.cb-theme-solid { background: #d35400; color: #ffffff; }
+            .cb-badge-country.cb-theme-solid { background: #8e44ad; color: #ffffff; }
+            .cb-badge-year.cb-theme-solid { background: #7f8c8d; color: #ffffff; }
 
             .card.cb-ua-hover-scale {
                 transition: transform 0.2s ease-out;
@@ -152,8 +161,8 @@
                 default: 'transparent'
             },
             field: {
-                name: 'Колірна тема бейджів',
-                description: 'Оберіть стиль забарвлення міток'
+                name: 'Стиль забарвлення бейджів',
+                description: 'Оберіть прозору підкладку чи суцільний колір'
             }
         });
 
@@ -215,18 +224,16 @@
         });
     }
 
-    function createBadge(text) {
+    function createBadge(text, className) {
         if (!text) return '';
         const theme = getSetting('color_theme', 'transparent');
         const font = getSetting('font_style', 'sans');
-        return `<span class="cb-ua-badge cb-theme-${theme} cb-font-${font}">${text}</span>`;
+        return `<span class="cb-ua-badge ${className} cb-theme-${theme} cb-font-${font}">${text}</span>`;
     }
 
-    // Пошук якості через прямі дані та порівняння з кешем торрентів (Lampac / TorrServer / Jackett)
     function extractQuality(data) {
         if (!data) return '';
         
-        // 1. Прямі поля
         if (data.quality) return data.quality;
         if (data.video_quality) return data.video_quality;
         if (data.max_quality) return data.max_quality;
@@ -234,7 +241,6 @@
         if (data.card && data.card.quality) return data.card.quality;
         if (data.movie && data.movie.quality) return data.movie.quality;
 
-        // 2. Пошук у сховищах торрентів або кеші Lampa за назвою
         const checkCollections = [
             data.sources, data.streams, data.torrents, data.files, 
             data.results, data.balancers, (data.balancer && data.balancer.results),
@@ -255,27 +261,6 @@
             }
         }
 
-        // 3. Звірка назви фільму з глобальним кешем активних переглядів/торрентів
-        const cardTitle = (data.title || data.original_title || data.name || '').toLowerCase();
-        if (cardTitle && window.Lampa && Lampa.Storage) {
-            // Перевіряємо збережені дані останніх відкритих торрентів чи результатів пошуку
-            let recentTorrents = Lampa.Storage.get('torrents_history') || Lampa.Storage.get('lampac_torrents') || [];
-            if (Array.isArray(recentTorrents)) {
-                for (let t of recentTorrents) {
-                    let tTitle = (t.title || t.name || '').toLowerCase();
-                    if (tTitle && (tTitle.includes(cardTitle) || cardTitle.includes(tTitle))) {
-                        let tStr = (t.quality || t.name || '') + '';
-                        let tm = tStr.match(/(2160p|1080p|720p|4K|HDRip|WEB-DL)/i);
-                        if (tm) {
-                            let q = tm[0].toUpperCase();
-                            return q === '2160P' ? '4K' : q;
-                        }
-                    }
-                }
-            }
-        }
-
-        // 4. Глибоке сканування текстових полів картки
         const rawString = [
             data.title, data.original_title, data.name, 
             data.info_text, data.quality_text, 
@@ -337,7 +322,7 @@
             type: (() => {
                 const mode = getSetting('pos_type', 'top_left');
                 if (mode === 'off') return null;
-                return { pos: mode, html: createBadge(isTv ? 'Серіал' : 'Фільм') };
+                return { pos: mode, html: createBadge(isTv ? 'Серіал' : 'Фільм', 'cb-badge-type') };
             })(),
 
             rating: (() => {
@@ -345,7 +330,8 @@
                 if (mode === 'off') return null;
                 const vote = parseFloat(data.vote_average || (data.vote && data.vote.average) || 0);
                 if (vote <= 0) return null;
-                return { pos: mode, html: createBadge('★ ' + vote.toFixed(1)) };
+                const ratingClass = vote >= 6.5 ? 'cb-badge-rating-high' : 'cb-badge-rating-low';
+                return { pos: mode, html: createBadge('★ ' + vote.toFixed(1), ratingClass) };
             })(),
 
             quality: (() => {
@@ -353,7 +339,7 @@
                 if (mode === 'off') return null;
                 const qualityText = extractQuality(data);
                 if (!qualityText) return null;
-                return { pos: mode, html: createBadge(qualityText) };
+                return { pos: mode, html: createBadge(qualityText, 'cb-badge-quality') };
             })(),
 
             seasons: (() => {
@@ -361,7 +347,7 @@
                 if (mode === 'off' || !isTv) return null;
                 const seasonsCount = data.number_of_seasons || (data.seasons ? data.seasons.length : 0);
                 if (!seasonsCount) return null;
-                return { pos: mode, html: createBadge(`${seasonsCount} сез.`) };
+                return { pos: mode, html: createBadge(`${seasonsCount} сез.`, 'cb-badge-seasons') };
             })(),
 
             next_ep: (() => {
@@ -370,7 +356,7 @@
                 const diffDays = Math.ceil((new Date(data.next_episode_to_air.air_date) - new Date()) / (1000 * 60 * 60 * 24));
                 if (diffDays < 0) return null;
                 const label = diffDays === 0 ? 'Сьогодні' : `Через ${diffDays} дн.`;
-                return { pos: mode, html: createBadge(label) };
+                return { pos: mode, html: createBadge(label, 'cb-badge-nextep') };
             })(),
 
             country: (() => {
@@ -378,7 +364,7 @@
                 if (mode === 'off') return null;
                 const countryText = formatCountry(data);
                 if (!countryText) return null;
-                return { pos: mode, html: createBadge(countryText) };
+                return { pos: mode, html: createBadge(countryText, 'cb-badge-country') };
             })(),
 
             year: (() => {
@@ -386,7 +372,7 @@
                 if (mode === 'off') return null;
                 const year = (data.release_date || data.first_air_date || '').slice(0, 4);
                 if (!year) return null;
-                return { pos: mode, html: createBadge(year) };
+                return { pos: mode, html: createBadge(year, 'cb-badge-year') };
             })()
         };
 
