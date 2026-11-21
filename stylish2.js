@@ -3126,6 +3126,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Рейтинги» та «Зовнішній вигляд».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3366,6 +3367,27 @@
             '.sui-badge--pl.sui-badge--text{background:#dc143c;color:#fff}' +
             '.sui-logo{max-width:min(28em,90%);max-height:6em;display:block;object-fit:contain;object-position:left center}' +
             '.sui-hidden{display:none!important}';
+        // ---- нижня інформаційна панель на постерах ----
+        var bs = S('bot_size', '0.8em'), st = S('bot_style', 'standard'), design = S('card_design', 'classic');
+        css +=
+            '.sui-bot{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;flex-wrap:wrap;gap:.3em;align-items:flex-end;padding:1.6em .45em .45em;font-size:' + bs + ';pointer-events:none;border-radius:0 0 .5em .5em}' +
+            '.sui-bot--standard{background:linear-gradient(transparent,rgba(0,0,0,.75))}' +
+            '.sui-bot__b{display:inline-flex;align-items:center;padding:.15em .45em;border-radius:.35em;font:700 1em/1.2 Arial,sans-serif;color:#fff;white-space:nowrap}' +
+            '.sui-bot--standard .sui-bot__b{background:rgba(0,0,0,.55)}' +
+            '.sui-bot--glass .sui-bot__b{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25)}' +
+            '.sui-bot--neon .sui-bot__b{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
+            '.sui-bot__sp{flex:1}' +
+            '.sui-rate{position:absolute;z-index:4;font-size:' + bs + ';padding:.15em .45em;border-radius:.35em;font:700 1em/1.2 Arial,sans-serif;pointer-events:none}' +
+            '.sui-rate{font-size:' + bs + '}' +
+            '.sui-bot--standard ~ .sui-rate,.sui-rate.sui-rate--standard{background:rgba(0,0,0,.65)}' +
+            '.sui-rate--glass{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25)}' +
+            '.sui-rate--neon{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
+            '.sui-rate--tl{left:.4em;top:.4em}.sui-rate--tr{right:.4em;top:.4em}.sui-rate--bl{left:.4em;bottom:.4em}.sui-rate--br{right:.4em;bottom:.4em}' +
+            '.sui-badges--tr{left:auto;right:.4em;align-items:flex-end}';
+        if (S('native_vote', true) === false) css += '.card .card__vote{display:none!important}';
+        if (design === 'square') css += '.card .card__view,.card .card__img{border-radius:0!important}';
+        if (design === 'shadow') css += '.card .card__view{box-shadow:0 .5em 1.2em rgba(0,0,0,.65)}';
+        if (design === 'minimal') css += '.card .card__title,.card .card__age{display:none!important}';
         el.textContent = css;
     }
 
@@ -3449,12 +3471,53 @@
             if (old) old.parentNode.removeChild(old);
             var h = badgeHtml(r);
             if (h) view.insertAdjacentHTML('beforeend', h);
+            var nb = view.querySelector('.sui-badges');
+            if (nb && view.querySelector('.sui-rate--tl')) nb.classList.add('sui-badges--tr');
         });
     }
 
+    function voteColor(v) { return v >= 7.5 ? '#3fd16b' : v >= 6 ? '#f5c518' : v >= 4 ? '#ff9b3d' : '#ff5a5a'; }
+
+    function infoCard(el) {
+        var d = el && el.card_data, view = el && el.querySelector('.card__view');
+        if (!d || !view) return;
+        var old = view.querySelectorAll('.sui-bot,.sui-rate');
+        for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+        if (S('bot_panel', false) !== true) return;
+        var st = S('bot_style', 'standard'), pos = S('bot_rate_pos', 'br'), parts = [];
+        if (S('bot_year', true) !== false) {
+            var y = String(d.release_date || d.first_air_date || '').slice(0, 4);
+            if (/^\d{4}$/.test(y)) parts.push('<span class="sui-bot__b">' + y + '</span>');
+        }
+        if (S('bot_season', true) !== false) {
+            var le = d.last_episode_to_air, se = '';
+            if (le && le.season_number) se = 'S' + le.season_number + (le.episode_number ? ' · E' + le.episode_number : '');
+            else if (d.number_of_seasons) se = 'S' + d.number_of_seasons;
+            if (se) parts.push('<span class="sui-bot__b" style="color:#9fd3ff">' + se + '</span>');
+        }
+        var vote = parseFloat(d.vote_average), rateHtml = '';
+        if (S('bot_rating', true) !== false && vote > 0) {
+            var vt = (Math.round(vote * 10) / 10).toFixed(1);
+            if (pos === 'bl' || pos === 'br') {
+                var b = '<span class="sui-bot__b" style="color:' + voteColor(vote) + '">★ ' + vt + '</span>';
+                if (pos === 'bl') parts.unshift(b); else { parts.push('<span class="sui-bot__sp"></span>'); parts.push(b); }
+            } else rateHtml = '<span class="sui-rate sui-rate--' + pos + ' sui-rate--' + st + '" style="color:' + voteColor(vote) + '">★ ' + vt + '</span>';
+        }
+        if (parts.length) view.insertAdjacentHTML('beforeend', '<div class="sui-bot sui-bot--' + st + '">' + parts.join('') + '</div>');
+        if (rateHtml) view.insertAdjacentHTML('beforeend', rateHtml);
+        var ua = view.querySelector('.sui-badges');
+        if (ua) ua.classList.toggle('sui-badges--tr', !!rateHtml && pos === 'tl');
+    }
+    function refreshInfo() {
+        var list = document.querySelectorAll('.card');
+        for (var i = 0; i < list.length; i++) infoCard(list[i]);
+    }
+
     var io = null;
+    var watching = false;
     function watchCards() {
-        if (S('badges', true) === false) return;
+        if (watching) return;
+        watching = true;
         if (window.IntersectionObserver && !io) {
             io = new IntersectionObserver(function (ents) {
                 ents.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); decorateCard(en.target); } });
@@ -3465,7 +3528,8 @@
             for (var i = 0; i < list.length; i++) {
                 if (list[i].__sui_seen) continue;
                 list[i].__sui_seen = true;
-                if (io) io.observe(list[i]); else decorateCard(list[i]);
+                infoCard(list[i]);
+                if (io) io.observe(list[i]); else if (S('badges', true) !== false) decorateCard(list[i]);
             }
         }
         scan(document);
@@ -3473,7 +3537,7 @@
             for (var i = 0; i < ms.length; i++) for (var j = 0; j < ms[i].addedNodes.length; j++) {
                 var n = ms[i].addedNodes[j];
                 if (n.nodeType !== 1) continue;
-                if (n.classList && n.classList.contains('card')) { if (!n.__sui_seen) { n.__sui_seen = true; if (io) io.observe(n); else decorateCard(n); } }
+                if (n.classList && n.classList.contains('card')) { if (!n.__sui_seen) { n.__sui_seen = true; infoCard(n); if (io) io.observe(n); else if (S('badges', true) !== false) decorateCard(n); } }
                 else scan(n);
             }
         }).observe(document.body, { childList: true, subtree: true });
@@ -3594,6 +3658,20 @@
     function addMenus() {
         [RT, RT_SEL, LOOK].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
 
+        // ---- 13a / 14a: у кінці «Інформаційної панелі» ----
+        var INFO = 'stylish_ui_info';
+        ttl(INFO, 'bot_head', 'Нижня інформаційна панель');
+        trg(INFO, 'bot_panel', 'Увімкнути', 'Плашка внизу постера з роком, сезоном і рейтингом', false);
+        sel(INFO, 'bot_style', 'Стиль', 'Вигляд бейджів на постері', { standard: 'Стандартний', glass: 'Скло (Apple)', neon: 'Неон' }, 'standard');
+        sel(INFO, 'card_design', 'Тип дизайну карток', '', { classic: 'Класичний', square: 'Без заокруглень', shadow: 'З тінню', minimal: 'Мінімалістичний (без підпису)' }, 'classic');
+        sel(INFO, 'bot_size', 'Розмір бейджів', '', sizes(['0.6em', '0.7em', '0.8em', '0.9em', '1em', '1.1em', '1.2em']), '0.8em');
+        sel(INFO, 'bot_rate_pos', 'Позиція рейтингу', '', { br: 'Справа знизу', bl: 'Зліва знизу', tr: 'Справа зверху', tl: 'Зліва зверху' }, 'br');
+        ttl(INFO, 'bot_badges_head', 'Наявність бейджів');
+        trg(INFO, 'bot_year', 'Бейдж року', 'Рік виходу на постері', true);
+        trg(INFO, 'bot_season', 'Бейдж сезону/серії', 'Для серіалів: S3 · E8 (якщо Lampa знає сезон)', true);
+        trg(INFO, 'bot_rating', 'Бейдж рейтингу (TMDB)', 'Оцінка TMDB кольором', true);
+        trg(INFO, 'native_vote', 'Рейтинги на картці', 'Стандартна оцінка Lampa на постері', true);
+
         // ---- 2. Рейтинги ----
         ttl(RT, 'rt_head', 'Рейтинги');
         trg(RT, 'rt_enable', 'Показувати рейтинги', 'Рейтинги IMDb, Rotten Tomatoes, Metacritic та інших у повній картці', true);
@@ -3641,7 +3719,8 @@
         Lampa.Storage.listener.follow('change', function (e) {
             var n = String(e.name || '');
             if (n.indexOf(P + 'rt_') === 0) rtCss();
-            if (n === P + 'card_size') lookCss();
+            if (n === P + 'card_size' || n === P + 'card_design' || n === P + 'bot_size' || n === P + 'bot_style' || n === P + 'native_vote') lookCss();
+            if (/^sui_(bot_|native_vote)/.test(n)) refreshInfo();
             if (n === P + 'badges' || n === P + 'badge_ua' || n === P + 'badge_pl' || n === P + 'badge_style') { if (n === P + 'badges' && S('badges', true) !== false) watchCards(); refreshBadges(); }
         });
     }
