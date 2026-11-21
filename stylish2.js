@@ -2,6 +2,7 @@
  * Стильний інтерфейс 2.0 — плагін для Lampa
  * https://github.com/crux1974/Lampa
  *
+ * Розділи «Рейтинги» і «Зовнішній вигляд» — власний код плагіна.
  * Розділ «Інформаційна панель» побудовано на основі плагіна
  * «Інтерфейс +» (interface+.js) автора ko31k — https://github.com/ko31k/LMP
  * Код змінено: власне меню українською, прибрано функції, які не ввійшли
@@ -962,6 +963,18 @@
             param: { name: 'stylish_ui_open_info', type: 'button' },
             field: { name: '1. Інформаційна панель', description: 'Кольорова панель, назви, статуси, віковий рейтинг, торенти, ключ TMDB' },
             onChange: function () { openSub(SUI_INFO); }
+        });
+        add({
+            component: SUI,
+            param: { name: 'stylish_ui_open_rt', type: 'button' },
+            field: { name: '2. Рейтинги', description: 'IMDb, Rotten Tomatoes, Metacritic, Trakt, Letterboxd, нагороди' },
+            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_rt'); }
+        });
+        add({
+            component: SUI,
+            param: { name: 'stylish_ui_open_look', type: 'button' },
+            field: { name: '3. Зовнішній вигляд', description: 'Розмір карток, мітки UA/PL, сторінка фільму, редактор кнопок' },
+            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_look'); }
         });
 
         // ---- 1. Інформаційна панель (підменю) ----
@@ -3109,4 +3122,609 @@
         if (window.appready) boot();
         else Lampa.Listener.follow('app', function (e) { if (e.type === 'ready') boot(); });
     })();
+})();
+
+
+
+
+/* ==========================================================================
+ * Стильний інтерфейс 2.0 — розділи «Рейтинги» та «Зовнішній вигляд».
+ * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
+ * ========================================================================== */
+(function () {
+    'use strict';
+    if (window.__sui_extra) return;
+    window.__sui_extra = true;
+
+    var P = 'sui_';
+    var SUI = 'stylish_ui', RT = 'stylish_ui_rt', RT_SEL = 'stylish_ui_rt_sel', LOOK = 'stylish_ui_look';
+
+    function S(k, d) {
+        var v = Lampa.Storage.get(P + k, d);
+        if (v === 'true') return true;
+        if (v === 'false') return false;
+        return v;
+    }
+    function setS(k, v) { Lampa.Storage.set(P + k, v); }
+    function esc(t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+    function trim(t) { return String(t == null ? '' : t).replace(/^\s+|\s+$/g, ''); }
+
+    function cacheGet(store, key, ttl) {
+        try {
+            var all = Lampa.Storage.get(store, '{}');
+            if (typeof all === 'string') all = JSON.parse(all || '{}');
+            var it = all && all[key];
+            if (it && Date.now() - it.t < (it.ttl || ttl)) return it.v;
+        } catch (e) { }
+        return null;
+    }
+    function cacheSet(store, key, val, ttl) {
+        try {
+            var all = Lampa.Storage.get(store, '{}');
+            if (typeof all === 'string') all = JSON.parse(all || '{}');
+            all = all || {};
+            all[key] = { t: Date.now(), v: val, ttl: ttl };
+            var keys = Object.keys(all);
+            if (keys.length > 700) {
+                keys.sort(function (a, b) { return all[a].t - all[b].t; });
+                for (var i = 0; i < keys.length - 500; i++) delete all[keys[i]];
+            }
+            Lampa.Storage.set(store, all);
+        } catch (e) { }
+    }
+
+    function getJSON(url, ok, fail) {
+        var done = false;
+        var x = new XMLHttpRequest();
+        var tm = setTimeout(function () { if (!done) { done = true; try { x.abort(); } catch (e) { } if (fail) fail('timeout'); } }, 12000);
+        try {
+            x.open('GET', url, true);
+            x.onload = function () {
+                if (done) return; done = true; clearTimeout(tm);
+                if (x.status < 200 || x.status >= 300) return fail && fail('http ' + x.status);
+                var j = null;
+                try { j = JSON.parse(x.responseText); } catch (e) { return fail && fail('json'); }
+                ok(j);
+            };
+            x.onerror = function () { if (!done) { done = true; clearTimeout(tm); if (fail) fail('net'); } };
+            x.send(null);
+        } catch (e) { if (!done) { done = true; clearTimeout(tm); if (fail) fail('err'); } }
+    }
+
+    function tmdbUrl(path) {
+        var key = '';
+        try { key = Lampa.Storage.get('interface_mod_new_tmdb_api_key', '') || (Lampa.TMDB && Lampa.TMDB.key ? Lampa.TMDB.key() : ''); } catch (e) { }
+        var u = path + (path.indexOf('?') < 0 ? '?' : '&') + 'api_key=' + key;
+        try { if (Lampa.TMDB && Lampa.TMDB.api) return Lampa.TMDB.api(u); } catch (e) { }
+        return 'https://api.themoviedb.org/3/' + u;
+    }
+    function tmdbImg(path) {
+        var u = 'https://image.tmdb.org/t/p/w500' + path;
+        try { if (Lampa.TMDB && Lampa.TMDB.image) return Lampa.TMDB.image('t/p/w500' + path); } catch (e) { }
+        return u;
+    }
+    function isTv(m) { return !!(m && (m.name || m.first_air_date || m.number_of_seasons || /tv/i.test(m.media_type || m.type || ''))); }
+
+    /* ======================================================================
+     * 2. РЕЙТИНГИ
+     * ==================================================================== */
+    var RATINGS = [
+        { key: 'tmdb', name: 'TMDB', color: '#01b4e4' },
+        { key: 'imdb', name: 'IMDb', color: '#f5c518' },
+        { key: 'rt', name: 'Rotten Tomatoes', short: 'RT', color: '#fa320a' },
+        { key: 'popcorn', name: 'RT Audience', short: 'RT 🍿', color: '#ffb000' },
+        { key: 'mc', name: 'Metacritic', short: 'MC', color: '#66cc33' },
+        { key: 'trakt', name: 'Trakt', color: '#ed1c24' },
+        { key: 'letterboxd', name: 'Letterboxd', short: 'LB', color: '#40bcf4' },
+        { key: 'mdblist', name: 'MDBList Score', short: 'MDB', color: '#4284f5' },
+        { key: 'awards', name: 'Нагороди', short: '🏆', color: '#e5b80b' }
+    ];
+    function rtOn(key) { return S('rt_show_' + key, true) !== false; }
+
+    function scoreColor(v10) {
+        if (v10 == null || isNaN(v10)) return '#ddd';
+        if (v10 >= 7.5) return '#3fd16b';
+        if (v10 >= 6) return '#f5c518';
+        if (v10 >= 4) return '#ff9b3d';
+        return '#ff5a5a';
+    }
+
+    function rtCss() {
+        var id = 'sui-rt-css', el = document.getElementById(id);
+        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+        var size = S('rt_size', '1.1em'), gap = S('rt_gap', '0.5em'), ml = S('rt_ml', '0em'), mt = S('rt_mt', '10px'), sat = S('rt_sat', '100%');
+        el.textContent =
+            '.sui-rt{display:flex;flex-wrap:wrap;align-items:center;gap:' + gap + ';margin:' + mt + ' 0 ' + mt + ' ' + ml + ';font-size:' + size + ';filter:saturate(' + sat + ')}' +
+            '.sui-rt__i{display:inline-flex;align-items:center;gap:.35em;padding:.25em .6em;border-radius:.45em;line-height:1.2;white-space:nowrap}' +
+            '.sui-rt--normal .sui-rt__i{background:rgba(0,0,0,.45)}' +
+            '.sui-rt--apple .sui-rt__i{background:rgba(255,255,255,.12);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18)}' +
+            '.sui-rt--apple_lite .sui-rt__i{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18)}' +
+            '.sui-rt__n{font-weight:700;font-size:.8em;letter-spacing:.02em}' +
+            '.sui-rt__v{font-weight:700}';
+    }
+
+    // отримати IMDb id: з картки, або через TMDB external_ids
+    function imdbIdFor(m, cb) {
+        if (m.imdb_id) return cb(m.imdb_id);
+        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
+        var c = cacheGet('sui_imdb', ck, 30 * 864e5);
+        if (c) return cb(c);
+        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/external_ids'), function (j) {
+            var id = j && j.imdb_id;
+            if (id) cacheSet('sui_imdb', ck, id, 30 * 864e5);
+            cb(id || '');
+        }, function () { cb(''); });
+    }
+
+    function fetchMdb(m, cb) {
+        var key = trim(S('rt_mdb_key', ''));
+        if (!key) return cb(null);
+        var url = 'https://mdblist.com/api/?apikey=' + encodeURIComponent(key) + '&tm=' + m.id + '&m=' + (isTv(m) ? 'show' : 'movie');
+        getJSON(url, function (j) {
+            if (!j || j.response === false) return cb(null);
+            var out = { imdbid: j.imdbid };
+            (j.ratings || []).forEach(function (r) {
+                if (r.value == null || r.value === 0) return;
+                var map = { imdb: 'imdb', tomatoes: 'rt', tomatoesaudience: 'popcorn', popcorn: 'popcorn', metacritic: 'mc', trakt: 'trakt', letterboxd: 'letterboxd' };
+                var k = map[r.source];
+                if (k) out[k] = r.value;
+            });
+            if (j.score) out.mdblist = j.score;
+            cb(out);
+        }, function () { cb(null); });
+    }
+
+    function fetchOmdb(imdb, cb) {
+        var key = trim(S('rt_omdb_key', ''));
+        if (!key || !imdb) return cb(null);
+        getJSON('https://www.omdbapi.com/?apikey=' + encodeURIComponent(key) + '&i=' + imdb, function (j) {
+            if (!j || j.Response === 'False') return cb(null);
+            var out = {};
+            if (j.imdbRating && j.imdbRating !== 'N/A') out.imdb = parseFloat(j.imdbRating);
+            (j.Ratings || []).forEach(function (r) {
+                if (r.Source === 'Rotten Tomatoes') out.rt = parseInt(r.Value, 10);
+                if (r.Source === 'Metacritic') out.mc = parseInt(r.Value, 10);
+            });
+            if (j.Awards && j.Awards !== 'N/A') out.awards = j.Awards;
+            cb(out);
+        }, function () { cb(null); });
+    }
+
+    function collectRatings(m, cb) {
+        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
+        var cached = cacheGet('sui_rt_cache', ck, 3 * 864e5);
+        if (cached) return cb(cached);
+        var res = {};
+        fetchMdb(m, function (md) {
+            if (md) for (var k in md) res[k] = md[k];
+            var imdb = (md && md.imdbid) || m.imdb_id;
+            var next = function (id) {
+                fetchOmdb(id, function (om) {
+                    if (om) for (var k2 in om) if (res[k2] == null) res[k2] = om[k2];
+                    if (Object.keys(res).length) cacheSet('sui_rt_cache', ck, res, 3 * 864e5);
+                    cb(res);
+                });
+            };
+            if (imdb) next(imdb); else imdbIdFor(m, next);
+        });
+    }
+
+    function pl(n, one, few, many) { n = Math.abs(n) % 100; if (n >= 5 && n <= 20) return many; n = n % 10; if (n === 1) return one; if (n >= 2 && n <= 4) return few; return many; }
+    function awardsText(a) {
+        var s = String(a || '');
+        var oscar = s.match(/Won (\d+) Oscar/i), wins = s.match(/(\d+) wins?/i), noms = s.match(/(\d+) nomination/i);
+        if (oscar) return oscar[1] + ' ' + pl(+oscar[1], 'Оскар', 'Оскари', 'Оскарів') + (wins ? ' · ' + wins[1] + ' ' + pl(+wins[1], 'перемога', 'перемоги', 'перемог') : '');
+        if (wins) return wins[1] + ' ' + pl(+wins[1], 'перемога', 'перемоги', 'перемог') + (noms ? ' · ' + noms[1] + ' номін.' : '');
+        if (noms) return noms[1] + ' ' + pl(+noms[1], 'номінація', 'номінації', 'номінацій');
+        return '';
+    }
+
+    function renderRatings(root, m, data) {
+        root.find('.sui-rt').remove();
+        var items = [];
+        RATINGS.forEach(function (r) {
+            if (!rtOn(r.key)) return;
+            var v = r.key === 'tmdb' ? (m.vote_average ? Math.round(m.vote_average * 10) / 10 : null) : data[r.key];
+            if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return;
+            var shown, v10;
+            if (r.key === 'awards') { shown = awardsText(v); if (!shown) return; v10 = 8; }
+            else if (r.key === 'rt' || r.key === 'popcorn' || r.key === 'mc' || r.key === 'mdblist' || r.key === 'trakt') { shown = Math.round(v) + (r.key === 'mc' || r.key === 'mdblist' ? '' : '%'); v10 = v / 10; }
+            else if (r.key === 'letterboxd') { shown = (Math.round(v * 10) / 10).toFixed(1); v10 = v * 2; }
+            else { shown = (Math.round(v * 10) / 10).toFixed(1); v10 = v; }
+            items.push('<span class="sui-rt__i"><span class="sui-rt__n" style="color:' + r.color + '">' + esc(r.short || r.name) + '</span><span class="sui-rt__v" style="color:' + scoreColor(v10) + '">' + esc(shown) + '</span></span>');
+        });
+        if (!items.length) return;
+        var box = $('<div class="sui-rt sui-rt--' + esc(S('rt_style', 'normal')) + '">' + items.join('') + '</div>');
+        var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        if (line.length) line.after(box); else root.find('.full-start-new__title, .full-start__title').first().after(box);
+    }
+
+    function onFullRatings(e) {
+        if (S('rt_enable', true) === false) return;
+        var m = e.data && e.data.movie;
+        if (!m || !m.id) return;
+        var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.full-start-new').closest('.activity');
+        rtCss();
+        renderRatings(root, m, {});                     // TMDB одразу
+        collectRatings(m, function (data) { renderRatings(root, m, data || {}); });
+    }
+
+    /* ======================================================================
+     * 3. ЗОВНІШНІЙ ВИГЛЯД
+     * ==================================================================== */
+    function lookCss() {
+        var id = 'sui-look-css', el = document.getElementById(id);
+        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+        var size = S('card_size', '1');
+        var css = '';
+        if (size !== '1') css += '.card:not(.card--wide):not(.card--collection){font-size:' + size + 'em}';
+        css +=
+            '.sui-badges{position:absolute;left:.4em;top:.4em;z-index:3;display:flex;flex-direction:column;gap:.25em;pointer-events:none}' +
+            '.sui-badge{display:inline-flex;align-items:center;justify-content:center;min-width:1.9em;height:1.25em;padding:0 .35em;border-radius:.3em;font:700 .75em/1 Arial,sans-serif;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.6)}' +
+            '.sui-badge--ua.sui-badge--flag{background:linear-gradient(#0057b7 50%,#ffd700 50%);color:transparent;width:1.9em}' +
+            '.sui-badge--pl.sui-badge--flag{background:linear-gradient(#fff 50%,#dc143c 50%);color:transparent;width:1.9em}' +
+            '.sui-badge--ua.sui-badge--text{background:#0057b7;color:#ffd700}' +
+            '.sui-badge--pl.sui-badge--text{background:#dc143c;color:#fff}' +
+            '.sui-logo{max-width:min(28em,90%);max-height:6em;display:block;object-fit:contain;object-position:left center}' +
+            '.sui-hidden{display:none!important}';
+        // ---- нижня інформаційна панель на постерах ----
+        var bs = S('bot_size', '0.8em'), st = S('bot_style', 'standard'), design = S('card_design', 'classic');
+        css +=
+            '.sui-bot{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;flex-wrap:wrap;gap:.3em;align-items:flex-end;padding:1.6em .45em .45em;font-size:' + bs + ';pointer-events:none;border-radius:0 0 .5em .5em}' +
+            '.sui-bot--standard{background:linear-gradient(transparent,rgba(0,0,0,.75))}' +
+            '.sui-bot__b{display:inline-flex;align-items:center;padding:.15em .45em;border-radius:.35em;font:700 1em/1.2 Arial,sans-serif;color:#fff;white-space:nowrap}' +
+            '.sui-bot--standard .sui-bot__b{background:rgba(0,0,0,.55)}' +
+            '.sui-bot--glass .sui-bot__b{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25)}' +
+            '.sui-bot--neon .sui-bot__b{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
+            '.sui-bot__sp{flex:1}' +
+            '.sui-rate{position:absolute;z-index:4;font-size:' + bs + ';padding:.15em .45em;border-radius:.35em;font:700 1em/1.2 Arial,sans-serif;pointer-events:none}' +
+            '.sui-rate{font-size:' + bs + '}' +
+            '.sui-bot--standard ~ .sui-rate,.sui-rate.sui-rate--standard{background:rgba(0,0,0,.65)}' +
+            '.sui-rate--glass{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25)}' +
+            '.sui-rate--neon{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
+            '.sui-rate--tl{left:.4em;top:.4em}.sui-rate--tr{right:.4em;top:.4em}.sui-rate--bl{left:.4em;bottom:.4em}.sui-rate--br{right:.4em;bottom:.4em}' +
+            '.sui-badges--tr{left:auto;right:.4em;align-items:flex-end}';
+        if (S('native_vote', true) === false) css += '.card .card__vote{display:none!important}';
+        if (design === 'square') css += '.card .card__view,.card .card__img{border-radius:0!important}';
+        if (design === 'shadow') css += '.card .card__view{box-shadow:0 .5em 1.2em rgba(0,0,0,.65)}';
+        if (design === 'minimal') css += '.card .card__title,.card .card__age{display:none!important}';
+        el.textContent = css;
+    }
+
+    /* ---- мітки UA / PL на картках (дані — з парсера торентів) ---- */
+    var RX_UA = /(^|[^a-z0-9])(ukr|ua|ukrainian)([^a-z0-9]|$)|ukr[ _-]?(dub|aud|voice)|(^|[^а-яіїєґa-z])укр(\.|[^а-яіїєґ]|$)|українськ|украинск/i;
+    var RX_PL = /(^|[^a-z0-9])(pl|pol|polish)([^a-z0-9]|$)|lektor|polsk|dubbing[ ._-]?pl|pl[ ._-]?dub/i;
+    var RX_SUBS = /(sub|субт|napisy)/i;
+
+    function langOf(it) {
+        var t = String(it.title || it.Title || ''), v = it.voices, l = it.languages;
+        var vs = v && v.join ? v.join(' | ') : String(v || ''), ls = l && l.join ? l.join(' ') : String(l || '');
+        var hay = t + ' | ' + vs;
+        return {
+            ua: RX_UA.test(hay) || /(^|[^a-z])(uk|ukr|ua)([^a-z]|$)/i.test(ls),
+            pl: (RX_PL.test(hay) && !RX_SUBS.test((hay.match(RX_PL) || [''])[0])) || /(^|[^a-z])(pl|pol)([^a-z]|$)/i.test(ls)
+        };
+    }
+
+    function parserHosts() {
+        var out = [], url = '', key = '';
+        try { url = trim(Lampa.Storage.get('jackett_url', '')).replace(/\/+$/, ''); key = trim(Lampa.Storage.get('jackett_key', '')); } catch (e) { }
+        if (url) {
+            if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+            out.push({ base: url, v: 2, key: key });
+            out.push({ base: url, v: 1, key: key });
+        }
+        out.push({ base: 'https://jac.red', v: 1, key: '' });
+        return out;
+    }
+    function parserUrl(h, q, yr) {
+        if (h.v === 2) return h.base + '/api/v2.0/indexers/all/results?apikey=' + encodeURIComponent(h.key || '') + '&Query=' + encodeURIComponent(q) + (yr ? '&year=' + yr : '');
+        return h.base + '/api/v1.0/torrents?search=' + encodeURIComponent(q) + (yr ? '&year=' + yr : '') + '&exact=true';
+    }
+
+    var queue = [], running = 0, MAXRUN = 2;
+    function lookupLangs(d, cb) {
+        var title = d.original_title || d.original_name || d.title || d.name || '';
+        var yr = parseInt(String(d.release_date || d.first_air_date || '').slice(0, 4), 10) || 0;
+        var ck = (d.name ? 'tv' : 'movie') + ':' + (d.id || title) ;
+        var c = cacheGet('sui_lang', ck, 3 * 864e5);
+        if (c) return cb(c);
+        queue.push({ d: d, title: title, yr: yr, ck: ck, cb: cb });
+        pump();
+    }
+    function pump() {
+        while (running < MAXRUN && queue.length) (function (job) {
+            running++;
+            var hosts = parserHosts(), i = 0;
+            function next() {
+                if (i >= hosts.length) { running--; job.cb({ ua: false, pl: false }); return pump(); }
+                var h = hosts[i++];
+                getJSON(parserUrl(h, job.title, job.yr), function (j) {
+                    var arr = Array.isArray(j) ? j : ((j && (j.Results || j.results)) || []);
+                    var r = { ua: false, pl: false };
+                    for (var k = 0; k < arr.length; k++) { var l = langOf(arr[k] || {}); if (l.ua) r.ua = true; if (l.pl) r.pl = true; }
+                    cacheSet('sui_lang', job.ck, r, arr.length ? 3 * 864e5 : 12 * 36e5);
+                    running--; job.cb(r); pump();
+                }, next);
+            }
+            next();
+        })(queue.shift());
+    }
+
+    function badgeHtml(r) {
+        if (S('badges', true) === false) return '';
+        var style = S('badge_style', 'flag') === 'text' ? 'text' : 'flag', out = '';
+        if (r.ua && S('badge_ua', true) !== false) out += '<span class="sui-badge sui-badge--ua sui-badge--' + style + '">UA</span>';
+        if (r.pl && S('badge_pl', true) !== false) out += '<span class="sui-badge sui-badge--pl sui-badge--' + style + '">PL</span>';
+        return out ? '<div class="sui-badges">' + out + '</div>' : '';
+    }
+
+    function decorateCard(el) {
+        if (!el || el.__sui_done) return;
+        var d = el.card_data;
+        if (!d || !d.id) return;
+        el.__sui_done = true;
+        lookupLangs(d, function (r) {
+            var view = el.querySelector('.card__view');
+            if (!view) return;
+            var old = view.querySelector('.sui-badges');
+            if (old) old.parentNode.removeChild(old);
+            var h = badgeHtml(r);
+            if (h) view.insertAdjacentHTML('beforeend', h);
+            var nb = view.querySelector('.sui-badges');
+            if (nb && view.querySelector('.sui-rate--tl')) nb.classList.add('sui-badges--tr');
+        });
+    }
+
+    function voteColor(v) { return v >= 7.5 ? '#3fd16b' : v >= 6 ? '#f5c518' : v >= 4 ? '#ff9b3d' : '#ff5a5a'; }
+
+    function infoCard(el) {
+        var d = el && el.card_data, view = el && el.querySelector('.card__view');
+        if (!d || !view) return;
+        var old = view.querySelectorAll('.sui-bot,.sui-rate');
+        for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
+        if (S('bot_panel', false) !== true) return;
+        var st = S('bot_style', 'standard'), pos = S('bot_rate_pos', 'br'), parts = [];
+        if (S('bot_year', true) !== false) {
+            var y = String(d.release_date || d.first_air_date || '').slice(0, 4);
+            if (/^\d{4}$/.test(y)) parts.push('<span class="sui-bot__b">' + y + '</span>');
+        }
+        if (S('bot_season', true) !== false) {
+            var le = d.last_episode_to_air, se = '';
+            if (le && le.season_number) se = 'S' + le.season_number + (le.episode_number ? ' · E' + le.episode_number : '');
+            else if (d.number_of_seasons) se = 'S' + d.number_of_seasons;
+            if (se) parts.push('<span class="sui-bot__b" style="color:#9fd3ff">' + se + '</span>');
+        }
+        var vote = parseFloat(d.vote_average), rateHtml = '';
+        if (S('bot_rating', true) !== false && vote > 0) {
+            var vt = (Math.round(vote * 10) / 10).toFixed(1);
+            if (pos === 'bl' || pos === 'br') {
+                var b = '<span class="sui-bot__b" style="color:' + voteColor(vote) + '">★ ' + vt + '</span>';
+                if (pos === 'bl') parts.unshift(b); else { parts.push('<span class="sui-bot__sp"></span>'); parts.push(b); }
+            } else rateHtml = '<span class="sui-rate sui-rate--' + pos + ' sui-rate--' + st + '" style="color:' + voteColor(vote) + '">★ ' + vt + '</span>';
+        }
+        if (parts.length) view.insertAdjacentHTML('beforeend', '<div class="sui-bot sui-bot--' + st + '">' + parts.join('') + '</div>');
+        if (rateHtml) view.insertAdjacentHTML('beforeend', rateHtml);
+        var ua = view.querySelector('.sui-badges');
+        if (ua) ua.classList.toggle('sui-badges--tr', !!rateHtml && pos === 'tl');
+    }
+    function refreshInfo() {
+        var list = document.querySelectorAll('.card');
+        for (var i = 0; i < list.length; i++) infoCard(list[i]);
+    }
+
+    var io = null;
+    var watching = false;
+    function watchCards() {
+        if (watching) return;
+        watching = true;
+        if (window.IntersectionObserver && !io) {
+            io = new IntersectionObserver(function (ents) {
+                ents.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); decorateCard(en.target); } });
+            }, { rootMargin: '300px' });
+        }
+        function scan(root) {
+            var list = (root.querySelectorAll ? root.querySelectorAll('.card') : []);
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].__sui_seen) continue;
+                list[i].__sui_seen = true;
+                infoCard(list[i]);
+                if (io) io.observe(list[i]); else if (S('badges', true) !== false) decorateCard(list[i]);
+            }
+        }
+        scan(document);
+        new MutationObserver(function (ms) {
+            for (var i = 0; i < ms.length; i++) for (var j = 0; j < ms[i].addedNodes.length; j++) {
+                var n = ms[i].addedNodes[j];
+                if (n.nodeType !== 1) continue;
+                if (n.classList && n.classList.contains('card')) { if (!n.__sui_seen) { n.__sui_seen = true; infoCard(n); if (io) io.observe(n); else if (S('badges', true) !== false) decorateCard(n); } }
+                else scan(n);
+            }
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+    function refreshBadges() {
+        var list = document.querySelectorAll('.card');
+        for (var i = 0; i < list.length; i++) { list[i].__sui_done = false; var b = list[i].querySelector('.sui-badges'); if (b) b.parentNode.removeChild(b); decorateCard(list[i]); }
+    }
+
+    /* ---- сторінка фільму ---- */
+    function hideRows(root) {
+        var seasons = S('hide_seasons', false) === true, comments = S('hide_comments', false) === true;
+        if (!seasons && !comments) return;
+        var tComments = '', tSeason = '', tSeries = '';
+        try { tComments = Lampa.Lang.translate('title_comments'); tSeason = Lampa.Lang.translate('torrent_serial_season'); tSeries = Lampa.Lang.translate('full_series_release'); } catch (e) { }
+        root.find('.items-line').each(function () {
+            var t = trim($(this).find('.items-line__title').first().text());
+            if (!t) return;
+            var isC = t === tComments || /^(коментар|комментар|comments)/i.test(t);
+            var isS = (tSeason && t.indexOf(tSeason) === 0) || t === tSeries || /^(сезон|season|сезони|seasons)/i.test(t);
+            if ((comments && isC) || (seasons && isS)) $(this).addClass('sui-hidden');
+        });
+    }
+
+    function applyLogo(root, m) {
+        if (S('logo', false) !== true) return;
+        var title = root.find('.full-start-new__title, .full-start__title').first();
+        if (!title.length || title.find('.sui-logo').length) return;
+        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
+        var put = function (path) {
+            if (!path) return;
+            var img = new Image();
+            img.className = 'sui-logo';
+            img.alt = title.text();
+            img.onload = function () { title.data('sui-text', title.html()); title.empty().append(img); };
+            img.src = tmdbImg(path);
+        };
+        var c = cacheGet('sui_logo', ck, 7 * 864e5);
+        if (c !== null) return put(c);
+        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/images?include_image_language=uk,en,null'), function (j) {
+            var logos = (j && j.logos) || [], pick = null;
+            ['uk', 'en', null].some(function (lng) {
+                for (var i = 0; i < logos.length; i++) if ((logos[i].iso_639_1 || null) === lng) { pick = logos[i].file_path; return true; }
+                return false;
+            });
+            if (!pick && logos.length) pick = logos[0].file_path;
+            cacheSet('sui_logo', ck, pick || '', 7 * 864e5);
+            put(pick);
+        }, function () { });
+    }
+
+    /* ---- редактор кнопок ---- */
+    function btnId($b) {
+        var cls = ($b.attr('class') || '').split(/\s+/), i;
+        for (i = 0; i < cls.length; i++) if (/^(button|view)--/.test(cls[i])) return cls[i];
+        return 'txt:' + trim($b.text()).slice(0, 30);
+    }
+    function knownButtons() { var k = S('btn_known', '{}'); if (typeof k === 'string') { try { k = JSON.parse(k); } catch (e) { k = {}; } } return k || {}; }
+    function hiddenButtons() { var h = S('btn_hidden', '[]'); if (typeof h === 'string') { try { h = JSON.parse(h); } catch (e) { h = []; } } return h || []; }
+
+    function applyButtons(root) {
+        var known = knownButtons(), hidden = hiddenButtons(), changed = false;
+        root.find('.full-start-new__buttons .full-start__button, .full-start__buttons .full-start__button').each(function () {
+            var $b = $(this), id = btnId($b), name = trim($b.find('span').first().text()) || trim($b.text()) || ($b.hasClass('button--options') ? 'Додатково (⋯)' : id);
+            if (!known[id] || known[id] !== name) { known[id] = name; changed = true; }
+            $b.toggleClass('sui-hidden', hidden.indexOf(id) >= 0);
+        });
+        if (changed) setS('btn_known', known);
+    }
+
+    function openButtonEditor() {
+        var known = knownButtons(), hidden = hiddenButtons(), ids = Object.keys(known);
+        if (!ids.length) { Lampa.Noty.show('Спершу відкрийте будь-який фільм — кнопки з’являться тут'); return; }
+        var items = ids.map(function (id) { return { title: known[id], id: id, checkbox: true, checked: hidden.indexOf(id) < 0 }; });
+        Lampa.Select.show({
+            title: 'Кнопки на сторінці фільму',
+            items: items,
+            onCheck: function (a) {
+                var h = hiddenButtons(), i = h.indexOf(a.id);
+                if (a.checked) { if (i >= 0) h.splice(i, 1); } else if (i < 0) h.push(a.id);
+                setS('btn_hidden', h);
+            },
+            onBack: function () { Lampa.Controller.toggle('settings_component'); }
+        });
+    }
+
+    function onFullLook(e) {
+        var m = e.data && e.data.movie;
+        if (!m) return;
+        var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.activity--active');
+        applyLogo(root, m);
+        applyButtons(root);
+        hideRows(root);
+        setTimeout(function () { hideRows(root); applyButtons(root); }, 800);
+        setTimeout(function () { hideRows(root); }, 2500);
+    }
+
+    /* ======================================================================
+     * МЕНЮ
+     * ==================================================================== */
+    function open(id) { Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(id === RT_SEL ? RT : SUI); } }); }
+    window.SUI_open = open;
+
+    function sel(comp, key, title, desc, values, def) {
+        Lampa.SettingsApi.addParam({ component: comp, param: { name: P + key, type: 'select', values: values, default: def }, field: { name: title, description: desc } });
+    }
+    function trg(comp, key, title, desc, def) {
+        Lampa.SettingsApi.addParam({ component: comp, param: { name: P + key, type: 'trigger', default: def }, field: { name: title, description: desc } });
+    }
+    function inp(comp, key, title, desc) {
+        Lampa.SettingsApi.addParam({ component: comp, param: { name: P + key, type: 'input', values: '', default: '', placeholder: '' }, field: { name: title, description: desc } });
+    }
+    function ttl(comp, name, text) { Lampa.SettingsApi.addParam({ component: comp, param: { name: P + name, type: 'title' }, field: { name: text } }); }
+    function btn(comp, name, title, desc, fn) { Lampa.SettingsApi.addParam({ component: comp, param: { name: P + name, type: 'button' }, field: { name: title, description: desc }, onChange: fn }); }
+
+    function sizes(list) { var o = {}; list.forEach(function (v) { o[v] = v; }); return o; }
+
+    function addMenus() {
+        [RT, RT_SEL, LOOK].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
+
+        // ---- 13a / 14a: у кінці «Інформаційної панелі» ----
+        var INFO = 'stylish_ui_info';
+        ttl(INFO, 'bot_head', 'Нижня інформаційна панель');
+        trg(INFO, 'bot_panel', 'Увімкнути', 'Плашка внизу постера з роком, сезоном і рейтингом', false);
+        sel(INFO, 'bot_style', 'Стиль', 'Вигляд бейджів на постері', { standard: 'Стандартний', glass: 'Скло (Apple)', neon: 'Неон' }, 'standard');
+        sel(INFO, 'card_design', 'Тип дизайну карток', '', { classic: 'Класичний', square: 'Без заокруглень', shadow: 'З тінню', minimal: 'Мінімалістичний (без підпису)' }, 'classic');
+        sel(INFO, 'bot_size', 'Розмір бейджів', '', sizes(['0.6em', '0.7em', '0.8em', '0.9em', '1em', '1.1em', '1.2em']), '0.8em');
+        sel(INFO, 'bot_rate_pos', 'Позиція рейтингу', '', { br: 'Справа знизу', bl: 'Зліва знизу', tr: 'Справа зверху', tl: 'Зліва зверху' }, 'br');
+        ttl(INFO, 'bot_badges_head', 'Наявність бейджів');
+        trg(INFO, 'bot_year', 'Бейдж року', 'Рік виходу на постері', true);
+        trg(INFO, 'bot_season', 'Бейдж сезону/серії', 'Для серіалів: S3 · E8 (якщо Lampa знає сезон)', true);
+        trg(INFO, 'bot_rating', 'Бейдж рейтингу (TMDB)', 'Оцінка TMDB кольором', true);
+        trg(INFO, 'native_vote', 'Рейтинги на картці', 'Стандартна оцінка Lampa на постері', true);
+
+        // ---- 2. Рейтинги ----
+        ttl(RT, 'rt_head', 'Рейтинги');
+        trg(RT, 'rt_enable', 'Показувати рейтинги', 'Рейтинги IMDb, Rotten Tomatoes, Metacritic та інших у повній картці', true);
+        inp(RT, 'rt_omdb_key', 'OMDB API ключ', 'Безкоштовний ключ: omdbapi.com/apikey.aspx — IMDb, Rotten Tomatoes, Metacritic, нагороди');
+        inp(RT, 'rt_mdb_key', 'MDBList API ключ', 'Безкоштовний ключ: mdblist.com → Preferences → API — усі джерела одразу');
+        sel(RT, 'rt_style', 'Стиль блоку', 'Зовнішній вигляд рейтингів', { normal: 'Звичайний', apple: 'Apple (скло з розмиттям)', apple_lite: 'Apple Lite (без розмиття)' }, 'normal');
+        sel(RT, 'rt_size', 'Розмір рейтингів', '', sizes(['0.8em', '0.9em', '1em', '1.1em', '1.2em', '1.3em', '1.5em']), '1.1em');
+        sel(RT, 'rt_gap', 'Відстань між рейтингами', '', sizes(['0.2em', '0.3em', '0.5em', '0.7em', '1em']), '0.5em');
+        sel(RT, 'rt_ml', 'Відступ зліва', '', sizes(['0em', '0.5em', '1em', '1.5em', '2em']), '0em');
+        sel(RT, 'rt_mt', 'Відступ до інших рядків', '', sizes(['0px', '5px', '10px', '15px', '20px']), '10px');
+        sel(RT, 'rt_sat', 'Насиченість', '', { '100%': '100% (стандарт)', '75%': '75%', '50%': '50%', '25%': '25%', '0%': '0% (Ч/Б)' }, '100%');
+        btn(RT, 'rt_sel_open', 'Вибір рейтингів', 'Увімкнути або вимкнути джерела', function () { open(RT_SEL); });
+        btn(RT, 'rt_clear', 'Очистити кеш рейтингів', 'Якщо рейтинги застаріли', function () { Lampa.Storage.set('sui_rt_cache', {}); Lampa.Noty.show('Кеш рейтингів очищено'); });
+
+        ttl(RT_SEL, 'rt_sel_head', 'Вибір рейтингів');
+        RATINGS.forEach(function (r) { trg(RT_SEL, 'rt_show_' + r.key, r.name, '', true); });
+
+        // ---- 3. Зовнішній вигляд ----
+        ttl(LOOK, 'look_cards', 'Картки');
+        sel(LOOK, 'card_size', 'Розмір карток', 'Розмір постерів у рядах', { '0.8': 'Дрібні (80%)', '0.9': 'Менші (90%)', '1': 'Стандартні', '1.1': 'Більші (110%)', '1.2': 'Великі (120%)' }, '1');
+
+        ttl(LOOK, 'look_badges', 'Мітки на картках');
+        trg(LOOK, 'badges', 'Показувати мітки', 'Мітки звукових доріжок на постерах (дані з парсера торентів)', true);
+        trg(LOOK, 'badge_ua', 'Мітка UA', 'Українська звукова доріжка', true);
+        trg(LOOK, 'badge_pl', 'Мітка PL', 'Польська звукова доріжка', true);
+        sel(LOOK, 'badge_style', 'Вигляд міток', '', { flag: 'Прапорець', text: 'Текст UA / PL' }, 'flag');
+
+        ttl(LOOK, 'look_full', 'Сторінка фільму');
+        trg(LOOK, 'hide_seasons', 'Сховати розділ «Сезони»', 'Ряд серій/сезонів у повній картці', false);
+        trg(LOOK, 'hide_comments', 'Сховати коментарі', 'Ряд коментарів у повній картці', false);
+        trg(LOOK, 'logo', 'Логотип замість назви', 'Показувати логотип фільму з TMDB (українською, якщо є)', false);
+        btn(LOOK, 'btn_editor', 'Редактор кнопок', 'Які кнопки показувати на сторінці фільму', openButtonEditor);
+    }
+
+    function start() {
+        addMenus();
+        lookCss();
+        rtCss();
+        watchCards();
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type !== 'complite') return;
+            try { onFullRatings(e); } catch (er) { }
+            try { onFullLook(e); } catch (er) { }
+        });
+        Lampa.Storage.listener.follow('change', function (e) {
+            var n = String(e.name || '');
+            if (n.indexOf(P + 'rt_') === 0) rtCss();
+            if (n === P + 'card_size' || n === P + 'card_design' || n === P + 'bot_size' || n === P + 'bot_style' || n === P + 'native_vote') lookCss();
+            if (/^sui_(bot_|native_vote)/.test(n)) refreshInfo();
+            if (n === P + 'badges' || n === P + 'badge_ua' || n === P + 'badge_pl' || n === P + 'badge_style') { if (n === P + 'badges' && S('badges', true) !== false) watchCards(); refreshBadges(); }
+        });
+    }
+
+    if (window.appready) start();
+    else Lampa.Listener.follow('app', function (e) { if (e.type === 'ready') start(); });
 })();
