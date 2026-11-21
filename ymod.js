@@ -1,0 +1,1482 @@
+(function () {
+    'use strict';
+
+    if (window.ymod_loaded) return;
+    window.ymod_loaded = true;
+
+    var YMOD = 'ymod_';
+
+    function isEnabled(mod) {
+        return Lampa.Storage.get(YMOD + 'enable_' + mod, true);
+    }
+
+    var yIcon = '<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><text x="50%" y="54%" dominant-baseline="middle" text-anchor="middle" font-weight="900" font-size="20" fill="currentColor">Y</text></svg>';
+
+    var mdblistSvg = "data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' width='24' height='24' fill='%23ffffff' style='opacity:1;'%3E%3Cpath d='M1.928.029A2.47 2.47 0 0 0 .093 1.673c-.085.248-.09.629-.09 10.33s.005 10.08.09 10.33a2.51 2.51 0 0 0 1.512 1.558l.276.108h20.237l.277-.108a2.51 2.51 0 0 0 1.512-1.559c.085-.25.09-.63.09-10.33s-.005-10.08-.09-10.33A2.51 2.51 0 0 0 22.395.115l-.277-.109L12.117 0C6.615-.004 2.032.011 1.929.029m7.48 8.067l2.123 2.004v1.54c0 .897-.02 1.536-.043 1.527s-.92-.845-1.995-1.86c-1.071-1.01-1.962-1.84-1.977-1.84s-.024 1.91-.024 4.248v4.25H4.911V6.085h1.188l1.183.006zm9.729 3.93v5.94h-2.63l-.01-4.25l-.013-4.25l-1.907 1.795a367 367 0 0 1-1.98 1.864c-.076.056-.08-.047-.08-1.489v-1.555l2.127-1.995l2.122-1.995l1.187-.005h1.184z'/%3E%3C/svg%3E";
+
+    var rateIcons = {
+        imdb: 'https://upload.wikimedia.org/wikipedia/commons/5/53/IMDB_-_SuperTinyIcons.svg',
+        rt: 'https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg',
+        mc: 'https://yarikrazor-star.github.io/lmp/mc.svg',
+        tmdb: 'https://upload.wikimedia.org/wikipedia/commons/8/89/Tmdb.new.logo.svg',
+        cub: 'https://raw.githubusercontent.com/yumata/lampa/9381985ad4371d2a7d5eb5ca8e3daf0f32669eb7/img/logo-icon.svg',
+        oscar: 'https://upload.wikimedia.org/wikipedia/commons/f/f8/Oscar_gold_silhouette.svg',
+        award: 'https://upload.wikimedia.org/wikipedia/commons/e/e8/Barnstar_film_3.svg',
+        trakt: 'https://upload.wikimedia.org/wikipedia/commons/3/3d/Trakt.tv-favicon.svg',
+        mdblist: mdblistSvg,
+        popcorn: 'https://yarikrazor-star.github.io/lmp/rt.svg',
+        letterboxd: 'https://upload.wikimedia.org/wikipedia/commons/9/9b/Letterboxd_2023_logo.png',
+        kinobaza: 'https://kinobaza.com.ua/favicon.svg'
+    };
+
+    var uatorIcons = {
+        ua: 'https://yarikrazor-star.github.io/lmp/ua.svg',
+        none: 'https://yarikrazor-star.github.io/lmp/dontknow.svg',
+        top: 'https://yarikrazor-star.github.io/lmp/stream.svg',
+        seeds: 'https://yarikrazor-star.github.io/lmp/upload.svg',
+        audio: 'https://yarikrazor-star.github.io/lmp/zvuk.svg',
+        dv: 'https://upload.wikimedia.org/wikipedia/commons/0/03/Dolby_Vision_2021_logo.svg',
+        hdr: 'https://yarikrazor-star.github.io/lmp/hdr.svg'
+    };
+
+    var renderOrder = {
+        'oscar': 1, 'award': 2, 'tmdb': 3, 'imdb': 4, 'kinobaza': 5, 'rt': 6,
+        'mc': 7, 'trakt': 8, 'cub': 9, 'popcorn': 10, 'mdblist': 11, 'letterboxd': 12
+    };
+
+    var availableRatings = [
+        { key: 'tmdb', name: 'TMDB', default: true },
+        { key: 'imdb', name: 'IMDb', default: true },
+        { key: 'kinobaza', name: 'РљС–РЅРѕР±Р°Р·Р°', default: true },
+        { key: 'rt', name: 'Rotten Tomatoes', default: true },
+        { key: 'mc', name: 'Metacritic', default: true },
+        { key: 'trakt', name: 'Trakt TV', default: true },
+        { key: 'cub', name: 'Lampa (CUB)', default: true },
+        { key: 'popcorn', name: 'RT Audience (Popcorn)', default: true },
+        { key: 'mdblist', name: 'MDBList Score', default: true },
+        { key: 'letterboxd', name: 'Letterboxd', default: true },
+        { key: 'awards', name: 'РќР°РіРѕСЂРѕРґРё (Awards)', default: true }
+    ];
+
+    var countryNames = {
+        'us': 'РЎРЁРђ', 'usa': 'РЎРЁРђ', 'gb': 'Р’РµР»РёРєР° Р‘СЂРёС‚Р°РЅС–СЏ', 'uk': 'Р’РµР»РёРєР° Р‘СЂРёС‚Р°РЅС–СЏ',
+        'ua': 'РЈРєСЂР°С—РЅР°', 'ca': 'РљР°РЅР°РґР°', 'hk': 'Р“РѕРЅРєРѕРЅРі', 'fr': 'Р¤СЂР°РЅС†С–СЏ',
+        'de': 'РќС–РјРµС‡С‡РёРЅР°', 'it': 'Р†С‚Р°Р»С–СЏ', 'es': 'Р†СЃРїР°РЅС–СЏ', 'jp': 'РЇРїРѕРЅС–СЏ',
+        'kr': 'РџС–РІРґРµРЅРЅР° РљРѕСЂРµСЏ', 'cn': 'РљРёС‚Р°Р№', 'pl': 'РџРѕР»СЊС‰Р°', 'au': 'РђРІСЃС‚СЂР°Р»С–СЏ',
+        'ie': 'Р†СЂР»Р°РЅРґС–СЏ', 'be': 'Р‘РµР»СЊРіС–СЏ', 'dk': 'Р”Р°РЅС–СЏ', 'no': 'РќРѕСЂРІРµРіС–СЏ',
+        'se': 'РЁРІРµС†С–СЏ', 'fi': 'Р¤С–РЅР»СЏРЅРґС–СЏ', 'tr': 'РўСѓСЂРµС‡С‡РёРЅР°', 'in': 'Р†РЅРґС–СЏ',
+        'br': 'Р‘СЂР°Р·РёР»С–СЏ', 'mx': 'РњРµРєСЃРёРєР°', 'nl': 'РќС–РґРµСЂР»Р°РЅРґРё', 'at': 'РђРІСЃС‚СЂС–СЏ',
+        'ch': 'РЁРІРµР№С†Р°СЂС–СЏ', 'cz': 'Р§РµС…С–СЏ', 'hu': 'РЈРіРѕСЂС‰РёРЅР°', 'nz': 'РќРѕРІР° Р—РµР»Р°РЅРґС–СЏ',
+        'za': 'РџРђР ', 'il': 'Р†Р·СЂР°С—Р»СЊ', 'th': 'РўР°С—Р»Р°РЅРґ', 'tw': 'РўР°Р№РІР°РЅСЊ', 
+        'ru': 'РљСЂР°С—РЅР°-Р°РіСЂРµСЃРѕСЂ', 'pt': 'РџРѕСЂС‚СѓРіР°Р»С–СЏ', 'gr': 'Р“СЂРµС†С–СЏ',
+        'is': 'Р†СЃР»Р°РЅРґС–СЏ', 'ro': 'Р СѓРјСѓРЅС–СЏ', 'bg': 'Р‘РѕР»РіР°СЂС–СЏ',
+        'ar': 'РђСЂРіРµРЅС‚РёРЅР°', 'cl': 'Р§РёР»С–', 'co': 'РљРѕР»СѓРјР±С–СЏ', 'pe': 'РџРµСЂСѓ',
+        'id': 'Р†РЅРґРѕРЅРµР·С–СЏ', 'my': 'РњР°Р»Р°Р№Р·С–СЏ', 'ph': 'Р¤С–Р»С–РїРїС–РЅРё', 'sg': 'РЎС–РЅРіР°РїСѓСЂ',
+        'vn': 'Р’\'С”С‚РЅР°Рј', 'ae': 'РћРђР•', 'sa': 'РЎР°СѓРґС–РІСЃСЊРєР° РђСЂР°РІС–СЏ', 'eg': 'Р„РіРёРїРµС‚'
+    };
+
+    var extSizes = { '0.5em':'0.5em', '0.6em':'0.6em', '0.7em':'0.7em', '0.8em':'0.8em', '0.9em':'0.9em', '1.0em':'1.0em', '1.1em':'1.1em', '1.2em':'1.2em', '1.3em':'1.3em', '1.4em':'1.4em', '1.5em':'1.5em', '1.7em':'1.7em', '2.0em':'2.0em', '2.5em':'2.5em', '3.0em':'3.0em', '3.5em':'3.5em', '4.0em':'4.0em', '5.0em':'5.0em', '6.0em':'6.0em' };
+    var extGaps = { '-2em': '-2em', '-1.5em': '-1.5em', '-1em': '-1em', '-0.8em': '-0.8em', '-0.5em': '-0.5em', '-0.2em': '-0.2em', '0px':'0', '0.2em':'0.2em', '0.5em':'0.5em', '0.8em':'0.8em', '1.0em':'1.0em', '1.2em':'1.2em', '1.5em':'1.5em', '2.0em':'2.0em', '2.5em':'2.5em', '3.0em':'3.0em' };
+    var extMargins = { 'auto':'РђРІС‚Рѕ', '-3em': '-3em', '-2.5em': '-2.5em', '-2em': '-2em', '-1.5em': '-1.5em', '-1em': '-1em', '-0.8em': '-0.8em', '-0.5em': '-0.5em', '-0.2em': '-0.2em', '0px':'0px', '5px':'5px', '10px':'10px', '15px':'15px', '20px':'20px', '0.5em':'0.5em', '1em':'1em', '1.5em':'1.5em', '2em':'2em', '3em':'3em' };
+    var extMarginsLeft = { '0px':'0px', '5px':'5px', '10px':'10px', '15px':'15px', '20px':'20px', '30px':'30px', '40px':'40px', '50px':'50px', '0.5em':'0.5em', '1em':'1em', '1.5em':'1.5em', '2em':'2em', '2.5em':'2.5em', '3em':'3em', '4em':'4em', '5em':'5em', '6em':'6em', '8em':'8em', '10em':'10em', '15em':'15em', '20em':'20em', '5vw':'5vw', '10vw':'10vw', '15vw':'15vw', '20vw':'20vw', '25vw':'25vw', '30vw':'30vw', '40vw':'40vw', '50vw':'50vw' };
+    var imgWidths = { 'auto':'РђРІС‚Рѕ', '10vw':'10vw', '15vw':'15vw', '20vw':'20vw', '25vw':'25vw', '30vw':'30vw', '35vw':'35vw', '40vw':'40vw', '50vw':'50vw', '60vw':'60vw', '70vw':'70vw', '80vw':'80vw', '90vw':'90vw', '100vw':'100vw' };
+    var imgHeights = { 'auto':'РђРІС‚Рѕ', '5vh':'5vh', '10vh':'10vh', '15vh':'15vh', '20vh':'20vh', '25vh':'25vh', '30vh':'30vh', '40vh':'40vh', '50vh':'50vh', '60vh':'60vh' };
+
+    var titleCache = Lampa.Storage.get("title_cache_hybrid_v3") || {};
+    var studiosCache = {};
+    var uatorCache = {};
+
+    var styles = `
+        .ymod-slogan-hidden .full-start__tagline, 
+        .ymod-slogan-hidden [class*="tagline"],
+        .ymod-slogan-hidden .full-start__description + div:not([class]) {
+            display: none !important; height: 0px !important; min-height: 0px !important; margin: 0px !important; padding: 0px !important;
+            font-size: 0px !important; line-height: 0 !important; visibility: hidden !important; opacity: 0 !important;
+            pointer-events: none !important; position: absolute !important; z-index: -1;
+        }
+        .ymod-slogan-hidden .full-start__title { margin-bottom: 5px !important; }
+        .ymod-slogan-hidden .full-start__details { margin-top: 0px !important; margin-bottom: 10px !important; }
+        
+        .ymod-ratings-enabled .rate--tmdb, .ymod-ratings-enabled .rate--imdb, .ymod-ratings-enabled .rate--kp, .ymod-ratings-enabled .full-start__rates { display: none !important; }
+        
+        .ymod-ratings-enabled .full-start-new__rate-line.rate-fix,
+        .full-start-new__rate-line.rate-fix:empty {
+            display: none !important; height: 0px !important; min-height: 0px !important; margin: 0px !important; padding: 0px !important; 
+            opacity: 0 !important; visibility: hidden !important; pointer-events: none !important; position: absolute !important;
+        }
+
+        .ymod-hybrid-enabled .full-start-new__head, 
+        .ymod-hybrid-enabled .full-start__head { 
+            display: none !important; height: 0px !important; margin: 0 !important; padding: 0 !important; visibility: hidden !important; position: absolute !important; 
+        }
+
+        .plugin-hybrid-title { margin-top: 5px; margin-bottom: 5px; width: 100%; position: relative; z-index: 10; text-align: left; }
+        .plugin-hybrid-title__body { line-height: 1.2; font-weight: bold; display: flex; align-items: baseline; flex-wrap: wrap; justify-content: flex-start; }
+        
+        .omdb-mdb-yarik-rate { display: flex; flex-wrap: wrap; align-items: center; width: 100%; min-height: 25px; margin: 0; }
+        .omdb-mdb-yarik-rate.is-bw-text .custom-rating div { color: #cccccc !important; }
+        .full-start__rate.custom-rating { display: inline-flex !important; align-items: center !important; margin: 0 !important; flex-shrink: 0 !important; white-space: nowrap !important; }
+        .custom-rating .rating-icon-wrap { width: 1.1em; height: 1.1em; display: flex; align-items: center; justify-content: center; }
+        .custom-rating img { width: 100%; height: 100%; object-fit: contain; display: block; }
+        .custom-rating div { font-weight: bold; line-height: 1; font-size: 1em !important; }
+        .omdb-api-val { margin-left: auto; font-size: 0.9em; opacity: 0.7; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 10px; }
+        
+        .rate--studio.studio-logo { align-items: center; vertical-align: middle; border-radius: 8px; transition: all 0.2s ease; height: auto; cursor: pointer; }
+        .rate--studio.studio-logo.focus { background: rgba(255,255,255,0.2) !important; border: 1px solid #fff; transform: scale(1.05); }
+        .rate--studio.studio-logo img { max-width: 200px; width: auto; object-fit: contain; transition: filter 0.3s ease; }
+        .studio-logo-text { font-size: 0.8em; font-weight: bold; color: #fff !important; white-space: nowrap; }
+        
+        .quality-badges-container { display: flex; align-items: center; }
+        .qb-unified-block { display: flex; flex-wrap: nowrap; align-items: center; }
+        .quality-badge { display: inline-flex; align-items: center; gap: 0.35em; color: #fff; white-space: nowrap; flex-shrink: 0; height: 1.1em; }
+        .qb-text { font-weight: bold; line-height: 1.1em; height: 1.1em; display: flex; align-items: center; }
+        .qb-prefix-icon { height: 1.1em !important; width: auto; display: block; object-fit: contain; margin: 0; }
+        .qb-text-icon { height: 1.1em !important; line-height: 1.1em !important; font-size: 0.85em !important; font-weight: 900; display: inline-flex; align-items: center; justify-content: center; background: #fff; color: #000; padding: 0 0.25em; border-radius: 2px; box-sizing: border-box; vertical-align: top; }
+        .qb-not-found { opacity: 0.6; }
+        
+        .card .qb-unified-block { position: absolute; top: 0.5rem; left: 0.5rem; z-index: 10; flex-direction: column; align-items: flex-start; gap: 0.2rem !important; font-size: 0.7em !important; }
+        .card .quality-badge { background: rgba(0, 0, 0, 0.6); padding: 2px 4px; border-radius: 4px; height: 1em; }
+        .card .qb-prefix-icon, .card .qb-text-icon { height: 1em !important; }
+        .card .qb-text { height: 1em; line-height: 1em; }
+
+        .ymod-gap-negative > *:not(:first-child) {
+            margin-left: var(--ymod-gap-negative, 0px) !important;
+        }
+
+        .ymod-logo-loader {
+            width: 250px; height: 3em; margin: 5px 0;
+            background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.05) 75%);
+            background-size: 200% 100%; animation: ymod-loading 1.5s infinite linear; border-radius: 8px;
+            display: inline-block;
+        }
+        @keyframes ymod-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        /* Р†РґРµР°Р»СЊРЅРµ, РїРѕСЃРёР»РµРЅРµ Р·Р°РѕРєСЂСѓРіР»РµРЅРЅСЏ РґР»СЏ РїРѕСЃС‚РµСЂС–РІ. РљРѕР¶РµРЅ РєСѓС‚ РїСЂРѕРїРёСЃР°РЅРѕ РѕРєСЂРµРјРѕ РґР»СЏ РіР°СЂР°РЅС‚С–С— */
+        img.ymod-poster-rounded,
+        .full-start-new__poster img,
+        .full-start__poster img,
+        img.full-start__poster {
+            border-radius: 36px 36px 36px 36px !important;
+            border-top-left-radius: 36px !important;
+            border-top-right-radius: 36px !important;
+            border-bottom-left-radius: 36px !important;
+            border-bottom-right-radius: 36px !important;
+            -webkit-border-radius: 36px !important;
+            -webkit-border-top-left-radius: 36px !important;
+            -webkit-border-top-right-radius: 36px !important;
+            -webkit-border-bottom-left-radius: 36px !important;
+            -webkit-border-bottom-right-radius: 36px !important;
+            -moz-border-radius: 36px !important;
+            -moz-border-radius-topleft: 36px !important;
+            -moz-border-radius-topright: 36px !important;
+            -moz-border-radius-bottomleft: 36px !important;
+            -moz-border-radius-bottomright: 36px !important;
+            overflow: hidden !important;
+            box-shadow: 0px 8px 25px rgba(0,0,0,0.3) !important;
+        }
+
+        .ymod-apple-container {
+            display: inline-flex !important; align-items: center;
+            padding: 0.21em 0.32em !important; border-radius: 999px !important;
+            background: rgba(22,24,30,.28) !important; border: 1px solid rgba(255,255,255,.10) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 8px 18px rgba(0,0,0,.12) !important;
+            backdrop-filter: blur(18px) saturate(140%) !important; -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+            width: max-content;
+        }
+        .ymod-apple-container.is-lite {
+            background: rgba(30, 32, 40, 0.98) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        }
+        .ymod-apple-item {
+            border: 0 !important; background: transparent !important; color: rgba(255,255,255,.92) !important;
+            height: 2.16em !important; min-height: 2.16em !important; 
+            display: inline-flex !important; align-items: center; justify-content: center;
+            padding: 0 0.8em !important; border-radius: 999px !important;
+            transition: background .2s ease !important; cursor: pointer; outline: none; margin: 0 !important;
+        }
+        .ymod-apple-item.focus, .ymod-apple-item.hover {
+            background: rgba(255,255,255,.14) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.10) !important; transform: none !important;
+        }
+        .ymod-apple-container .custom-rating { font-size: 0.92em !important; }
+        .ymod-apple-container .rate--studio { padding: 0 0.8em !important; border-radius: 999px !important; }
+        .ymod-apple-container .quality-badge { padding: 0 0.8em !important; }
+
+        body .full-start__buttons,
+        body .full-start-new__buttons,
+        body.ymod-buttons-apple .full-start__buttons,
+        body.ymod-buttons-apple .full-start-new__buttons {
+            display: inline-flex !important; align-items: center; justify-content: flex-start;
+            margin-top: var(--ymod-btn-margin-top, 1em) !important;
+            max-width: 100%; flex-wrap: wrap !important; gap: 0.25em !important;
+            box-sizing: border-box;
+        }
+        
+        body.ymod-buttons-apple .full-start__buttons,
+        body.ymod-buttons-apple .full-start-new__buttons {
+            padding: 0.35em 0.4em !important; border-radius: 999px !important;
+            background: rgba(22,24,30,.28) !important; border: 1px solid rgba(255,255,255,.10) !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.10), 0 8px 18px rgba(0,0,0,.12) !important;
+            backdrop-filter: blur(18px) saturate(140%) !important; -webkit-backdrop-filter: blur(18px) saturate(140%) !important;
+            font-size: var(--ymod-btn-size, 1em) !important;
+        }
+        
+        body.ymod-buttons-apple-lite .full-start__buttons,
+        body.ymod-buttons-apple-lite .full-start-new__buttons {
+            background: rgba(30, 32, 40, 0.98) !important; box-shadow: 0 4px 15px rgba(0,0,0,0.6) !important;
+            backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+        }
+
+        body.ymod-buttons-apple .full-start__button,
+        body.ymod-buttons-apple .full-start-new__button {
+            border: 0 !important; background: transparent !important; color: rgba(255,255,255,.92) !important;
+            height: 2.8em !important; min-height: 2.8em !important; align-items: center; justify-content: center;
+            padding: 0 1.2em !important; border-radius: 999px !important; transition: background .2s ease !important;
+            margin: 0 !important; font-weight: bold; font-size: inherit !important; box-shadow: none !important;
+        }
+        
+        body.ymod-buttons-apple .full-start__button:not(.hidden):not(.hide):not([style*="display: none"]):not([style*="display:none"]),
+        body.ymod-buttons-apple .full-start-new__button:not(.hidden):not(.hide):not([style*="display: none"]):not([style*="display:none"]) {
+            display: inline-flex !important;
+        }
+        
+        body.ymod-buttons-apple .ua-sites-container {
+            display: inline-flex !important; align-items: center; gap: 0.25em !important; margin: 0 !important; padding: 0 !important; background: transparent !important; border: none !important; box-shadow: none !important;
+        }
+        body.ymod-buttons-apple .ua-btn-item {
+            border: 0 !important; background: transparent !important; color: rgba(255,255,255,.92) !important;
+            height: 2.8em !important; min-height: 2.8em !important; width: 2.8em !important; display: inline-flex !important; align-items: center; justify-content: center;
+            border-radius: 999px !important; transition: background .2s ease !important; margin: 0 !important; padding: 0 !important; box-shadow: none !important;
+            font-size: inherit !important; 
+        }
+        body.ymod-buttons-apple .full-start__button.focus, 
+        body.ymod-buttons-apple .full-start__button:hover,
+        body.ymod-buttons-apple .ua-btn-item.focus,
+        body.ymod-buttons-apple .ua-btn-item:hover,
+        body.ymod-buttons-apple .ua-btn-item.active.focus {
+            background: rgba(255,255,255,.14) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.10) !important; transform: none !important; color: #fff !important;
+        }
+        body.ymod-buttons-apple .ua-btn-item.active {
+            transform: none !important;
+        }
+        body.ymod-buttons-apple .full-start__button svg {
+            width: 1.2em !important; height: 1.2em !important; margin-right: 0.4em !important;
+        }
+        body.ymod-buttons-apple .full-start__button.button--options svg {
+            margin-right: 0 !important;
+        }
+        body.ymod-buttons-apple .full-start__button.button--options {
+            padding: 0 0.8em !important;
+        }
+        body.ymod-buttons-apple .ua-btn-item img,
+        body.ymod-buttons-apple .ua-btn-item svg {
+            width: 1.5em !important; height: 1.5em !important; border-radius: 0 !important; display: block; filter: none !important;
+        }
+        body.ymod-buttons-apple .ua-sites-container:not(.is-bw) .ua-btn-item.active.focus img {
+            filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.3)) !important;
+        }
+        body.ymod-buttons-apple .ua-btn-item.loading svg {
+            animation: spin-badge 1.5s linear infinite !important;
+        }
+
+        @media screen and (orientation: portrait), screen and (max-width: 767px) {
+            .plugin-hybrid-title { text-align: center !important; }
+            .plugin-hybrid-title__body { justify-content: center !important; }
+            .omdb-mdb-yarik-rate { justify-content: center; }
+            .plugin-uk-title-combined { align-items: center !important; text-align: center !important; }
+            .studio-logos-container { justify-content: center !important; }
+            .quality-badges-container { width: 100%; justify-content: center; display: block !important; margin: 10px 0; clear: both; }
+            .qb-unified-block { flex-wrap: wrap; justify-content: center; width: 100%; }
+            .ymod-apple-container { flex-wrap: wrap !important; width: 100% !important; justify-content: center !important; }
+            body.ymod-buttons-apple .full-start__buttons,
+            body.ymod-buttons-apple .full-start-new__buttons {
+                justify-content: center !important; width: 100% !important; margin-left: 0 !important; margin-right: 0 !important;
+            }
+
+            .card__age { text-align: center !important; width: 100% !important; display: block !important; }
+            .full-start__pg { text-align: center !important; display: flex !important; justify-content: center !important; align-items: center !important; margin-left: auto !important; margin-right: auto !important; }
+            .full-start-new__details, .full-start__details { justify-content: center !important; display: flex !important; flex-wrap: wrap !important; }
+            .full-start-new__details > *, .full-start__details > * { text-align: center !important; margin: 0.45em !important; }
+        }
+        
+        div[data-component="ym_logo"], div[data-component="ym_title"], div[data-component="ym_ratings"], div[data-component="ym_ratings_select"], div[data-component="ym_studios"], div[data-component="ym_uator"], div[data-component="ym_buttons"] { display: none !important; }
+    `;
+    $('head').append('<style id="ymod-global-styles">' + styles + '</style>');
+
+    function updateBodyClasses() {
+        if (isEnabled('slogan')) $('body').addClass('ymod-slogan-hidden');
+        else $('body').removeClass('ymod-slogan-hidden');
+        
+        if (isEnabled('ratings')) $('body').addClass('ymod-ratings-enabled');
+        else $('body').removeClass('ymod-ratings-enabled');
+
+        if (isEnabled('hybrid')) $('body').addClass('ymod-hybrid-enabled');
+        else $('body').removeClass('ymod-hybrid-enabled');
+
+        var btnStyle = Lampa.Storage.get('ym_button_style', 'normal');
+        var btnSize = Lampa.Storage.get('ym_button_size', '1em');
+        var btnMarginTop = Lampa.Storage.get('ym_button_margin_top', '1em');
+        
+        $('body').removeClass('ymod-buttons-apple ymod-buttons-apple-lite');
+        if (btnStyle === 'apple') $('body').addClass('ymod-buttons-apple');
+        if (btnStyle === 'apple_lite') $('body').addClass('ymod-buttons-apple ymod-buttons-apple-lite');
+        
+        document.documentElement.style.setProperty('--ymod-btn-size', btnSize);
+        document.documentElement.style.setProperty('--ymod-btn-margin-top', btnMarginTop);
+    }
+    updateBodyClasses();
+
+    function ymodCleanSlogan() {
+        var full = document.querySelector('.full-start');
+        if (full) {
+            var nodes = full.querySelectorAll('div, span, p');
+            nodes.forEach(function(node) {
+                if (node.innerText && node.innerText.length > 3 && node.innerText.length < 150) {
+                    var prev = node.previousElementSibling;
+                    if (prev && prev.classList.contains('full-start__details')) {
+                        node.style.display = 'none';
+                        node.setAttribute('data-slogan-hidden', 'true');
+                    }
+                }
+            });
+        }
+    }
+
+    var sloganObserver = new MutationObserver(function() {
+        if (isEnabled('slogan')) ymodCleanSlogan();
+    });
+    sloganObserver.observe(document.body, { childList: true, subtree: true });
+
+    function analyzeAndInvert(img, threshold) {
+        try {
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+            canvas.width = img.naturalWidth || img.width;
+            canvas.height = img.naturalHeight || img.height;
+            if (canvas.width === 0 || canvas.height === 0) return;
+            ctx.drawImage(img, 0, 0);
+            var imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            var data = imageData.data;
+            var darkPixels = 0;
+            var totalPixels = 0;
+            for (var i = 0; i < data.length; i += 4) {
+                var alpha = data[i + 3];
+                if (alpha < 10) continue;
+                totalPixels++;
+                var r = data[i], g = data[i + 1], b = data[i + 2];
+                var brightness = (r * 299 + g * 587 + b * 114) / 1000;
+                if (brightness < 120) darkPixels++;
+            }
+            if (totalPixels > 0 && (darkPixels / totalPixels) >= threshold) {
+                img.style.filter += " brightness(0) invert(1)";
+            }
+        } catch (e) {}
+    }
+
+    function handleLogo(e) {
+        var render = e.object.activity.render();
+        var data = e.data.movie;
+        var type = data.name ? "tv" : "movie";
+        
+        var isMoveEnabled = Lampa.Storage.get("logo_move", false);
+        var isLandscape = window.innerWidth > window.innerHeight;
+
+        var originalTitle = render.find(".full-start-new__title, .full-start__title").not('.ymod-moved-title').first();
+        var finalTarget = originalTitle;
+
+        // Р—Р±РµСЂС–РіР°С”РјРѕ РѕСЂРёРіС–РЅР°Р»СЊРЅРёР№ С‚РµРєСЃС‚ РґР»СЏ fallback СЂРµР¶РёРјСѓ С‚РµРєСЃС‚Сѓ
+        if (originalTitle.length) {
+            if (!originalTitle.data('ymod-orig-html')) {
+                var rawHtml = originalTitle.html();
+                // РќРµ Р·Р±РµСЂС–РіР°С”РјРѕ Р»РѕР°РґРµСЂ СЏРє РѕСЂРёРіС–РЅР°Р»СЊРЅРёР№ С‚РµРєСЃС‚, СЏРєС‰Рѕ С„СѓРЅРєС†С–СЏ РІРёРєР»РёРєР°РЅР° РїРѕРІС‚РѕСЂРЅРѕ
+                if (rawHtml && rawHtml.indexOf('ymod-logo-loader') === -1) {
+                    originalTitle.data('ymod-orig-html', rawHtml);
+                } else {
+                    originalTitle.data('ymod-orig-html', data.title || data.name || "Title");
+                }
+            }
+        }
+
+        if (isMoveEnabled && isLandscape && originalTitle.length) {
+            var body = render.find('.full-start-new__body');
+            if (body.length) {
+                var wrapper = render.find('.ymod-title-wrapper');
+                if (wrapper.length === 0) {
+                    body.css('position', 'relative');
+                    wrapper = $('<div class="ymod-title-wrapper"></div>');
+                    var mT = Lampa.Storage.get("logo_margin_top", "0px");
+                    var mL = Lampa.Storage.get("logo_margin_left", "0px");
+                    var mB = Lampa.Storage.get("logo_margin_bottom", "auto");
+                    wrapper.css({
+                        'position': 'absolute',
+                        'top': mT !== 'auto' ? mT : 'auto',
+                        'left': mL !== 'auto' ? mL : 'auto',
+                        'bottom': mB !== 'auto' && mB !== '0px' ? mB : 'auto',
+                        'z-index': '9999',
+                        'pointer-events': 'none',
+                        'box-sizing': 'border-box',
+                        'max-width': '100vw'
+                    });
+                    body.append(wrapper);
+                }
+
+                var movedTitle = render.find('.ymod-moved-title');
+                if (movedTitle.length === 0) {
+                    movedTitle = originalTitle.clone();
+                    movedTitle.removeClass('full-start-new__title full-start__title');
+                    movedTitle.addClass('ymod-moved-title');
+                    movedTitle.data('ymod-orig-html', originalTitle.data('ymod-orig-html'));
+                    movedTitle.css({
+                        'margin': '0', 'padding': '0', 'line-height': '1.2', 'text-shadow': '1px 1px 3px rgba(0,0,0,0.9)',
+                        'text-align': 'left'
+                    });
+                    wrapper.append(movedTitle);
+                }
+                originalTitle.hide().attr('style', 'display: none !important;');
+                finalTarget = movedTitle;
+            }
+        } else if (originalTitle.length) {
+            if (!isLandscape) finalTarget.css("text-align", "center");
+            else finalTarget.css("text-align", "left");
+            
+            if (!(isMoveEnabled && isLandscape)) {
+                var leftM = Lampa.Storage.get("logo_margin_left", "0px");
+                if(leftM !== '0px') finalTarget.css('margin-left', leftM);
+            }
+        }
+
+        var head_elem = render.find(".full-start-new__head");
+        var details_elem = render.find(".full-start-new__details");
+        if (head_elem.length && details_elem.length && details_elem.find(".logo-moved-head").length === 0 && (!isMoveEnabled || !isLandscape)) {
+            var content = head_elem.html();
+            if (content) {
+                head_elem.hide();
+                if (details_elem.children().length > 0) details_elem.append('<span class="full-start-new__split logo-moved-separator">в—Џ</span>');
+                details_elem.append('<span class="logo-moved-head">' + content + "</span>");
+            }
+        }
+
+        function applyTextFallback() {
+            if (!finalTarget.length) return;
+            var orig = finalTarget.data('ymod-orig-html');
+            if (orig) finalTarget.html(orig);
+            
+            var customSize = Lampa.Storage.get("logo_custom_text_size", "3.0em");
+            var customW = Lampa.Storage.get("logo_custom_width", "auto");
+            var customH = Lampa.Storage.get("logo_custom_height", "auto");
+            var defaultMaxW = (isMoveEnabled && isLandscape) ? "100%" : (!isLandscape ? "90vw" : "50vw");
+
+            finalTarget.css({
+                'font-size': customSize,
+                'white-space': 'normal',
+                'word-break': 'break-word',
+                'overflow-wrap': 'break-word',
+                'max-width': customW !== "auto" ? customW : defaultMaxW,
+                'max-height': customH !== "auto" ? customH : 'none',
+                'display': 'block',
+                'margin': '0',
+                'padding': '0',
+                'line-height': '1.2',
+                'text-shadow': '1px 1px 3px rgba(0,0,0,0.9)',
+                'text-align': (isMoveEnabled && isLandscape) ? 'left' : (!isLandscape ? 'center' : 'left'),
+                'opacity': '1'
+            });
+
+            finalTarget[0].style.setProperty("overflow", "visible", "important");
+            var pElem = finalTarget[0].parentElement;
+            if (pElem) {
+                pElem.style.setProperty("overflow", "visible", "important");
+            }
+
+            if (!(isMoveEnabled && isLandscape)) {
+                var mLeftStatic = Lampa.Storage.get("logo_margin_left", "0px");
+                if (mLeftStatic !== '0px') finalTarget.css('margin-left', mLeftStatic);
+            }
+        }
+
+        if (Lampa.Storage.get("logo_glav", "0") == "1") {
+            applyTextFallback();
+            return;
+        }
+
+        var imgType = Lampa.Storage.get("logo_type", "logo");
+        var user_lang = Lampa.Storage.get("logo_lang", "uk");
+        var target_lang = user_lang ? user_lang : Lampa.Storage.get("language");
+        var size = Lampa.Storage.get("logo_size", "original");
+        var cache_key = "img_cache_v3_" + type + "_" + data.id + "_" + target_lang + "_" + imgType;
+
+        var isPoster = imgType.indexOf("poster") !== -1;
+        var isBackdrop = imgType.indexOf("backdrop") !== -1;
+
+        function startLogoAnimation(img_url, save_to_cache) {
+            if (save_to_cache) Lampa.Storage.set(cache_key, img_url);
+            var img = new Image();
+            img.crossOrigin = "anonymous";
+            img.src = img_url;
+            
+            img.onload = function () {
+                if (finalTarget.length) {
+                    finalTarget[0].style.height = ""; 
+                    finalTarget[0].style.margin = "0"; 
+                    finalTarget[0].style.padding = "0";
+                    finalTarget[0].style.display = "block"; 
+                    finalTarget[0].style.transition = "none";
+                    finalTarget[0].style.boxSizing = "border-box"; 
+                    finalTarget[0].style.opacity = "1";
+                    
+                    finalTarget[0].style.setProperty("overflow", "visible", "important");
+                    finalTarget[0].style.setProperty("white-space", "normal", "important");
+                    var pElem = finalTarget[0].parentElement;
+                    if (pElem) {
+                        pElem.style.setProperty("overflow", "visible", "important");
+                    }
+                    
+                    if (!isLandscape) {
+                        finalTarget[0].style.textAlign = "center";
+                    } else {
+                        finalTarget[0].style.textAlign = "left";
+                    }
+                    
+                    if (!(isMoveEnabled && isLandscape)) {
+                        var mLeftStatic = Lampa.Storage.get("logo_margin_left", "0px");
+                        if(mLeftStatic !== '0px') finalTarget[0].style.marginLeft = mLeftStatic;
+                    }
+
+                    img.style.marginTop = "0"; img.style.marginBottom = "0"; img.style.paddingTop = "0em"; img.style.paddingBottom = "0em";
+                    
+                    var customW = Lampa.Storage.get("logo_custom_width", "auto");
+                    var defaultCustomH = (isPoster || isBackdrop) ? "40vh" : "15vh";
+                    var customH = Lampa.Storage.get("logo_custom_height", defaultCustomH);
+
+                    if (isPoster || isBackdrop) {
+                        var defaultH;
+                        if (isPoster) {
+                            defaultH = isLandscape ? "55vh" : "40vh";
+                        } else {
+                            defaultH = isLandscape ? "35vh" : "25vh";
+                        }
+
+                        img.style.width = customW !== "auto" ? customW : "auto";
+                        img.style.height = customH !== "auto" ? customH : (customW === "auto" ? defaultH : "auto");
+                        
+                        img.style.maxWidth = "100%"; 
+                        img.style.maxHeight = customH !== "auto" ? customH : "80vh";
+                        
+                        img.style.aspectRatio = isPoster ? "2 / 3" : "16 / 9";
+                        img.style.objectFit = "cover";
+                        img.classList.add('ymod-poster-rounded');
+                    } else {
+                        var defaultMaxW = (isMoveEnabled && isLandscape) ? "100%" : (!isLandscape ? "90vw" : "50vw");
+                        var defaultMaxH = (isMoveEnabled && isLandscape) ? "100%" : "60vh";
+                        
+                        img.style.width = customW !== "auto" ? customW : "auto";
+                        img.style.height = "auto";
+                        
+                        if (customW === "auto" && !isLandscape) {
+                            img.style.width = "100%";
+                        }
+                        
+                        img.style.maxWidth = customW !== "auto" ? customW : defaultMaxW;
+                        img.style.maxHeight = customH !== "auto" ? customH : defaultMaxH;
+                        img.style.objectFit = "contain";
+                        img.classList.remove('ymod-poster-rounded');
+                    }
+                    
+                    img.style.display = "inline-block";
+                    img.style.boxSizing = "border-box";
+                    
+                    if (isMoveEnabled && isLandscape) {
+                        img.style.objectPosition = "left top"; 
+                        img.style.marginLeft = "0"; 
+                        img.style.marginRight = "0"; 
+                    } else if (!isLandscape) { 
+                        img.style.objectPosition = "center"; 
+                        img.style.marginLeft = "auto"; 
+                        img.style.marginRight = "auto"; 
+                    } else { 
+                        img.style.objectPosition = "left bottom"; 
+                        img.style.marginLeft = "0"; 
+                        img.style.marginRight = "0"; 
+                    }
+                    
+                    img.style.opacity = "1"; img.style.transition = "none";
+                    var saturation = Lampa.Storage.get("logo_saturation", "1");
+                    img.style.filter = "drop-shadow(3px 3px 3px rgba(0, 0, 0, 0.5)) saturate(" + saturation + ")";
+                    
+                    if (!isPoster && !isBackdrop && Lampa.Storage.get("logo_auto_white", true)) analyzeAndInvert(img, 0.85);
+                    
+                    finalTarget.empty().append(img);
+                }
+            };
+            img.onerror = function () {
+                Lampa.Storage.set(cache_key, "none");
+                applyTextFallback();
+            };
+        }
+
+        var cached_url = Lampa.Storage.get(cache_key);
+        if (cached_url && cached_url !== "none") {
+            startLogoAnimation(cached_url, false);
+            return;
+        } else if (cached_url === "none") {
+            applyTextFallback();
+            return;
+        }
+
+        if (finalTarget.length) {
+            finalTarget.html('<div class="ymod-logo-loader"></div>');
+            finalTarget.css({
+                'display': 'block', 'margin': '0', 'padding': '0',
+                'text-align': (isMoveEnabled && isLandscape) ? 'left' : (!isLandscape ? 'center' : 'left')
+            });
+            if (!(isMoveEnabled && isLandscape)) {
+                var mLf = Lampa.Storage.get("logo_margin_left", "0px");
+                if(mLf !== '0px') finalTarget.css('margin-left', mLf);
+            }
+        }
+
+        if (data.id) {
+            var url = Lampa.TMDB.api(type + "/" + data.id + "/images?api_key=" + Lampa.TMDB.key() + "&include_image_language=" + target_lang + ",en,null");
+            $.get(url, function (data_api) {
+                var final_img = null;
+                var targetArray;
+                
+                if (isPoster) targetArray = data_api.posters;
+                else if (isBackdrop) targetArray = data_api.backdrops;
+                else targetArray = data_api.logos;
+
+                if (targetArray && targetArray.length > 0) {
+                    var found;
+                    if (imgType.indexOf("_ua") !== -1) {
+                        found = targetArray.find(function(l) { return l.iso_639_1 == "uk"; }) || 
+                                targetArray.find(function(l) { return l.iso_639_1 == "en"; }) || 
+                                targetArray[0];
+                    } else if (imgType.indexOf("_en") !== -1) {
+                        found = targetArray.find(function(l) { return l.iso_639_1 == "en"; }) || 
+                                targetArray[0];
+                    } else {
+                        found = targetArray.find(function(l) { return l.iso_639_1 == target_lang; }) || 
+                                targetArray.find(function(l) { return l.iso_639_1 == "en"; }) || 
+                                targetArray[0];
+                    }
+                    if (found) final_img = found.file_path;
+                }
+                if (final_img) {
+                    var img_url = Lampa.TMDB.image("/t/p/" + size + final_img.replace(".svg", ".png"));
+                    startLogoAnimation(img_url, true);
+                } else {
+                    Lampa.Storage.set(cache_key, "none");
+                    applyTextFallback();
+                }
+            }).fail(function() {
+                Lampa.Storage.set(cache_key, "none");
+                applyTextFallback();
+            });
+        } else {
+            applyTextFallback();
+        }
+    }
+
+    function getCountryUA(iso) {
+        if (!iso) return '';
+        var code = iso.toLowerCase().trim();
+        return countryNames[code] || Lampa.Lang.translate(code) || iso;
+    }
+
+    function renderHybridTitle(render, ukTitle, enTitle, hasLogo, year, country) {
+        if (!render) return;
+        $(".plugin-hybrid-title", render).remove();
+        
+        var mode = Lampa.Storage.get('hybrid_title_mode', 'smart');
+        var sizeKey = Lampa.Storage.get('hybrid_title_size', 'm');
+        var marginLeft = Lampa.Storage.get('hybrid_title_margin_left', '0px');
+        var displayTitle = (mode === 'smart' && hasLogo) ? enTitle : ukTitle;
+        if (!displayTitle || displayTitle === "undefined") displayTitle = "";
+
+        var sizes = {
+            'xs': { title: '1.0em', info: '0.8em' }, 's': { title: '1.2em', info: '0.9em' },
+            'm': { title: '1.4em', info: '1.0em' }, 'l': { title: '1.7em', info: '1.1em' },
+            'xl': { title: '2.0em', info: '1.2em' }, 'xxl': { title: '2.4em', info: '1.3em' },
+            'giant': { title: '3.0em', info: '1.5em' }
+        };
+        var currentSize = sizes[sizeKey] || sizes['m'];
+
+        var details =[];
+        if (year && year !== "undefined") details.push(year);
+        if (country && country !== "undefined") details.push(country);
+        var secondaryInfo = details.length > 0 ? ' вЂў ' + details.join(' вЂў ') : '';
+
+        var html = '<div class="plugin-hybrid-title" style="margin-left: ' + marginLeft + ';"><div class="plugin-hybrid-title__body">' +
+            '<span style="font-size: ' + currentSize.title + '; color: #fff; opacity: 0.8;">' + displayTitle + '</span>' + 
+            '<span style="font-size: ' + currentSize.info + '; color: #fff; opacity: 0.5; margin-left: 6px;">' + secondaryInfo + '</span>' +
+            '</div></div>';
+
+        var target = render.find(".full-start-new__title, .full-start__title").not('.ymod-moved-title').first();
+        if(target.length) target.after(html);
+
+        render.find('.full-start-new__details span, .full-start__details span').each(function() {
+            var txt = $(this).text().trim();
+            if (/^\d{4}$/.test(txt) || Object.values(countryNames).includes(txt) || !!countryNames[txt.toLowerCase()]) {
+                var next = $(this).next('.full-start-new__split');
+                if(next.length) next.hide();
+                else $(this).prev('.full-start-new__split').hide();
+                $(this).hide();
+            }
+        });
+    }
+
+    function handleHybridTitle(e) {
+        var card = e.data.movie;
+        var render = e.object.activity.render();
+        var cached = titleCache[card.id];
+        var now = Date.now();
+
+        var imgType = Lampa.Storage.get("logo_type", "logo");
+
+        if (cached && (now - cached.timestamp < 2592000000)) {
+            renderHybridTitle(render, cached.ukTitle, cached.enTitle, cached.hasLogo, cached.year, cached.country);
+            return;
+        }
+
+        var type = card.first_air_date ? "tv" : "movie";
+        var url = "https://api.themoviedb.org/3/" + type + "/" + card.id + "?api_key=" + Lampa.TMDB.key() + "&append_to_response=translations,images&include_image_language=uk,en,null";
+
+        $.getJSON(url, function (data) {
+            var hasUkrainianImage = false;
+            var isPoster = imgType.indexOf("poster") !== -1;
+            var isBackdrop = imgType.indexOf("backdrop") !== -1;
+            var targetArray = isPoster ? data.images.posters : (isBackdrop ? data.images.backdrops : data.images.logos);
+
+            if (data.images && targetArray) {
+                hasUkrainianImage = targetArray.some(function (l) { return l.iso_639_1 === "uk"; });
+            }
+            var originalName = data.original_title || data.original_name || card.original_title || card.original_name || "";
+            var enTitle = data.title || data.name || originalName;
+            var ukTitle = enTitle;
+            if (data.translations && data.translations.translations) {
+                var translation = data.translations.translations.find(function (t) { return t.iso_3166_1 === "UA" || t.iso_639_1 === "uk"; });
+                if (translation) ukTitle = translation.data.title || translation.data.name || enTitle;
+            }
+            var dateStr = data.release_date || data.first_air_date || "";
+            var year = dateStr ? dateStr.split("-")[0] : "";
+            var countryList = (data.production_countries ||[]).map(function (c) { return getCountryUA(c.iso_3166_1); });
+            var countryString = countryList.join(" / ");
+
+            titleCache[card.id] = { ukTitle: ukTitle || "", enTitle: enTitle || "", hasLogo: hasUkrainianImage, year: year || "", country: countryString || "", timestamp: now };
+            Lampa.Storage.set("title_cache_hybrid_v3", titleCache);
+            renderHybridTitle(render, ukTitle, enTitle, hasUkrainianImage, year, countryString);
+        }).fail(function() {
+            var fallbackTitle = card.title || card.name || card.original_title || "";
+            renderHybridTitle(render, fallbackTitle, fallbackTitle, false, "", "");
+        });
+    }
+
+    function normalizeRating(val, type) {
+        if (!val && val !== 0) return '0.0';
+        var strVal = String(val).replace('%', ''); 
+        var num = parseFloat(strVal);
+        if (isNaN(num)) return '0.0';
+        if (type === 'letterboxd' && num <= 5) num = num * 2;
+        else if (num > 10) num = num / 10;
+        return num.toFixed(1);
+    }
+
+    function getRatingColor(rating) {
+        var val = parseFloat(rating);
+        if (!val || val === 0) return '#fff';
+        if (val < 3) return '#ff4d4d';
+        else if (val < 5) return '#ff9f43';
+        else if (val < 7.0) return '#feca57';
+        else return '#2ecc71';
+    }
+
+    function addRatingBlock(container, className, iconUrl, rawValue, keyName) {
+        if (keyName && !Lampa.Storage.get('omdb_rating_toggle_' + keyName, true)) return;
+        if (container.find('.' + className).length > 0) return; 
+        if (!rawValue || rawValue === '0' || rawValue === '0.0' || rawValue === 'N/A' || rawValue === '0%') return;
+        
+        var isAward = (keyName === 'awards');
+        var finalValue = isAward ? rawValue : normalizeRating(rawValue, keyName);
+        if (!isAward && finalValue === '0.0') return;
+
+        var color = isAward ? '#feca57' : getRatingColor(finalValue);
+        if (isAward) color = (className.indexOf('oscar') > -1) ? '#feca57' : '#fff';
+        var orderKey = keyName;
+        if (className.indexOf('oscar') > -1) orderKey = 'oscar';
+        else if (className.indexOf('award') > -1) orderKey = 'award';
+
+        var size = Lampa.Storage.get('omdb_rating_size', '1.1em');
+        var order = renderOrder[orderKey] || 50;
+        var sat = Lampa.Storage.get('omdb_rating_saturation', '75%');
+        
+        var styleType = Lampa.Storage.get('omdb_rating_style', 'normal');
+        var isApple = (styleType === 'apple' || styleType === 'apple_lite');
+        var itemClass = isApple ? ' ymod-apple-item' : '';
+
+        var block = $('<div class="full-start__rate custom-rating ' + className + itemClass + '" style="font-size: ' + size + '; order: ' + order + ';">\
+            <div class="rating-icon-wrap"><img src="' + iconUrl + '" style="filter: saturate(' + sat + ');" /></div>\
+            <div style="color: ' + color + '">' + finalValue + '</div>\
+        </div>');
+        container.append(block);
+    }
+
+    function getCubRating(e) {
+        if (!e.object || !e.object.source || !(e.object.source === 'cub' || e.object.source === 'tmdb')) return null;
+        var reactionCoef = { fire: 10, nice: 7.5, think: 5, bore: 2.5, shit: 0 };
+        var sum = 0, cnt = 0;
+        if (e.data && e.data.reactions && e.data.reactions.result) {
+            e.data.reactions.result.forEach(function(r) {
+                if (r.counter) { sum += (r.counter * reactionCoef[r.type]); cnt += r.counter; }
+            });
+        }
+        if (cnt >= 20) {
+            var isTv = e.object.method === 'tv';
+            var avg = isTv ? 7.436 : 6.584;
+            var m = isTv ? 69 : 274;
+            return ((avg * m + sum) / (m + cnt)).toFixed(1);
+        }
+        return null;
+    }
+
+    function handleRatings(e) {
+        var render = e.object.activity.render();
+        var movie = e.data.movie;
+        
+        var container = render.find('.omdb-mdb-yarik-rate');
+        if (container.length > 1) { container.not(':first').remove(); container = render.find('.omdb-mdb-yarik-rate').first(); }
+
+        if (container.length === 0) {
+            container = $('<div class="omdb-mdb-yarik-rate"></div>');
+            var cardifyLeft = render.find('.cardify__left');
+            if (cardifyLeft.length > 0) {
+                var localRateLine = cardifyLeft.find('.full-start-new__rate-line, .full-start__rate-line').first();
+                var localTitle = cardifyLeft.find('.full-start-new__title, .full-start__title').not('.ymod-moved-title').first();
+                if (localRateLine.length > 0) container.insertBefore(localRateLine);
+                else if (localTitle.length > 0) container.insertAfter(localTitle);
+                else cardifyLeft.append(container);
+            } else {
+                var rateLine = render.find('.full-start-new__rate-line, .full-start__rate-line').first();
+                var titleLine = render.find('.full-start-new__title, .full-start__title').not('.ymod-moved-title').first();
+                var infoBlock = render.find('.full-start__info');
+                if (rateLine.length > 0) container.insertBefore(rateLine);
+                else if (titleLine.length > 0) container.insertAfter(titleLine);
+                else if (infoBlock.length > 0) infoBlock.prepend(container);
+            }
+        }
+
+        var marginVal = Lampa.Storage.get('omdb_rating_margin', '10px');
+        var marginLeftVal = Lampa.Storage.get('omdb_rating_margin_left', '0px');
+        var sat = Lampa.Storage.get('omdb_rating_saturation', '75%');
+        var gapVal = Lampa.Storage.get('omdb_rating_gap', '0.5em');
+        var styleType = Lampa.Storage.get('omdb_rating_style', 'normal');
+        var isApple = (styleType === 'apple' || styleType === 'apple_lite');
+
+        container.css({ 'margin-top': marginVal, 'margin-bottom': marginVal, 'margin-left': marginLeftVal });
+        
+        if (gapVal.indexOf('-') !== -1) {
+            container.css({ 'gap': '0px', '--ymod-gap-negative': gapVal }).addClass('ymod-gap-negative');
+        } else {
+            container.css({ 'gap': gapVal }).removeClass('ymod-gap-negative');
+        }
+        
+        if (isApple) {
+            container.addClass('ymod-apple-container');
+            if (styleType === 'apple_lite') container.addClass('is-lite');
+        } else {
+            container.removeClass('ymod-apple-container is-lite');
+        }
+
+        if (sat === '0%') container.addClass('is-bw-text');
+        else container.removeClass('is-bw-text');
+
+        if (movie.vote_average > 0) addRatingBlock(container, 'rate--tmdb-custom', rateIcons.tmdb, movie.vote_average, 'tmdb');
+        var cubVal = getCubRating(e);
+        if (cubVal) addRatingBlock(container, 'rate--cub-custom', rateIcons.cub, cubVal, 'cub');
+
+        var imdb_id = movie.imdb_id || (movie.external_ids ? movie.external_ids.imdb_id : '');
+
+        var requestKinobaza = function(id) {
+            if (!Lampa.Storage.get('omdb_rating_toggle_kinobaza', true)) return;
+            if (container.find('.rate--kinobaza').length > 0) return;
+            var cleanId = (id.indexOf('tt') === 0 ? id : ('tt' + id));
+            if (!cleanId || cleanId === 'tt') return;
+            var rawUrl = 'https://kinobaza.com.ua/rating/imdb/' + cleanId + '.json';
+            var proxy = (Lampa.Storage.get('kinobaza_proxy', '') || '').trim();
+            var targetUrl = rawUrl;
+            if (proxy) {
+                if (proxy.indexOf('{url}') !== -1) {
+                    targetUrl = proxy.replace('{url}', encodeURIComponent(rawUrl));
+                } else if (proxy.indexOf('{raw_url}') !== -1) {
+                    targetUrl = proxy.replace('{raw_url}', rawUrl);
+                } else if (proxy.slice(-1) === '=' || proxy.slice(-1) === '?') {
+                    targetUrl = proxy + encodeURIComponent(rawUrl);
+                } else if (proxy.slice(-1) === '/') {
+                    targetUrl = proxy + rawUrl;
+                } else {
+                    targetUrl = proxy + '/' + rawUrl;
+                }
+            }
+            $.getJSON(targetUrl, function(data) {
+                if (typeof data === 'string') {
+                    try { data = JSON.parse(data); } catch (e) {}
+                }
+                if (data && data.contents) {
+                    try {
+                        var parsed = typeof data.contents === 'string' ? JSON.parse(data.contents) : data.contents;
+                        if (parsed && typeof parsed === 'object') data = parsed;
+                    } catch (e) {}
+                }
+                if (data && data.rating !== undefined && data.rating !== null && data.rating !== '') {
+                    addRatingBlock(container, 'rate--kinobaza', rateIcons.kinobaza, data.rating, 'kinobaza');
+                }
+            });
+        };
+
+        var requestMDBList = function(id) {
+            var key = Lampa.Storage.get('omdb_mdblist_api_key', '');
+            if (!key) return;
+            $.getJSON('https://mdblist.com/api/?apikey=' + key + '&i=' + id, function(data) {
+                if (!data) return;
+                if (data.score) addRatingBlock(container, 'rate--mdblist-score', rateIcons.mdblist, data.score, 'mdblist');
+                if (data.ratings && Array.isArray(data.ratings)) {
+                    data.ratings.forEach(function(r) {
+                        if (r.source === 'trakt') addRatingBlock(container, 'rate--mdblist-trakt', rateIcons.trakt, r.value, 'trakt');
+                        if (r.source === 'letterboxd') addRatingBlock(container, 'rate--mdblist-lb', rateIcons.letterboxd, r.value, 'letterboxd');
+                        if (r.source === 'tomatoesaudience') addRatingBlock(container, 'rate--mdblist-popcorn', rateIcons.popcorn, r.value, 'popcorn');
+                        if (r.source === 'metacritic' && container.find('.rate--omdb-meta').length === 0) addRatingBlock(container, 'rate--mdblist-meta', rateIcons.mc, r.value, 'mc');
+                        if (r.source === 'tomatoes' && container.find('.rate--omdb-rt').length === 0) addRatingBlock(container, 'rate--mdblist-rt', rateIcons.rt, r.value, 'rt');
+                        if (r.source === 'imdb' && container.find('.rate--omdb-imdb').length === 0) addRatingBlock(container, 'rate--mdblist-imdb', rateIcons.imdb, r.value, 'imdb');
+                    });
+                }
+            });
+        };
+
+        var requestOMDB = function(id) {
+            var key = Lampa.Storage.get('omdb_api_key', '');
+            if (!key) return requestMDBList(id);
+            $.getJSON('https://www.omdbapi.com/?apikey=' + key + '&i=' + id, function(data) {
+                if (data && data.Response !== "False") {
+                    if (data.Awards && data.Awards !== "N/A") {
+                        var oscars = data.Awards.match(/Won (\d+) Oscar/i);
+                        var wins = data.Awards.match(/(\d+) win/i);
+                        if (oscars && parseInt(oscars[1]) > 0) addRatingBlock(container, 'rate--omdb-oscar', rateIcons.oscar, oscars[1], 'awards');
+                        if (wins && parseInt(wins[1]) > 0) addRatingBlock(container, 'rate--omdb-awards', rateIcons.award, wins[1], 'awards');
+                    }
+                    if (data.Metascore && data.Metascore !== 'N/A') addRatingBlock(container, 'rate--omdb-meta', rateIcons.mc, data.Metascore, 'mc');
+                    var rt = (data.Ratings ||[]).find(function(r) { return r.Source === 'Rotten Tomatoes'; });
+                    if (rt) addRatingBlock(container, 'rate--omdb-rt', rateIcons.rt, rt.Value, 'rt');
+                    if (data.imdbRating && data.imdbRating !== 'N/A') addRatingBlock(container, 'rate--omdb-imdb', rateIcons.imdb, data.imdbRating, 'imdb');
+                }
+            }).always(function() { requestMDBList(id); });
+        };
+
+        if (imdb_id) {
+            requestOMDB(imdb_id);
+            requestKinobaza(imdb_id);
+        } else if (movie.id) {
+            var type = (e.object.method === 'tv' || movie.number_of_seasons) ? 'tv' : 'movie';
+            Lampa.Network.silent(Lampa.TMDB.api(type + '/' + movie.id + '/external_ids?api_key=' + Lampa.TMDB.key()), function (res) {
+                if (res && res.imdb_id) {
+                    requestOMDB(res.imdb_id);
+                    requestKinobaza(res.imdb_id);
+                }
+            });
+        }
+    }
+
+   function renderStudiosTitle(render, title, movie) {
+        if (!render) return;
+        $(".plugin-uk-title-combined", render).remove();
+        
+        var styleType = Lampa.Storage.get('studio_logo_style', 'normal');
+        var isApple = (styleType === 'apple' || styleType === 'apple_lite');
+
+        var showBg = isApple ? false : Lampa.Storage.get("studio_logo_bg", true);
+        var sizeEm = Lampa.Storage.get("studio_logo_size", '0.7em');
+        var gapEm = Lampa.Storage.get("studio_logo_gap", '0.2em');
+        var mLeft = Lampa.Storage.get("studio_logo_margin_left", "0px");
+        var saturation = Lampa.Storage.get("studio_logo_saturation", '1');
+
+        var html = '';
+        if (movie && movie.production_companies) {
+            var companies = movie.production_companies.slice(0, 3);
+            companies.forEach(function (co, index) {
+                var content = co.logo_path ? '<img src="https://image.tmdb.org/t/p/h100' + co.logo_path + '" title="' + co.name + '" crossorigin="anonymous" class="studio-img-check">' : '<span class="studio-logo-text">' + co.name + '</span>';
+                
+                if (!showBg && !isApple && index > 0) {
+                    html += '<span style="color: rgba(255,255,255,0.4); margin: 0 ' + gapEm + '; font-size: 0.6em; display: inline-flex; align-items: center;">в—Џ</span>';
+                }
+                
+                var itemClass = 'rate--studio studio-logo ymod-studio-item' + (isApple ? ' ymod-apple-item' : '');
+                html += '<div class="' + itemClass + '" data-id="' + co.id + '" data-name="' + co.name + '" style="display: inline-flex; vertical-align: middle;">' + content + '</div>';
+            });
+        }
+        if (!html) return;
+
+        var bgCSS = '';
+        if (!isApple) {
+            bgCSS = showBg 
+                ? 'background: rgba(255,255,255,0.08) !important; padding: 5px 12px !important; margin-right: ' + (gapEm.indexOf('-') !== -1 ? '0px' : gapEm) + ' !important;' 
+                : 'background: transparent !important; border: none !important; padding: 5px 0px !important; margin-bottom: 0.2em !important;';
+        }
+
+        var containerClass = 'studio-logos-container' + (isApple ? ' ymod-apple-container' + (styleType === 'apple_lite' ? ' is-lite' : '') : '');
+        var wrapStyle = isApple ? '' : 'flex-wrap: wrap;';
+        
+        if (gapEm.indexOf('-') !== -1) {
+            wrapStyle += ' gap: 0px; --ymod-gap-negative: ' + gapEm + ';';
+            containerClass += ' ymod-gap-negative';
+        } else {
+            wrapStyle += ' gap: ' + gapEm + ';';
+        }
+
+        var wrap = $('<div class="plugin-uk-title-combined" style="margin-left: ' + mLeft + '; margin-top: 10px; margin-bottom: 5px; text-align: left; width: 100%; display: flex; flex-direction: column; align-items: flex-start;"><div class="' + containerClass + '" style="display: flex; align-items: center; ' + wrapStyle + '">' + html + '</div></div>');
+        
+        var target = render.find(".plugin-hybrid-title");
+        if (!target.length) target = render.find(".full-start-new__title, .full-start__title").not('.ymod-moved-title').first();
+        if (target.length) target.after(wrap);
+
+        if (!isApple) {
+            $('.rate--studio', render).css('cssText', bgCSS + ' filter: saturate(' + saturation + ');');
+        } else {
+            $('.rate--studio', render).css('filter', 'saturate(' + saturation + ')');
+        }
+        
+        $('.rate--studio img', render).css('cssText', 'height: ' + sizeEm + ' !important; filter: brightness(1) invert(0);');
+
+        $('.studio-img-check', render).each(function() {
+            var img = this;
+            if (img.complete) analyzeAndInvert(img, 0.85);
+            else img.onload = function() { analyzeAndInvert(img, 0.85); };
+        });
+
+        $('.rate--studio', render).on('hover:enter', function () {
+            var id = $(this).data('id');
+            if (id) Lampa.Activity.push({ url: 'movie', id: id, title: $(this).data('name'), component: 'company', source: 'tmdb', page: 1 });
+        });
+
+        setTimeout(function() {
+            var studios = render.find('.ymod-studio-item:not(.selector)');
+            if (studios.length) {
+                studios.addClass('selector');
+                var current = Lampa.Controller.enabled();
+                if (current && (current.name === 'full_start' || current.name === 'full_descr')) {
+                    current.collection = render.find('.selector');
+                }
+            }
+        }, 1000);
+    }
+
+    function handleStudios(e) {
+        var card = e.data.movie;
+        var render = e.object.activity.render();
+        var now = Date.now();
+        var cached = studiosCache[card.id];
+
+        if (cached && (now - cached.timestamp < 180000)) {
+            renderStudiosTitle(render, cached.uk_title, cached.full_data);
+        } else {
+            var type = card.first_air_date ? "tv" : "movie";
+            Lampa.Api.sources.tmdb.get(type + "/" + card.id + "?append_to_response=translations", {}, function (data) {
+                var tr = data.translations ? data.translations.translations :[];
+                var found = tr.find(function (t) { return t.iso_3166_1 === "UA" || t.iso_639_1 === "uk"; });
+                var uk = found ? (found.data.title || found.data.name) : (card.title || card.name);
+                studiosCache[card.id] = { uk_title: uk, full_data: data, timestamp: now };
+                renderStudiosTitle(render, uk, data);
+            }, function() { renderStudiosTitle(render, card.title || card.name, card); });
+        }
+    }
+
+    function getResolutionLabel(width) {
+        var w = parseInt(width || 0);
+        if (w >= 3800) return '4K';
+        if (w >= 2500) return '2K';
+        if (w >= 1900) return 'FHD';
+        if (w >= 1200) return 'HD';
+        return 'SD';
+    }
+
+    function getBestAndPopular(results, movie) {
+        if (!results || !Array.isArray(results)) return { ukr: false };
+        
+        var ukrPattern = /(^|[^Р°-СЏС‘С–С”Т‘С—a-z])(ukr|ukrainian|СѓРєСЂР°С—РЅСЃСЊРє[Р°-СЏС‘С–С”Т‘С—]*|СѓРєСЂ|ua|СѓРєСЂРґСѓР±Р»СЏР¶|СѓРєСЂРїРµСЂРµРєР»Р°Рґ|СѓРєСЂРјРѕРІ[Р°-СЏС‘С–С”Т‘С—]*)($|[^Р°-СЏС‘С–С”Т‘С—a-z])/i;
+        var ukrResults =[];
+        var movieYear = parseInt(movie.release_date || movie.first_air_date || movie.year || 0);
+        var isTv = !!(movie.name || movie.first_air_date); 
+
+        results.forEach(function(item) {
+            var title = (item.Title || '').toLowerCase();
+            
+            if (movieYear > 0 && !isTv) {
+                var yearMatch = title.match(/\b(19|20)\d{2}\b/g);
+                if (yearMatch) {
+                    var correctYear = yearMatch.some(function(y) { return Math.abs(parseInt(y) - movieYear) <= 1; });
+                    if (!correctYear) return;
+                }
+            }
+            
+            var titleClean = title
+                .replace(/[a-z0-9\-]+\.(ua|uk)\b/ig, '') 
+                .replace(/(СѓРєСЂ[Р°-СЏС‘С–С”Т‘С—]*|ukr[a-z]*|ua|ukrainian)[\s\.\,\_\-\|]*(sub|СЃСѓР±)[a-zР°-СЏС‘С–С”Т‘С—]*/ig, '')
+                .replace(/(sub|СЃСѓР±)[a-zР°-СЏС‘С–С”Т‘С—]*[\s\.\,\_\-\|]*(СѓРєСЂ[Р°-СЏС‘С–С”Т‘С—]*|ukr[a-z]*|ua|ukrainian)/ig, '');
+                
+            var hasUkr = ukrPattern.test(titleClean);
+
+            if (!hasUkr && item.ffprobe && Array.isArray(item.ffprobe)) {
+                hasUkr = item.ffprobe.some(function(s) {
+                    if (s.codec_type !== 'audio') return false;
+                    var l = (s.tags && s.tags.language ? s.tags.language : '').toLowerCase();
+                    var t = (s.tags && s.tags.title ? s.tags.title : '').toLowerCase();
+                    return l === 'uk' || l === 'ukr' || l === 'ua' || ukrPattern.test(t);
+                });
+            }
+
+            if (!hasUkr) {
+                var trackerName = (item.tracker || item.Tracker || item.name || '').toLowerCase();
+                if (trackerName.indexOf('toloka') !== -1 || trackerName.indexOf('mazepa') !== -1) {
+                    hasUkr = true;
+                }
+            }
+
+            if (hasUkr) {
+                var width = 0;
+                if (item.ffprobe) {
+                    item.ffprobe.forEach(function(s) { if (s.codec_type === 'video' && s.width) width = Math.max(width, parseInt(s.width)); });
+                }
+                if (width === 0) {
+                    if (/2160|4k|uhd/i.test(title)) width = 3840; 
+                    else if (/1080|fhd/i.test(title)) width = 1920; 
+                    else if (/720|hd/i.test(title)) width = 1280; 
+                    else if (/480|sd/i.test(title)) width = 720; 
+                    else width = 720;
+                }
+                item.detectedWidth = width;
+                item.seedersCount = parseInt(item.Seeders || 0);
+                ukrResults.push(item);
+            }
+        });
+
+        if (ukrResults.length === 0) return { ukr: false };
+
+        var best = ukrResults.reduce(function(p, c) { 
+            if (p.detectedWidth > c.detectedWidth) return p;
+            if (p.detectedWidth < c.detectedWidth) return c;
+            return (p.seedersCount > c.seedersCount) ? p : c;
+        });
+        var popular = ukrResults.reduce(function(p, c) { return (p.seedersCount > c.seedersCount) ? p : c; });
+        var tech = { hdr: false, dv: false, audio: null };
+        var maxChannels = 0;
+
+        ukrResults.forEach(function(item) {
+            if (item.ffprobe) {
+                item.ffprobe.forEach(function(s) { if (s.codec_type === 'audio' && s.channels) maxChannels = Math.max(maxChannels, parseInt(s.channels)); });
+            }
+            var t = item.Title.toLowerCase();
+            if (t.match(/7\.1|8ch/)) maxChannels = Math.max(maxChannels, 8);
+            else if (t.match(/5\.1|6ch/)) maxChannels = Math.max(maxChannels, 6);
+            else if (t.match(/2\.0/)) maxChannels = Math.max(maxChannels, 2);
+        });
+
+        if (maxChannels > 0) tech.audio = (maxChannels >= 8) ? '7.1' : (maxChannels >= 6) ? '5.1' : (maxChannels >= 4) ? '4.0' : '2.0';
+
+        if (best.ffprobe) {
+            best.ffprobe.forEach(function(s) {
+                if (s.codec_type === 'video') {
+                    var side = JSON.stringify(s.side_data_list ||[]);
+                    if (/vision|dovi/i.test(side)) tech.dv = true;
+                    if (s.color_transfer === 'smpte2084') tech.hdr = true;
+                }
+            });
+        }
+        var bTitle = best.Title.toLowerCase();
+        if (!tech.dv && /vision|dovi/i.test(bTitle)) tech.dv = true;
+        if (!tech.hdr && /hdr/i.test(bTitle)) tech.hdr = true;
+
+        return { ukr: true, bestRes: getResolutionLabel(best.detectedWidth), popRes: getResolutionLabel(popular.detectedWidth), popSeeds: popular.seedersCount, tech: tech };
+    }
+
+    function renderUator(container, data) {
+        container.find('.qb-unified-block').remove();
+        if (!data) return;
+
+        var isCard = container.closest('.card').length > 0 || container.hasClass('card__view');
+        var styleType = isCard ? 'normal' : Lampa.Storage.get('uator_style', 'normal');
+        var isApple = (styleType === 'apple' || styleType === 'apple_lite');
+
+        var size = Lampa.Storage.get('uator_rating_size', '1.1em');
+        var saturation = Lampa.Storage.get('uator_saturation', '100%');
+        var uatorGap = Lampa.Storage.get('uator_gap', '0.45em');
+        
+        var blockClass = 'qb-unified-block' + (isApple ? ' ymod-apple-container' + (styleType === 'apple_lite' ? ' is-lite' : '') : '');
+        var blockStyle = 'font-size: ' + size + ';';
+
+        if (uatorGap.indexOf('-') !== -1) {
+            blockStyle += ' gap: 0px; --ymod-gap-negative: ' + uatorGap + ';';
+            blockClass += ' ymod-gap-negative';
+        } else {
+            blockStyle += ' gap: ' + uatorGap + ';';
+        }
+
+        var block = $('<div class="' + blockClass + '" style="' + blockStyle + '"></div>');
+        var badgeClass = 'quality-badge' + (isApple ? ' ymod-apple-item' : '');
+
+        if (!data.ukr) {
+            var iconHtml = (saturation === '0%') ? '<span class="qb-text-icon">UA</span>' : '<img src="'+uatorIcons.none+'" class="qb-prefix-icon" style="filter: saturate('+saturation+')">';
+            block.append('<div class="' + badgeClass + ' qb-not-found">' + iconHtml + '<span class="qb-text">РЅРµРјР°С”</span></div>');
+        } else {
+            var items =[ {i: uatorIcons.ua, t: data.bestRes, type: 'ua'}, {i: uatorIcons.top, t: data.popRes}, {i: uatorIcons.seeds, t: data.popSeeds} ];
+            if (data.tech.audio) items.push({i: uatorIcons.audio, t: data.tech.audio});
+            if (data.tech.dv) items.push({i: uatorIcons.dv, t: '', type: 'dv'});
+            if (data.tech.hdr) items.push({i: uatorIcons.hdr, t: '', type: 'hdr'});
+            
+            items.forEach(function(it) {
+                var iconHtml = '';
+                if (it.i) {
+                    var style = 'filter: saturate('+saturation+');';
+                    if (it.type === 'ua' && saturation === '0%') iconHtml = '<span class="qb-text-icon">UA</span>';
+                    else {
+                        if (it.type === 'dv') style = 'filter: brightness(0) invert(1);';
+                        else if (it.type === 'hdr') style = 'filter: grayscale(1);';
+                        iconHtml = '<img src="'+it.i+'" class="qb-prefix-icon" style="'+style+'">';
+                    }
+                }
+                var textHtml = it.t ? '<span class="qb-text">' + it.t + '</span>' : '';
+                block.append('<div class="' + badgeClass + '">' + iconHtml + textHtml + '</div>');
+            });
+        }
+        container.append(block);
+    }
+
+    function processUatorCards() {
+        if (!isEnabled('uator')) return;
+        $('.card:not(.qb-processed)').each(function() {
+            var card = $(this);
+            var movie = card.data('item');
+            if (movie && movie.id) {
+                card.addClass('qb-processed');
+                var key = movie.id + '_' + (movie.title || movie.name);
+                if (uatorCache[key] && uatorCache[key].ukr) {
+                    renderUator(card.find('.card__view'), uatorCache[key]);
+                } else {
+                    var localSearch = movie.title || movie.name;
+                    var origSearch = movie.original_title || movie.original_name;
+                    
+                    Lampa.Parser.get({ search: localSearch, movie: movie, page: 1 }, function(res) {
+                        var data = (res && res.Results) ? getBestAndPopular(res.Results, movie) : { ukr: false };
+                        if (data.ukr) { 
+                            uatorCache[key] = data; 
+                            renderUator(card.find('.card__view'), data); 
+                        } else if (origSearch && origSearch !== localSearch) {
+                            Lampa.Parser.get({ search: origSearch, movie: movie, page: 1 }, function(res2) {
+                                var data2 = (res2 && res2.Results) ? getBestAndPopular(res2.Results, movie) : { ukr: false };
+                                uatorCache[key] = data2;
+                                if (data2.ukr) renderUator(card.find('.card__view'), data2);
+                            }, function() { uatorCache[key] = data; });
+                        } else {
+                            uatorCache[key] = data;
+                        }
+                    }, function() { uatorCache[key] = { ukr: false }; });
+                }
+            }
+        });
+    }
+    setInterval(processUatorCards, 2000);
+
+    function handleUatorFull(e) {
+        var renderTarget = e.object.activity.render();
+        var isPortrait = window.innerHeight > window.innerWidth;
+        var cont = $('.quality-badges-container', renderTarget);
+        if (!cont.length) { 
+            cont = $('<div class="quality-badges-container"></div>'); 
+            if (isPortrait) {
+                var title = $('.full-start-new__title, .full-start__title', renderTarget).not('.ymod-moved-title').first();
+                if(title.length) title.after(cont);
+            } else {
+                var rateLine = $('.full-start-new__rate-line, .full-start__rate-line', renderTarget);
+                if (rateLine.length) rateLine.append(cont);
+                else $('.full-start__info', renderTarget).append(cont);
+            }
+        }
+        
+        var mLeft = Lampa.Storage.get('uator_margin_left', '0px');
+        cont.css('margin-left', mLeft);
+        
+        var movie = e.data.movie;
+        var localSearch = movie.title || movie.name;
+        var origSearch = movie.original_title || movie.original_name;
+        
+        Lampa.Parser.get({ search: localSearch, movie: movie, page: 1 }, function(res) {
+            var data = (res && res.Results) ? getBestAndPopular(res.Results, movie) : { ukr: false };
+            if (data.ukr) { 
+                renderUator(cont, data); 
+            } else if (origSearch && origSearch !== localSearch) {
+                Lampa.Parser.get({ search: origSearch, movie: movie, page: 1 }, function(res2) {
+                    var data2 = (res2 && res2.Results) ? getBestAndPopular(res2.Results, movie) : { ukr: false };
+                    renderUator(cont, data2);
+                }, function() { renderUator(cont, data); });
+            } else {
+                renderUator(cont, data);
+            }
+        }, function() { renderUator(cont, { ukr: false }); });
+    }
+
+    Lampa.Listener.follow('full', function(e) {
+        if (e.type === 'complite' || e.type === 'ready') {
+            if (isEnabled('slogan')) ymodCleanSlogan();
+        }
+        if (e.type === 'complite' || e.type === 'complete') {
+            var render = e.object && e.object.activity ? e.object.activity.render() : null;
+            if(render) {
+                if (render.data('ymod_processed')) return;
+                render.data('ymod_processed', true);
+            }
+
+            if (isEnabled('logo')) handleLogo(e);
+            if (isEnabled('hybrid')) handleHybridTitle(e);
+            if (isEnabled('studios')) handleStudios(e);
+            if (isEnabled('ratings')) {
+                setTimeout(function() { handleRatings(e); }, 100);
+                setTimeout(function() { handleRatings(e); }, 1000);
+            }
+            if (isEnabled('uator')) handleUatorFull(e);
+        }
+    });
+
+    function createSettings() {
+        var MAIN_C = 'yariks_mod_main';
+        Lampa.SettingsApi.addComponent({ component: MAIN_C, name: "Yarik's Mod", icon: yIcon });
+        Lampa.SettingsApi.addComponent({ component: 'ym_logo', name: 'Р›РѕРіРѕ / РџРѕСЃС‚РµСЂ' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_title', name: 'Р”РѕРґР°С‚РєРѕРІР° РЅР°Р·РІР°' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_buttons', name: 'РљРЅРѕРїРєРё РєР°СЂС‚РѕРє' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_ratings', name: 'OMDB & MDBList' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_ratings_select', name: 'Р’РёР±С–СЂ СЂРµР№С‚РёРЅРіС–РІ' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_studios', name: 'Р›РѕРіРѕ СЃС‚СѓРґС–Р№' });
+        Lampa.SettingsApi.addComponent({ component: 'ym_uator', name: 'Uator' });
+
+        function addStatic(comp, name, title, desc, onClick) {
+            Lampa.SettingsApi.addParam({ component: comp, param: { name: name, type: "static" }, field: { name: title, description: desc }, onRender: function (item) { item.on("hover:enter", onClick); } });
+        }
+        function addToggle(comp, modName, title, desc) {
+            Lampa.SettingsApi.addParam({ component: comp, param: { name: YMOD + 'enable_' + modName, type: "trigger", default: true }, field: { name: title, description: desc }, onChange: function(val) { Lampa.Storage.set(YMOD + 'enable_' + modName, val); updateBodyClasses(); } });
+        }
+        function addSelect(comp, name, title, desc, values, def, onChange) {
+            Lampa.SettingsApi.addParam({ component: comp, param: { name: name, type: "select", values: values, default: def }, field: { name: title, description: desc }, onChange: onChange });
+        }
+        function backTo(comp, target) {
+            addStatic(comp, comp+'_back', "РќР°Р·Р°Рґ", "РџРѕРІРµСЂРЅСѓС‚РёСЃСЏ", function() { Lampa.Settings.create(target); });
+        }
+        function clearCacheBtn(comp, title, prefix) {
+            addStatic(comp, comp+'_clear', title, "РћС‡РёСЃС‚РёС‚Рё РєРµС€ РїР»Р°РіС–РЅСѓ", function() {
+                for (var i = 0; i < localStorage.length; i++) {
+                    var key = localStorage.key(i);
+                    if (key && key.indexOf(prefix) !== -1) { localStorage.removeItem(key); i--; }
+                }
+                Lampa.Noty.show("РљРµС€ РѕС‡РёС‰РµРЅРѕ. РџРµСЂРµР·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ...");
+                setTimeout(function() { window.location.reload(); }, 1000);
+            });
+        }
+
+        addStatic(MAIN_C, "ym_info_link", "Р†РЅС„РѕСЂРјР°С†С–СЏ + РџРѕРґСЏРєСѓРІР°С‚Рё", "http://lampalampa.free.nf", function() { window.open('http://lampalampa.free.nf', '_blank'); });
+        addToggle(MAIN_C, 'slogan', "РџСЂРёС…РѕРІСѓРІР°РЅРЅСЏ СЃР»РѕРіР°РЅСѓ", "РџСЂРёР±СЂР°С‚Рё РєРѕСЂРѕС‚РєС– СЃР»РѕРіР°РЅРё РїС–Рґ РЅР°Р·РІРѕСЋ");
+        
+        addStatic(MAIN_C, "ym_logo_entry", "Р›РѕРіРѕ / РџРѕСЃС‚РµСЂ (Smart)", "Р—Р°РјС–РЅР° С‚РµРєСЃС‚Сѓ РЅР°Р·РІРё РЅР° РєР°СЂС‚РёРЅРєСѓ", function() { Lampa.Settings.create('ym_logo'); });
+        backTo('ym_logo', MAIN_C);
+        addToggle('ym_logo', 'logo', "РЈРІС–РјРєРЅСѓС‚Рё РїР»Р°РіС–РЅ", "Р’С–РґРѕР±СЂР°Р¶Р°С‚Рё РіСЂР°С„С–С‡РЅСѓ РЅР°Р·РІСѓ");
+        Lampa.SettingsApi.addParam({ component: 'ym_logo', param: { name: "logo_move", type: "trigger", default: false }, field: { name: "РџРµСЂРµРЅРµСЃС‚Рё РЅР°Р·РІСѓ", description: "РџРµСЂРµРјС–СЃС‚РёС‚Рё РЅР°Р·РІСѓ РІ Р»С–РІРёР№ РІРµСЂС…РЅС–Р№ РєСѓС‚ (РіРѕСЂРёР·. РµРєСЂР°РЅРё)" } });
+        Lampa.SettingsApi.addParam({ component: 'ym_logo', param: { name: "logo_auto_white", type: "trigger", default: true }, field: { name: "РђРІС‚РѕРјР°С‚РёС‡РЅРµ Р±С–Р»Рµ Р»РѕРіРѕ", description: "Р РѕР±РёС‚Рё С‚РµРјРЅРµ Р»РѕРіРѕ Р±С–Р»РёРј" } });
+        addSelect('ym_logo', "logo_glav", "Р РµР¶РёРј Р·Р°РјС–РЅРё", "", { 1: "РўРµРєСЃС‚ (РІРёРјРєРЅСѓС‚Рё РєР°СЂС‚РёРЅРєСѓ)", 0: "РљР°СЂС‚РёРЅРєР° (Р›РѕРіРѕ/РџРѕСЃС‚РµСЂ)" }, "0");
+        
+        addSelect('ym_logo', "logo_type", "Р©Рѕ РїРѕРєР°Р·СѓРІР°С‚Рё?", "Р›РѕРіРѕС‚РёРї Р°Р±Рѕ РїРѕСЃС‚РµСЂ С„С–Р»СЊРјСѓ", { 
+            "logo": "Р›РѕРіРѕС‚РёРї (С‚РµРєСЃС‚РѕРІРёР№ РґРёР·Р°Р№РЅ)", 
+            "poster_ua": "Р’РµСЂС‚РёРєР°Р»СЊРЅРёР№ РїРѕСЃС‚РµСЂ (UA -> EN)", 
+            "poster_en": "Р’РµСЂС‚РёРєР°Р»СЊРЅРёР№ РїРѕСЃС‚РµСЂ (РўС–Р»СЊРєРё EN)",
+            "backdrop_ua": "Р“РѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРёР№ РїРѕСЃС‚РµСЂ (UA -> EN)",
+            "backdrop_en": "Р“РѕСЂРёР·РѕРЅС‚Р°Р»СЊРЅРёР№ РїРѕСЃС‚РµСЂ (РўС–Р»СЊРєРё EN)"
+        }, "logo");
+        
+        addSelect('ym_logo', "logo_custom_text_size", "Р РѕР·РјС–СЂ РЅР°Р·РІРё (С‚РµРєСЃС‚)", "РЇРєС‰Рѕ РІРёР±СЂР°РЅРѕ 'РўРµРєСЃС‚'", extSizes, '3.0em');
+        addSelect('ym_logo', "logo_lang", "РњРѕРІР° Р»РѕРіРѕС‚РёРїР°", "РџСЂС–РѕСЂРёС‚РµС‚ РјРѕРІРё", { "": "РЇРє Сѓ Lampa", en: "English", uk: "РЈРєСЂР°С—РЅСЃСЊРєР°" }, "uk");
+        addSelect('ym_logo', "logo_size", "РЇРєС–СЃС‚СЊ TMDB", "", { w300: "w300", w500: "w500", w780: "w780", original: "РћСЂРёРіС–РЅР°Р»" }, "original");
+        addSelect('ym_logo', "logo_custom_width", "РћР±РјРµР¶РµРЅРЅСЏ РїРѕ С€РёСЂРёРЅС– (vw)", "Р’С–РґРЅРѕСЃРЅРѕ С€РёСЂРёРЅРё РµРєСЂР°РЅСѓ", imgWidths, "auto");
+        addSelect('ym_logo', "logo_custom_height", "РћР±РјРµР¶РµРЅРЅСЏ РїРѕ РІРёСЃРѕС‚С– (vh)", "Р’С–РґРЅРѕСЃРЅРѕ РІРёСЃРѕС‚Рё РµРєСЂР°РЅСѓ", imgHeights, "15vh");
+        addSelect('ym_logo', "logo_margin_top", "Р’С–РґСЃС‚СѓРї Р·РІРµСЂС…Сѓ (РџРµСЂРµРЅРѕСЃ)", "", extMargins, '0px');
+        addSelect('ym_logo', "logo_margin_left", "Р’С–РґСЃС‚СѓРї Р·Р»С–РІР° (Р—Р°РІР¶РґРё)", "Р”С–С” С– РґР»СЏ РїРµСЂРµРЅРµСЃРµРЅРѕРіРѕ С– Р·РІРёС‡Р°Р№РЅРѕРіРѕ Р»РѕРіРѕ", extMarginsLeft, '0px');
+        addSelect('ym_logo', "logo_margin_bottom", "Р’С–РґСЃС‚СѓРї Р·РЅРёР·Сѓ (РџРµСЂРµРЅРѕСЃ)", "auto (Р·Р° Р·Р°РјРѕРІС‡СѓРІР°РЅРЅСЏРј)", extMargins, 'auto');
+        addSelect('ym_logo', "logo_saturation", "РќР°СЃРёС‡РµРЅС–СЃС‚СЊ", "", { "1": "100%", "0.75": "75%", "0.5": "50%", "0.25": "25%", "0": "0% (Р§/Р‘)" }, "1");
+        clearCacheBtn('ym_logo', "РћС‡РёСЃС‚РёС‚Рё РєРµС€ РєР°СЂС‚РёРЅРѕРє", "img_cache_v3_");
+
+        addStatic(MAIN_C, "ym_title_entry", "Р”РѕРґР°С‚РєРѕРІР° РЅР°Р·РІР°", "РћСЂРёРіС–РЅР°Р»СЊРЅР° РЅР°Р·РІР°, СЂС–Рє, РєСЂР°С—РЅР°", function() { Lampa.Settings.create('ym_title'); });
+        backTo('ym_title', MAIN_C);
+        addToggle('ym_title', 'hybrid', "РЈРІС–РјРєРЅСѓС‚Рё РїР»Р°РіС–РЅ", "Р’С–РґРѕР±СЂР°Р¶Р°С‚Рё РґРѕРґР°С‚РєРѕРІСѓ С–РЅС„РѕСЂРјР°С†С–СЋ");
+        addSelect('ym_title', "hybrid_title_mode", "Р РµР¶РёРј", "", { 'smart': 'Р—Р°Р»РµР¶РЅРѕ РІС–Рґ РЅР°СЏРІРЅРѕСЃС‚С– РєР°СЂС‚РёРЅРѕРє', 'always_ua': 'Р—Р°РІР¶РґРё СѓРєСЂР°С—РЅСЃСЊРєР°' }, 'smart');
+        addSelect('ym_title', "hybrid_title_size", "Р РѕР·РјС–СЂ", "", { 'xs': 'Р”СѓР¶Рµ РјР°Р»Р°', 's': 'РњР°Р»Р°', 'm': 'РќРѕСЂРјР°Р»СЊРЅР° (СЃС‚Р°РЅРґР°СЂС‚)', 'l': 'Р’РµР»РёРєР°', 'xl': 'Р”СѓР¶Рµ РІРµР»РёРєР°', 'xxl': 'РњР°РєСЃРёРјР°Р»СЊРЅР°', 'giant': 'Р“С–РіР°РЅС‚СЃСЊРєР°' }, 'xs');
+        addSelect('ym_title', "hybrid_title_margin_left", "Р’С–РґСЃС‚СѓРї Р·Р»С–РІР°", "", extMarginsLeft, '0px');
+        clearCacheBtn('ym_title', "РћС‡РёСЃС‚РёС‚Рё РєРµС€ РЅР°Р·РІ", "title_cache_hybrid_v3");
+
+        addStatic(MAIN_C, "ym_buttons_entry", "РљРЅРѕРїРєРё РєР°СЂС‚РѕРє", "Р—РѕРІРЅС–С€РЅС–Р№ РІРёРіР»СЏРґ РєРЅРѕРїРѕРє РґС–Р№", function() { Lampa.Settings.create('ym_buttons'); });
+        backTo('ym_buttons', MAIN_C);
+        addSelect('ym_buttons', 'ym_button_style', 'РЎС‚РёР»СЊ РєРЅРѕРїРѕРє', 'Р—РѕРІРЅС–С€РЅС–Р№ РІРёРіР»СЏРґ РєРЅРѕРїРѕРє РїР»РµС”СЂР°, Р·Р°РєР»Р°РґРѕРє С‚РѕС‰Рѕ', { 'normal': 'Р—РІРёС‡Р°Р№РЅРёР№ (Lampa)', 'apple': 'Apple Style (Р РѕР·РјРёС‚С‚СЏ)', 'apple_lite': 'Apple Lite (Р‘РµР· СЂРѕР·РјРёС‚С‚СЏ)' }, 'normal', function() { updateBodyClasses(); });
+        addSelect('ym_buttons', 'ym_button_size', 'Р РѕР·РјС–СЂ РєРЅРѕРїРѕРє', 'РџСЂР°С†СЋС” РґР»СЏ Apple СЃС‚РёР»С–РІ', { '0.8em': '0.8em (РњС–РЅС–)', '0.9em': '0.9em (Р”СЂС–Р±РЅС–)', '1em': '1em (РЎС‚Р°РЅРґР°СЂС‚)', '1.1em': '1.1em (Р‘С–Р»СЊС€С–)', '1.2em': '1.2em (Р’РµР»РёРєС–)', '1.4em': '1.4em (Р“С–РіР°РЅС‚СЃСЊРєС–)' }, '1em', function() { updateBodyClasses(); });
+        addSelect('ym_buttons', 'ym_button_margin_top', 'Р’С–РґСЃС‚СѓРї Р·РІРµСЂС…Сѓ (РґРѕ РєРЅРѕРїРѕРє)', 'Р’С–РґСЃС‚Р°РЅСЊ РјС–Р¶ РґРµС‚Р°Р»СЏРјРё С„С–Р»СЊРјСѓ С‚Р° РєРЅРѕРїРєР°РјРё', extMargins, '1em', function() { updateBodyClasses(); });
+
+        addStatic(MAIN_C, "ym_ratings_entry", "Р РµР№С‚РёРЅРіРё (OMDB/MDBList)", "РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ РґРѕРґР°С‚РєРѕРІРёС… РѕС†С–РЅРѕРє", function() { Lampa.Settings.create('ym_ratings'); });
+        backTo('ym_ratings', MAIN_C);
+        addToggle('ym_ratings', 'ratings', "РЈРІС–РјРєРЅСѓС‚Рё РїР»Р°РіС–РЅ", "Р’С–РґРѕР±СЂР°Р¶Р°С‚Рё Р·РѕРІРЅС–С€РЅС– СЂРµР№С‚РёРЅРіРё");
+        
+        Lampa.SettingsApi.addParam({ component: 'ym_ratings', param: { name: "omdb_api_key_set", type: "static" }, field: { name: "OMDB API Key", description: "Р’СЃС‚Р°РЅРѕРІРёС‚Рё РєР»СЋС‡" }, onRender: function (item) {
+            var valEl = $('<div class="omdb-api-val">' + (Lampa.Storage.get('omdb_api_key', '') || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ') + '</div>');
+            item.find('.settings-param__descr').after(valEl);
+            item.on('hover:enter', function() {
+                Lampa.Input.edit({ title: 'OMDB API Key', value: Lampa.Storage.get('omdb_api_key', ''), free: true, nosave: true }, function(newValue) { Lampa.Storage.set('omdb_api_key', newValue); valEl.text(newValue || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ'); });
+            });
+        }});
+        Lampa.SettingsApi.addParam({ component: 'ym_ratings', param: { name: "mdblist_api_key_set", type: "static" }, field: { name: "MDBList API Key", description: "Р’СЃС‚Р°РЅРѕРІРёС‚Рё РєР»СЋС‡" }, onRender: function (item) {
+            var valEl = $('<div class="omdb-api-val">' + (Lampa.Storage.get('omdb_mdblist_api_key', '') || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ') + '</div>');
+            item.find('.settings-param__descr').after(valEl);
+            item.on('hover:enter', function() {
+                Lampa.Input.edit({ title: 'MDBList API Key', value: Lampa.Storage.get('omdb_mdblist_api_key', ''), free: true, nosave: true }, function(newValue) { Lampa.Storage.set('omdb_mdblist_api_key', newValue); valEl.text(newValue || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ'); });
+            });
+        }});
+        Lampa.SettingsApi.addParam({ component: 'ym_ratings', param: { name: "kinobaza_proxy_set", type: "static" }, field: { name: "РљС–РЅРѕР±Р°Р·Р° CORS РїСЂРѕРєСЃС–", description: "Р’РєР°Р·Р°С‚Рё РїСЂРѕРєСЃС– (СЏРєС‰Рѕ С” РїРѕРјРёР»РєР° CORS)" }, onRender: function (item) {
+            var valEl = $('<div class="omdb-api-val">' + (Lampa.Storage.get('kinobaza_proxy', '') || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ') + '</div>');
+            item.find('.settings-param__descr').after(valEl);
+            item.on('hover:enter', function() {
+                Lampa.Input.edit({ title: 'CORS РїСЂРѕРєСЃС– РґР»СЏ РљС–РЅРѕР±Р°Р·Р°', value: Lampa.Storage.get('kinobaza_proxy', ''), free: true, nosave: true }, function(newValue) { Lampa.Storage.set('kinobaza_proxy', newValue); valEl.text(newValue || 'РќРµ РІСЃС‚Р°РЅРѕРІР»РµРЅРѕ'); });
+            });
+        }});
+        addSelect('ym_ratings', 'omdb_rating_style', 'РЎС‚РёР»СЊ Р±Р»РѕРєСѓ', 'Р—РѕРІРЅС–С€РЅС–Р№ РІРёРіР»СЏРґ', { 'normal': 'Р—РІРёС‡Р°Р№РЅРёР№', 'apple': 'Apple Style (Р РѕР·РјРёС‚С‚СЏ)', 'apple_lite': 'Apple Lite (Р‘РµР· СЂРѕР·РјРёС‚С‚СЏ)' }, 'normal');
+        addSelect('ym_ratings', 'omdb_rating_size', 'Р РѕР·РјС–СЂ СЂРµР№С‚РёРЅРіС–РІ', '', extSizes, '1.1em');
+        addSelect('ym_ratings', 'omdb_rating_gap', 'Р’С–РґСЃС‚Р°РЅСЊ РјС–Р¶ СЂРµР№С‚РёРЅРіР°РјРё', '', extGaps, '0.5em');
+        addSelect('ym_ratings', 'omdb_rating_margin_left', 'Р’С–РґСЃС‚СѓРї Р·Р»С–РІР°', '', extMarginsLeft, '0px');
+        addSelect('ym_ratings', 'omdb_rating_margin', 'Р’С–РґСЃС‚СѓРї РґРѕ С–РЅС€РёС… СЂСЏРґРєС–РІ', '', extMargins, '10px');
+        addSelect('ym_ratings', 'omdb_rating_saturation', 'РќР°СЃРёС‡РµРЅС–СЃС‚СЊ', '', { '100%': '100% (РЎС‚Р°РЅРґР°СЂС‚)', '75%': '75%', '50%': '50%', '25%': '25%', '0%': '0% (Р§/Р‘)' }, '75%');
+        addStatic('ym_ratings', "omdb_select_ratings", "Р’РёР±С–СЂ СЂРµР№С‚РёРЅРіС–РІ", "Р’РєР»/Р’РёРєР» РґР¶РµСЂРµР»", function() { Lampa.Settings.create('ym_ratings_select'); });
+        
+        backTo('ym_ratings_select', 'ym_ratings');
+        availableRatings.forEach(function(rating) {
+            Lampa.SettingsApi.addParam({ component: 'ym_ratings_select', param: { name: 'omdb_rating_toggle_' + rating.key, type: 'trigger', default: rating.default }, field: { name: rating.name } });
+        });
+
+        addStatic(MAIN_C, "ym_studios_entry", "Р›РѕРіРѕ СЃС‚СѓРґС–Р№", "Р’С–РґРѕР±СЂР°Р¶РµРЅРЅСЏ РІРёСЂРѕР±РЅРёС‡РёС… РєРѕРјРїР°РЅС–Р№", function() { Lampa.Settings.create('ym_studios'); });
+        backTo('ym_studios', MAIN_C);
+        addToggle('ym_studios', 'studios', "РЈРІС–РјРєРЅСѓС‚Рё РїР»Р°РіС–РЅ", "Р’С–РґРѕР±СЂР°Р¶Р°С‚Рё Р»РѕРіРѕС‚РёРїРё СЃС‚СѓРґС–Р№");
+        addSelect('ym_studios', 'studio_logo_style', 'РЎС‚РёР»СЊ Р±Р»РѕРєСѓ', 'Р—РѕРІРЅС–С€РЅС–Р№ РІРёРіР»СЏРґ', { 'normal': 'Р—РІРёС‡Р°Р№РЅРёР№', 'apple': 'Apple Style (Р РѕР·РјРёС‚С‚СЏ)', 'apple_lite': 'Apple Lite (Р‘РµР· СЂРѕР·РјРёС‚С‚СЏ)' }, 'normal');
+        Lampa.SettingsApi.addParam({ component: 'ym_studios', param: { name: "studio_logo_bg", type: "trigger", default: true }, field: { name: "РџС–РґР»РѕР¶РєР°", description: "РќР°РїС–РІРїСЂРѕР·РѕСЂРёР№ С„РѕРЅ (РЅРµ РґС–С” РґР»СЏ Apple Style)" } });
+        addSelect('ym_studios', "studio_logo_size", "Р РѕР·РјС–СЂ Р»РѕРіРѕ", "", extSizes, '0.7em');
+        addSelect('ym_studios', "studio_logo_gap", "Р’С–РґСЃС‚СѓРї РјС–Р¶ Р»РѕРіРѕ", "", extGaps, '0.2em');
+        addSelect('ym_studios', "studio_logo_margin_left", "Р’С–РґСЃС‚СѓРї Р·Р»С–РІР°", "", extMarginsLeft, '0px');
+        addSelect('ym_studios', "studio_logo_saturation", "РќР°СЃРёС‡РµРЅС–СЃС‚СЊ", "", { '1': '100%', '0.75': '75%', '0.5': '50%', '0.25': '25%', '0': '0% (Р§/Р‘)' }, '1');
+
+        addStatic(MAIN_C, "ym_uator_entry", "Uator", "РќР°Р»Р°С€С‚СѓРІР°РЅРЅСЏ РјР°СЂРєРµСЂС–РІ UA РєРѕРЅС‚РµРЅС‚Сѓ", function() { Lampa.Settings.create('ym_uator'); });
+        backTo('ym_uator', MAIN_C);
+        addToggle('ym_uator', 'uator', "РЈРІС–РјРєРЅСѓС‚Рё РїР»Р°РіС–РЅ", "Р’С–РґРѕР±СЂР°Р¶Р°С‚Рё Р·РЅР°С‡РєРё С‚РѕСЂСЂРµРЅС‚С–РІ");
+        addSelect('ym_uator', 'uator_style', 'РЎС‚РёР»СЊ Р±Р»РѕРєСѓ', 'РўС–Р»СЊРєРё РґР»СЏ РїРѕРІРЅРѕС— СЃС‚РѕСЂС–РЅРєРё С„С–Р»СЊРјСѓ', { 'normal': 'Р—РІРёС‡Р°Р№РЅРёР№', 'apple': 'Apple Style (Р РѕР·РјРёС‚С‚СЏ)', 'apple_lite': 'Apple Lite (Р‘РµР· СЂРѕР·РјРёС‚С‚СЏ)' }, 'normal');
+        addSelect('ym_uator', 'uator_gap', 'Р’С–РґСЃС‚Р°РЅСЊ РјС–Р¶ Р·РЅР°С‡РєР°РјРё', '', extGaps, '0.45em');
+        addSelect('ym_uator', 'uator_margin_left', 'Р’С–РґСЃС‚СѓРї Р·Р»С–РІР°', 'РўС–Р»СЊРєРё РґР»СЏ РїРѕРІРЅРѕС— СЃС‚РѕСЂС–РЅРєРё', extMarginsLeft, '0px');
+        addSelect('ym_uator', 'uator_saturation', 'РќР°СЃРёС‡РµРЅС–СЃС‚СЊ', '', { '100%': '100% (РЎС‚Р°РЅРґР°СЂС‚)', '75%': '75%', '50%': '50%', '25%': '25%', '0%': '0% (Р§/Р‘)' }, '100%');
+        addSelect('ym_uator', 'uator_rating_size', 'Р РѕР·РјС–СЂ Р·РЅР°С‡РєС–РІ', '', extSizes, '1.1em');
+    }
+
+    if (window.appready) createSettings();
+    else Lampa.Listener.follow("app", function (e) { if (e.type === "ready") createSettings(); });
+
+})();
