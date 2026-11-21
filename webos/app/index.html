@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=1920, initial-scale=1">
+<title>Alcopac UA</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d0f14;color:#e8eaf0;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+  .box{position:absolute;left:50%;top:50%;width:1100px;margin-left:-550px;transform:translateY(-50%);-webkit-transform:translateY(-50%);text-align:center}
+  h1{font-size:64px;margin:0 0 20px;font-weight:bold}
+  h1 span{color:#ffb547}
+  p{font-size:34px;color:#9aa0b0;margin:12px 0}
+  .url{color:#ffb547}
+  .btns{margin-top:50px}
+  .btn{display:inline-block;margin:0 16px;padding:22px 46px;font-size:34px;border-radius:14px;background:#1c2030;border:4px solid #1c2030}
+  .btn.focus{border-color:#ffb547;background:#2a3047}
+  input{font-size:36px;width:900px;padding:18px 24px;border-radius:12px;border:4px solid #ffb547;background:#1c2030;color:#fff;margin-top:30px}
+  .hide{display:none}
+  .dots:after{content:'';-webkit-animation:d 1.4s infinite;animation:d 1.4s infinite}
+  @-webkit-keyframes d{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+  @keyframes d{0%{content:''}33%{content:'.'}66%{content:'..'}100%{content:'...'}}
+</style>
+</head>
+<body>
+<div class="box">
+  <p id="status"></p>
+  <p class="url hide" id="url"></p>
+  <div id="direct" class="hide">
+    <p>Не вдалося завантажити Lampa всередину застосунку:</p>
+    <p class="url" id="reason"></p>
+    <p>Відкрию напряму через <span id="count">6</span> с — тоді меню адрес і збереження налаштувань не працюватимуть.</p>
+    <div class="btns">
+      <div class="btn" data-act="go">Відкрити зараз</div>
+      <div class="btn" data-act="retry">Спробувати знову</div>
+      <div class="btn" data-act="edit">Адреси сервера</div>
+    </div>
+  </div>
+  <div id="error" class="hide">
+    <p>Сервер не відповідає. Перевірте інтернет або адресу.</p>
+    <div class="btns">
+      <div class="btn" data-act="retry">Спробувати знову</div>
+      <div class="btn" data-act="edit">Адреси сервера</div>
+      <div class="btn" data-act="exit">Вийти</div>
+    </div>
+  </div>
+</div>
+<script>
+window.ALCO_DEFAULT_URL = 'http://92-5-178-165.sslip.io';
+window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
+</script>
+<script src="menu.js"></script>
+<script>
+(function () {
+  var DEFAULT_URL = window.ALCO_DEFAULT_URL;
+  var APP_VER = '1.0.0';
+  var KEY = 'mylampa_url2';
+
+  function $(id) { return document.getElementById(id); }
+
+  function getUrl() {
+    var u = '';
+    try { u = window.localStorage.getItem(KEY) || ''; } catch (e) {}
+    return u || DEFAULT_URL;
+  }
+
+  function norm(u) {
+    u = (u || '').replace(/^\s+|\s+$/g, '').replace(/\/+$/, '');
+    if (!u) return '';
+    if (!/^https?:\/\//i.test(u)) u = 'http://' + u;
+    return u;
+  }
+
+  function show(id) {
+    $('error').className = id === 'error' ? '' : 'hide';
+    $('direct').className = id === 'direct' ? '' : 'hide';
+    if (id !== 'direct') clearTimeout(directTimer);
+    $('status').textContent = '';
+    $('url').className = id ? 'url' : 'url hide';
+    focusFirst();
+  }
+
+  /* Перевірка сервера. На старих webOS без fetch — просто переходимо */
+  function ping(u, done) {
+    if (typeof fetch !== 'function') return done(true);
+    var finished = false;
+    var timer = setTimeout(function () { if (!finished) { finished = true; done(false); } }, 2500);
+    fetch(u + '/?ping=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }).then(function () {
+      if (!finished) { finished = true; clearTimeout(timer); done(true); }
+    }, function () {
+      if (!finished) { finished = true; clearTimeout(timer); done(false); }
+    });
+  }
+
+
+  /* Завантажити Lampa з сервера всередину застосунку.
+     Тоді налаштування зберігаються в пам'яті самого застосунку
+     і не зникають після виходу (як в офіційному застосунку Lampa). */
+  function loadInside(u, fail) {
+    // Alcopac віддає Lampa лише тоді, коли просять HTML (інакше — меню Media Station X)
+    var paths = ['/', '/index.html', '/lampa/', '/lampa/index.html'];
+    var reasons = [];
+    function attempt(i) {
+      if (i >= paths.length) return fail(reasons.join('; '));
+      var done = false;
+      var xhr = new XMLHttpRequest();
+      var timer = setTimeout(function () { if (!done) { done = true; try { xhr.abort(); } catch (e) {} reasons.push(paths[i] + ': немає відповіді'); attempt(i + 1); } }, 8000);
+      try {
+        xhr.open('GET', u + paths[i] + (paths[i].indexOf('?') < 0 ? '?' : '&') + 't=' + Date.now(), true);
+        xhr.setRequestHeader('Accept', 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8');
+        xhr.onload = function () {
+          if (done) return;
+          done = true; clearTimeout(timer);
+          var html = xhr.responseText || '';
+          if (xhr.status !== 200) { reasons.push(paths[i] + ': код ' + xhr.status); return attempt(i + 1); }
+          if (!/<script/i.test(html) || !/<html|<body|<head/i.test(html)) { reasons.push(paths[i] + ': не сторінка Lampa'); return attempt(i + 1); }
+          var dir = paths[i].replace(/[^\/]*$/, '');               // тека сторінки на сервері
+          var baseHref = u + dir;
+          // якщо сторінка сама вказує базову теку (<base href="/lampa-main/">) — беремо її
+          var bm = html.match(/<base[^>]*href\s*=\s*["']([^"']*)["'][^>]*>/i);
+          if (bm) {
+            var bh = bm[1];
+            if (/^https?:\/\//i.test(bh)) baseHref = bh;
+            else if (bh.charAt(0) === '/') baseHref = u + bh;
+            else baseHref = u + dir + bh;
+            if (!/\/$/.test(baseHref)) baseHref += '/';
+            html = html.replace(bm[0], '');
+          }
+          try { window.localStorage.setItem('mylampa_inside', '1'); } catch (e) {}
+          var appDir = window.ALCO_START.replace(/[^\/]*$/, '');
+          var base = '<base href="' + baseHref + '">' +
+            '<script>window.ALCO_DEFAULT_URL=' + JSON.stringify(window.ALCO_DEFAULT_URL) + ';window.ALCO_START=' + JSON.stringify(window.ALCO_START) + ';' +
+            // Lampa пише переходи в історію; всередині застосунку адреса інша — переводимо на адресу застосунку
+            '(function(){var h=window.history;["pushState","replaceState"].forEach(function(m){var o=h[m];h[m]=function(st,t,url){' +
+            'try{return o.call(h,st,t,url)}catch(e){var q=(url==null?"":String(url));var i=q.indexOf("?");' +
+            'try{return o.call(h,st,t,window.ALCO_START+(i>=0?q.slice(i):""))}catch(e2){}}}})})();' +
+            '<\/script>' +
+            '<script src="' + appDir + 'webos_shim.js"><\/script>' +
+            '<script src="' + appDir + 'menu.js"><\/script>';
+          if (/<head[^>]*>/i.test(html)) html = html.replace(/<head[^>]*>/i, function (m) { return m + base; });
+          else html = base + html;
+          window.__alcoInside = true;
+          document.open();
+          document.write(html);
+          document.close();
+        };
+        xhr.onerror = function () { if (!done) { done = true; clearTimeout(timer); reasons.push(paths[i] + ': CORS або немає зв’язку'); attempt(i + 1); } };
+        xhr.send(null);
+      } catch (e) { if (!done) { done = true; clearTimeout(timer); reasons.push(paths[i] + ': ' + e.message); attempt(i + 1); } }
+    }
+    attempt(0);
+  }
+
+  function start() {
+    var u = norm(getUrl());
+    $('url').textContent = u.replace(/^https?:\/\//, '');
+    show(null);
+    // нова версія застосунку — забуваємо старі позначки «лише напряму», пробуємо знову
+    try {
+      if (window.localStorage.getItem('mylampa_ver') !== APP_VER) {
+        for (var i = window.localStorage.length - 1; i >= 0; i--) {
+          var key = window.localStorage.key(i);
+          if (key && key.indexOf('mylampa_mode_') === 0) window.localStorage.removeItem(key);
+        }
+        window.localStorage.setItem('mylampa_ver', APP_VER);
+      }
+    } catch (e) {}
+    var hm = (u.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
+    var mode = null;
+    try { mode = window.localStorage.getItem('mylampa_mode_' + hm.toLowerCase()); } catch (e) {}
+    if (mode === 'direct') {                    // цей сервер працює лише напряму
+      var t0 = Date.now();
+      $('status').textContent = 'Натисніть ◀ — змінити сервер';
+      document.addEventListener('keydown', function onLeft(e) {   // на старті досить натиснути ◀
+        if (e.keyCode === 37 && window.AlcoMenu && !window.AlcoMenu.isOpen()) { window.AlcoMenu.open(); document.removeEventListener('keydown', onLeft, true); }
+      }, true);
+      return ping(u, function (ok) {
+        // 1,5 с, щоб встигнути натиснути ◀ і змінити адресу
+        setTimeout(function () {
+          if (window.AlcoMenu && window.AlcoMenu.isOpen()) return;
+          if (ok) window.location.replace(u); else show('error');
+        }, Math.max(0, 1500 - (Date.now() - t0)));
+      });
+    }
+    loadInside(u, function (reason) {
+      try { window.localStorage.setItem('mylampa_fail', reason); } catch (e) {}
+      ping(u, function (ok) {
+        if (ok) window.location.replace(u);
+        else show('error');
+      });
+    });
+  }
+  var directTimer = null;
+
+  /* ---- керування пультом ---- */
+  var focused = 0;
+  function buttons() {
+    var box = $('error').className === 'hide' ? $('direct') : $('error');
+    return box.className === 'hide' ? [] : box.getElementsByClassName('btn');
+  }
+  function paint() {
+    var b = buttons();
+    for (var i = 0; i < b.length; i++) b[i].className = 'btn' + (i === focused ? ' focus' : '');
+  }
+  function focusFirst() { focused = 0; paint(); }
+
+  function act(name) {
+    if (name === 'retry') start();
+    else if (name === 'go') { clearTimeout(directTimer); window.location.replace(norm(getUrl())); }
+    else if (name === 'edit') { clearTimeout(directTimer); $('count').textContent = '—'; if (window.AlcoMenu) window.AlcoMenu.open(); }
+    else if (name === 'exit') exit();
+  }
+
+  function exit() {
+    try { if (window.PalmSystem && window.PalmSystem.platformBack) return window.PalmSystem.platformBack(); } catch (e) {}
+    try { window.close(); } catch (e) {}
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (window.__alcoInside) return;
+    var k = e.keyCode;
+    var b = buttons();
+    if (k === 37 && focused > 0) { focused--; paint(); }
+    else if (k === 39 && focused < b.length - 1) { focused++; paint(); }
+    else if (k === 13 && b[focused]) act(b[focused].getAttribute('data-act'));
+    else if (k === 461 || k === 8 || k === 27) {           // «Назад» на пульті LG
+      exit();
+    }
+    e.preventDefault();
+  }, true);
+
+  document.addEventListener('click', function (e) {
+    if (window.__alcoInside) return;
+    var t = e.target;
+    if (t && t.getAttribute && t.getAttribute('data-act')) act(t.getAttribute('data-act'));
+  });
+
+  start();
+})();
+</script>
+</body>
+</html>
