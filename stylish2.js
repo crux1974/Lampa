@@ -3162,6 +3162,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3354,6 +3355,7 @@
         if (design === 'shadow') css += '.card .card__view{box-shadow:0 .5em 1.2em rgba(0,0,0,.65)}';
         if (design === 'minimal') css += '.card .card__title,.card .card__age{display:none!important}';
         css += rateCss();
+        css += crownCss();
         el.textContent = css;
     }
 
@@ -3768,6 +3770,34 @@
             '.sui-rt-hide.rate-fix{display:none!important}';
     }
 
+
+    /* ---- VIP-корона біля балансерів з 4K (Lampac дописує « - 4K» до назви) ---- */
+    var CROWN = '<svg class="sui-crown" viewBox="0 0 24 18"><defs><linearGradient id="suicr" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe680"/><stop offset=".55" stop-color="#ffbf1f"/><stop offset="1" stop-color="#d98a00"/></linearGradient></defs><path d="M2 5.5l5 4.2L12 2l5 7.7 5-4.2-2 10.3H4z" fill="url(#suicr)" stroke="#8a5600" stroke-width=".8" stroke-linejoin="round"/><rect x="4" y="15.6" width="16" height="2.2" rx=".6" fill="url(#suicr)" stroke="#8a5600" stroke-width=".6"/><circle cx="2" cy="5.5" r="1.4" fill="#ffe680"/><circle cx="12" cy="2" r="1.4" fill="#ffe680"/><circle cx="22" cy="5.5" r="1.4" fill="#ffe680"/></svg>';
+    var RX_4K = /(^|[^a-z0-9])(4k|2160p?)([^a-z0-9]|$)/i;
+    function crownScan() {
+        if (S('crown_4k', true) === false) return;
+        var l = document.querySelectorAll('.selectbox-item__title, .filter--sort > div, .filter--sort span');
+        for (var i = 0; i < l.length; i++) {
+            var el = l[i];
+            if (el.querySelector('.sui-crown')) continue;
+            var t = el.textContent || '';
+            if (t.length > 80 || !RX_4K.test(t)) continue;
+            el.insertAdjacentHTML('beforeend', '<span class="sui-crown-w">' + CROWN + '<b>VIP</b></span>');
+        }
+    }
+    function crownCss() {
+        return '.sui-crown-w{display:inline-flex;align-items:center;gap:.15em;margin-left:.4em;vertical-align:middle;line-height:1}' +
+            '.sui-crown{width:1.15em!important;height:.9em!important;filter:drop-shadow(0 0 .25em rgba(255,191,31,.65))}' +
+            '.sui-crown-w b{font:900 .62em/1 Arial,sans-serif;letter-spacing:.06em;color:#ffcf40;text-shadow:0 0 .3em rgba(255,191,31,.6)}';
+    }
+    function watchCrown() {
+        var tm = null;
+        new MutationObserver(function () {
+            if (tm) return;
+            tm = setTimeout(function () { tm = null; try { crownScan(); } catch (e) { } }, 150);
+        }).observe(document.body, { childList: true, subtree: true });
+    }
+
     function onFullLook(e) {
         var m = e.data && e.data.movie;
         if (!m || !m.id) return;
@@ -4004,6 +4034,7 @@
         if (!styleIs('appletv')) {
             btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
         } else ttl(LOOK, 'look_hidden_atv', 'Лого й студії малює «Стиль Apple TV» (розділ 3)');
+        trg(LOOK, 'crown_4k', 'VIP-корона для 4K', 'Золота корона біля балансерів і джерел з якістю 4K', true);
         btn(LOOK, 'go_btns', 'Кнопки карток', 'Зовнішній вигляд кнопок дій', function () { open(BTNS); });
         if (!styleIs('appletv')) btn(LOOK, 'go_studios', 'Лого студій', 'Відображення виробничих компаній', function () { open(STUD); });
         btn(LOOK, 'go_uator', 'Uator', 'Налаштування маркерів UA контенту', function () { open(UAT); });
@@ -4116,6 +4147,7 @@
         btnEdCss();
         setS('style_just', '');
         watchCards();
+        watchCrown();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
             try { onFullLook(e); } catch (er) { console.log('SUI look', er); }
