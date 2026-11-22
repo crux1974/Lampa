@@ -970,6 +970,13 @@
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_look'); }
         });
 
+        add({
+            component: SUI,
+            param: { name: 'stylish_ui_open_styles', type: 'button' },
+            field: { name: '3. Стилі', description: 'Cardify, Obsidian, Apple TV, Netflix — одночасно лише один' },
+            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_styles'); }
+        });
+
         // ---- 1. Інформаційна панель (підменю) ----
         Lampa.Template.add('settings_' + SUI_INFO, '<div></div>');
         add({ component: SUI_INFO, param: { name: 'stylish_ui_info_head', type: 'title' }, field: { name: 'Інформаційна панель' } });
@@ -3123,8 +3130,11 @@
 
 
 
+
+
+
 /* ==========================================================================
- * Стильний інтерфейс 2.0 — розділ «Зовнішній вигляд».
+ * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
  * ========================================================================== */
 (function () {
@@ -3206,6 +3216,8 @@
      * ==================================================================== */
     var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
     var PARENT = {};
+    PARENT['stylish_ui_styles'] = 'stylish_ui';
+    ['cardify', 'obsidian', 'appletv', 'netflix'].forEach(function (k) { PARENT['stylish_ui_style_' + k] = 'stylish_ui_styles'; });
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
     function on(key) { return S(key, true) !== false; }
@@ -3525,7 +3537,7 @@
         uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
     }
     function uatorCard(el) {
-        if (!on('uator') || !el || el.__sui_ua) return;
+        if (!on('uator') || !el || el.__sui_ua || styleIs('obsidian') || styleIs('netflix')) return;
         var d = el.card_data;
         if (!d || !d.id) return;
         el.__sui_ua = true;
@@ -3545,7 +3557,7 @@
         if (!d || !view) return;
         var old = view.querySelectorAll('.sui-bot,.sui-rate');
         for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
-        if (S('bot_panel', false) !== true) return;
+        if (S('bot_panel', false) !== true || styleIs('obsidian') || styleIs('netflix')) return;
         var st = S('bot_style', 'standard'), pos = S('bot_rate_pos', 'br'), parts = [];
         if (S('bot_year', true) !== false) {
             var y = String(d.release_date || d.first_air_date || '').slice(0, 4);
@@ -3616,9 +3628,56 @@
     }
 
     /* ======================================================================
+     * 3. СТИЛІ — підключення стилів сторонніх авторів з їхніх адрес.
+     * Код стилів не копіюється: завантажується оригінальний плагін автора.
+     * Одночасно активний лише один стиль; після зміни — перезапуск Lampa.
+     * ==================================================================== */
+    var STYLES_C = 'stylish_ui_styles';
+    var STYLE_LIST = [
+        { id: 'cardify', no: '3.1', name: 'Стиль Cardify', author: 'YCard Mod (lampalampa.free.nf)', url: 'http://lampalampa.free.nf/ycardmod.js', comp: 'cardify' },
+        { id: 'obsidian', no: '3.2', name: 'Стиль Obsidian', author: '@levende', url: 'https://levende.github.io/lampa-plugins/obsidian.js', comp: 'obsidian_settings' },
+        { id: 'appletv', no: '3.3', name: 'Стиль Apple TV', author: '@llowmikee', url: '', comp: '' },
+        { id: 'netflix', no: '3.4', name: 'Стиль Netflix', author: '@adambenhassen', url: 'https://adambenhassen.github.io/netflix.js', comp: 'netflix' }
+    ];
+    function styleById(id) { for (var i = 0; i < STYLE_LIST.length; i++) if (STYLE_LIST[i].id === id) return STYLE_LIST[i]; return null; }
+    function activeStyle() { var s = styleById(S('style_active', '')); return s && styleUrl(s) ? s : null; }
+    function styleUrl(s) { return trim(S('style_url_' + s.id, '')) || s.url; }
+    function styleIs(id) { var a = activeStyle(); return !!(a && a.id === id); }
+
+    // Завантаження активного стилю якомога раніше (до появи головної сторінки)
+    (function loadStyle() {
+        var st = activeStyle();
+        if (!st || window.__sui_style_loaded) return;
+        window.__sui_style_loaded = st.id;
+        document.documentElement.className += ' sui-style-' + st.id;
+        try { if (document.body) document.body.classList.add('sui-style-' + st.id); } catch (e) { }
+        var url = styleUrl(st);
+        try {
+            if (Lampa.Utils && Lampa.Utils.putScriptAsync) Lampa.Utils.putScriptAsync([url], function () { });
+            else { var sc = document.createElement('script'); sc.src = url; document.head.appendChild(sc); }
+        } catch (e) { console.log('SUI style', e); }
+    })();
+
+    function setStyle(id) {
+        var prev = S('style_active', '');
+        if (prev === id) return;
+        setS('style_active', id);
+        Lampa.Noty.show(id ? 'Стиль змінено — перезапуск Lampa…' : 'Стиль вимкнено — перезапуск Lampa…');
+        setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 1500);
+    }
+    function styleCss() {
+        var id = 'sui-styles-css', el = document.getElementById(id);
+        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+        // налаштування стилів відкриваються з «Стильного інтерфейсу», тож ховаємо їхні окремі пункти в корені налаштувань
+        el.textContent = STYLE_LIST.filter(function (s) { return s.comp; }).map(function (s) {
+            return '.settings-folder[data-component="' + s.comp + '"]';
+        }).join(',') + '{display:none!important}';
+    }
+
+    /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [LOGO, XT, BTNS, STUD, UAT].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_styles', 'stylish_ui_style_cardify', 'stylish_ui_style_obsidian', 'stylish_ui_style_appletv', 'stylish_ui_style_netflix'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -3718,11 +3777,41 @@
         sel(UAT, 'ua_ml', 'Відступ зліва', 'Тільки для повної сторінки', MLEFT, '0px');
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
+
+
+        // ---- 3. Стилі ----
+        Lampa.Template.add('settings_' + STYLES_C, '<div></div>');
+        ttl(STYLES_C, 'styles_head', 'Стилі');
+        btn(STYLES_C, 'styles_info', 'Як це працює', 'Одночасно може бути увімкнений лише один стиль. Після зміни Lampa перезапуститься', function () { });
+        STYLE_LIST.forEach(function (st) {
+            var comp = 'stylish_ui_style_' + st.id;
+            Lampa.Template.add('settings_' + comp, '<div></div>');
+            btn(STYLES_C, 'style_go_' + st.id, st.no + ' ' + st.name, 'Автор: ' + st.author + (S('style_active', '') === st.id ? ' · увімкнено' : ''), function () { open(comp); });
+            ttl(comp, 'style_t_' + st.id, st.no + ' ' + st.name);
+            Lampa.SettingsApi.addParam({
+                component: comp,
+                param: { name: P + 'style_on_' + st.id, type: 'select', values: { '1': 'Так', '0': 'Ні' }, 'default': S('style_active', '') === st.id ? '1' : '0' },
+                field: { name: 'Увімкнути стиль', description: 'Інші стилі вимкнуться. Lampa перезапуститься' },
+                onChange: function (v) {
+                    if (String(v) === '1') {
+                        if (!styleUrl(st)) { setS('style_on_' + st.id, '0'); return Lampa.Noty.show('Спершу вкажіть адресу плагіна нижче'); }
+                        STYLE_LIST.forEach(function (o) { if (o.id !== st.id) setS('style_on_' + o.id, '0'); });
+                        setStyle(st.id);
+                    } else if (S('style_active', '') === st.id) setStyle('');
+                }
+            });
+            btn(comp, 'style_set_' + st.id, 'Налаштування стилю', 'Власне меню стилю від автора', function () {
+                if (!st.comp || S('style_active', '') !== st.id) return Lampa.Noty.show('Спершу увімкніть цей стиль');
+                try { Lampa.Settings.create(st.comp, { onBack: function () { open(comp); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+            });
+            inp(comp, 'style_url_' + st.id, 'Адреса плагіна', st.url ? 'За замовчуванням: ' + st.url : 'Вкажіть адресу плагіна автора');
+        });
     }
 
     function start() {
         addMenus();
         lookCss();
+        styleCss();
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
