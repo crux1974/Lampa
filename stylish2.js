@@ -2188,6 +2188,11 @@
                     '<rect width="20" height="7.5" y="0" fill="#0057B7"/>' +
                     '<rect width="20" height="7.5" y="7.5" fill="#FFD700"/>' +
                     '</svg>';
+                const POLAND_FLAG_SVG =
+                    '<svg class="ua-flag-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 15" aria-hidden="true" focusable="false">' +
+                    '<rect width="20" height="7.5" y="0" fill="#FFFFFF"/>' +
+                    '<rect width="20" height="7.5" y="7.5" fill="#DC143C"/>' +
+                    '</svg>';
                 const REPLACEMENTS = [
                     ['Uaflix', 'UAFlix'],
                     ['Zetvideo', 'UaFlix'],
@@ -2202,6 +2207,18 @@
                     ['Український', UKRAINE_FLAG_SVG + ' Українською'],
                     ['Украинская', UKRAINE_FLAG_SVG + ' Українською'],
                     ['Українська', UKRAINE_FLAG_SVG + ' Українською'],
+                    ['Польский', POLAND_FLAG_SVG + ' Польською'],
+                    ['польский', POLAND_FLAG_SVG + ' Польською'],
+                    ['Польская', POLAND_FLAG_SVG + ' Польською'],
+                    ['Польська', POLAND_FLAG_SVG + ' Польською'],
+                    ['Польський', POLAND_FLAG_SVG + ' Польською'],
+                    ['Polski', POLAND_FLAG_SVG + ' Польською'],
+                    ['Polish', POLAND_FLAG_SVG + ' Польською'],
+                    {
+                        pattern: /\bPol\b/gi,
+                        replacement: POLAND_FLAG_SVG + ' Польською',
+                        condition: (text) => !text.includes('flag-container')
+                    },
                     {
                         pattern: /\bUkr\b/gi,
                         replacement: UKRAINE_FLAG_SVG + ' Українською',
@@ -2436,12 +2453,12 @@
                                 let changed = false;
                                 REPLACEMENTS.forEach(item => {
                                     if (Array.isArray(item)) {
-                                        if (html.includes(item[0]) && !html.includes(UKRAINE_FLAG_SVG)) {
+                                        if (html.includes(item[0]) && !html.includes(item[1].indexOf('#DC143C') >= 0 ? POLAND_FLAG_SVG : UKRAINE_FLAG_SVG)) {
                                             html = html.replace(new RegExp(item[0], 'g'), item[1]);
                                             changed = true;
                                         }
                                     } else if (item.pattern) {
-                                        if ((!item.condition || item.condition(html)) && item.pattern.test(html) && !html.includes(UKRAINE_FLAG_SVG)) {
+                                        if ((!item.condition || item.condition(html)) && item.pattern.test(html) && !html.includes(item.replacement.indexOf('#DC143C') >= 0 ? POLAND_FLAG_SVG : UKRAINE_FLAG_SVG)) {
                                             html = html.replace(item.pattern, item.replacement);
                                             changed = true;
                                         }
