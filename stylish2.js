@@ -2215,6 +2215,12 @@
                     ['Polski', POLAND_FLAG_SVG + ' Польською'],
                     ['Polish', POLAND_FLAG_SVG + ' Польською'],
                     {
+                        // скорочення з назв роздач: Lektor PL, Dubbing PL, PLDUB, PL (не «Napisy PL» — це субтитри)
+                        pattern: /\b(Lektor\s*PL|Dubbing\s*PL|PL\s*DUB|PLDUB|PL)\b/g,
+                        replacement: POLAND_FLAG_SVG + ' $&',
+                        condition: (text) => !text.includes('flag-container') && !/napisy\s*pl|pl\s*sub|sub\s*pl/i.test(text)
+                    },
+                    {
                         pattern: /\bPol\b/gi,
                         replacement: POLAND_FLAG_SVG + ' Польською',
                         condition: (text) => !text.includes('flag-container')
