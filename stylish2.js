@@ -979,6 +979,13 @@
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_styles'); }
         });
 
+        add({
+            component: SUI,
+            param: { name: 'stylish_ui_open_btned', type: 'button' },
+            field: { name: '4. Редактор кнопок', description: 'Порядок, приховування й підписи кнопок на сторінці фільму' },
+            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_btned'); }
+        });
+
         // ---- 1. Інформаційна панель (підменю) ----
         Lampa.Template.add('settings_' + SUI_INFO, '<div></div>');
         add({ component: SUI_INFO, param: { name: 'stylish_ui_info_head', type: 'title' }, field: { name: 'Інформаційна панель' } });
@@ -3141,8 +3148,9 @@
 
 
 
+
 /* ==========================================================================
- * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
+ * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
  * ========================================================================== */
 (function () {
@@ -3226,6 +3234,7 @@
     var PARENT = {};
     PARENT['stylish_ui_styles'] = 'stylish_ui';
     ['cardify', 'obsidian', 'appletv', 'netflix'].forEach(function (k) { PARENT['stylish_ui_style_' + k] = 'stylish_ui_styles'; });
+    PARENT['stylish_ui_btned'] = 'stylish_ui';
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
     function on(key) { return S(key, true) !== false; }
@@ -3284,6 +3293,10 @@
             '.sui-uat--br{right:1.5em;bottom:1.4em}.sui-uat--tr{right:1.5em;top:1em}' +
             '.sui-uat--abs .sui-uat__b,.sui-uat--under .sui-uat__b{background:transparent;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:0 .25em}' +
             '.sui-uat--under{margin-top:.8em}' +
+            '.sui-uat__b svg{flex-shrink:0}.sui-uat__b{gap:.3em}' +
+            '.sui-dv{display:inline-flex;align-items:center;gap:.15em}.sui-dv__t{display:inline-flex;flex-direction:column;line-height:.85}' +
+            '.sui-dv__t b{font:800 .72em/1 Arial,sans-serif;letter-spacing:-.02em}.sui-dv__t i{font:700 .38em/1 Arial,sans-serif;letter-spacing:.12em;font-style:normal;text-align:center}' +
+            '.sui-hdr{display:inline-block;border:.12em solid #fff;border-radius:.2em;padding:.05em .25em;font:800 .72em/1 Arial,sans-serif;color:#fff}' +
             '.sui-uat__dv span{font:italic 800 .75em/1 Arial,sans-serif;letter-spacing:-.02em}' +
             '.sui-uat__hdr span{border:2px solid currentColor;border-radius:.25em;padding:0 .25em;font-size:.8em;opacity:.9}' +
             '.sui-uat__b{display:inline-flex;align-items:center;gap:.3em;padding:.2em .55em;border-radius:.4em;background:rgba(0,0,0,.45);font:700 .9em/1.2 Arial,sans-serif;color:#fff;white-space:nowrap}' +
@@ -3516,16 +3529,31 @@
         seed: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="#3fd16b"><path d="M12 3l7 8h-4v10h-6V11H5z"/></svg>',
         snd: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="#9fd3ff"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>'
     };
+    // новий вигляд (як на фото): круглий прапор, червоний «play», хмарка роздач, жовтий звук, лого Dolby Vision, HDR у рамці
+    var UI2 = {
+        ua: '<svg viewBox="0 0 24 24" width="1.1em" height="1.1em"><clipPath id="suiuac"><circle cx="12" cy="12" r="11"/></clipPath><g clip-path="url(#suiuac)"><rect width="24" height="12" fill="#0a5cd6"/><rect y="12" width="24" height="12" fill="#ffd500"/></g></svg>',
+        top: '<svg viewBox="0 0 24 24" width="1.1em" height="1.1em"><rect x="2" y="3" width="20" height="18" rx="4" fill="#e50914"/><path d="M10 8.5v7l6-3.5z" fill="#fff"/></svg>',
+        seed: '<svg viewBox="0 0 24 24" width="1.1em" height="1.1em"><circle cx="12" cy="12" r="11" fill="#5ec8f2"/><path d="M7.5 15.5h9a2.8 2.8 0 0 0 .3-5.6 4 4 0 0 0-7.6-.9 3.3 3.3 0 0 0-1.7 6.5z" fill="#fff"/></svg>',
+        snd: '<svg viewBox="0 0 24 24" width="1.1em" height="1.1em"><rect x="5" y="2" width="14" height="20" rx="3" fill="#ffd21f"/><circle cx="12" cy="14" r="3.4" fill="#222"/><circle cx="12" cy="6.8" r="1.6" fill="#222"/></svg>',
+        dv: '<span class="sui-dv"><svg viewBox="0 0 30 20" width="1.25em" height=".85em"><path d="M0 0h6a10 10 0 0 1 0 20H0z" fill="#fff"/><path d="M30 0h-6a10 10 0 0 0 0 20h6z" fill="#fff"/></svg><span class="sui-dv__t"><b>Dolby</b><i>VISION</i></span></span>',
+        hdr: '<span class="sui-hdr">HDR</span>'
+    };
     function uatorHtml(r, card) {
-        var sat = S('ua_sat', '100%'), f = 'filter:saturate(' + sat + ')';
+        var sat = S('ua_sat', '100%'), f = 'filter:saturate(' + sat + ')', nu = S('ua_look', 'new') === 'new';
         var b = function (ico, txt, cls) { return '<span class="sui-uat__b' + (cls ? ' ' + cls : '') + '" style="' + f + '">' + (ico || '') + (txt !== '' && txt != null ? '<span>' + esc(txt) + '</span>' : '') + '</span>'; };
-        var flag = sat === '0%' ? '<b>UA</b>' : '<i class="sui-uat__ua"></i>';
+        var flag = sat === '0%' ? '<b>UA</b>' : (nu ? UI2.ua : '<i class="sui-uat__ua"></i>');
         if (card) return r.ukr ? b(flag, r.best) : '';
         if (!r.ukr) return b(flag, 'немає', 'sui-uat__no');
-        var out = b(flag, r.best) + b(UI.top, r.pop) + b(UI.seed, r.seeds);
-        if (r.audio) out += b(UI.snd, r.audio);
-        if (r.dv) out += b('', 'Dolby Vision', 'sui-uat__dv');
-        if (r.hdr) out += b('', 'HDR', 'sui-uat__hdr');
+        var I = nu ? UI2 : UI;
+        var out = b(flag, r.best) + b(I.top, r.pop) + b(I.seed, r.seeds);
+        if (r.audio) out += b(I.snd, r.audio);
+        if (nu) {
+            if (r.dv) out += b(UI2.dv, '', 'sui-uat__dvb');
+            if (r.hdr) out += b(UI2.hdr, '', 'sui-uat__hdrb');
+        } else {
+            if (r.dv) out += b('', 'Dolby Vision', 'sui-uat__dv');
+            if (r.hdr) out += b('', 'HDR', 'sui-uat__hdr');
+        }
         return out;
     }
     function applyUatorFull(root, m) {
@@ -3640,6 +3668,8 @@
         applyLogo(root, m);
         applyUatorFull(root, m);
         applyXTitle(root);
+        try { applyBtnEditor(root); } catch (e) { }
+        setTimeout(function () { try { applyBtnEditor(root); } catch (e) { } }, 1500);
         if (on('studios')) tmdbFull(m, function (d) { applyStudios(root, m, d); });
     }
 
@@ -3690,10 +3720,92 @@
         }).join(',') + '{display:none!important}';
     }
 
+
+    /* ======================================================================
+     * 4. РЕДАКТОР КНОПОК — порядок, видимість і підписи кнопок у повній картці
+     * ==================================================================== */
+    var BTNED = 'stylish_ui_btned';
+    function jget(k, d) { var v = S(k, null); if (v == null || v === '') return d; if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return d; } } return v || d; }
+    function btnKey($b) {
+        var cls = String($b.attr('class') || '').split(/\s+/).filter(function (c) { return /^button--|^view--|^sui-/.test(c); })[0];
+        if (cls) return cls;
+        var t = trim($b.find('span').first().text() || $b.text());
+        return t ? 'txt:' + t.toLowerCase() : '';
+    }
+    function btnLabel($b) {
+        var t = trim($b.find('span').first().text() || $b.attr('data-title') || $b.text());
+        if (t) return t;
+        var k = btnKey($b);
+        return ({ 'button--play': 'Дивитись', 'button--book': 'Закладки', 'button--reaction': 'Реакції', 'button--subscribe': 'Підписатися', 'button--options': 'Ще (⋯)', 'button--trailer': 'Трейлер', 'view--torrent': 'Торенти', 'view--online': 'Онлайн' })[k] || k;
+    }
+    function applyBtnEditor(root) {
+        if (S('btned_on', true) === false) return;
+        var bar = root.find('.full-start-new__buttons, .full-start__buttons').first();
+        if (!bar.length) return;
+        var known = jget('btned_known', {}), changed = false;
+        bar.children('.full-start__button').each(function () {
+            var $b = $(this), k = btnKey($b);
+            if (!k) return;
+            $b.attr('data-sui-btn', k);
+            var l = btnLabel($b);
+            if (known[k] !== l && l) { known[k] = l; changed = true; }
+        });
+        if (changed) setS('btned_known', known);
+        var hidden = jget('btned_hidden', []), order = jget('btned_order', []);
+        bar.children('.full-start__button').each(function () { $(this).toggleClass('sui-btn-hidden', hidden.indexOf($(this).attr('data-sui-btn')) >= 0); });
+        if (order.length) {
+            var items = bar.children('.full-start__button').get();
+            items.sort(function (a, b) {
+                var ia = order.indexOf($(a).attr('data-sui-btn')), ib = order.indexOf($(b).attr('data-sui-btn'));
+                return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
+            });
+            items.forEach(function (el) { bar.append(el); });
+        }
+        var lab = S('btned_labels', 'lampa');
+        bar.toggleClass('sui-btn-lab-all', lab === 'all').toggleClass('sui-btn-lab-none', lab === 'none');
+        setTimeout(function () { try { var en = Lampa.Controller.enabled(); if (en && /full/.test(en.name || '')) en.collection = root.find('.selector:visible'); } catch (e) { } }, 300);
+    }
+    function btnEdCss() {
+        var id = 'sui-btned-css', el = document.getElementById(id);
+        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
+        el.textContent = '.full-start__button.sui-btn-hidden{display:none!important}' +
+            '.sui-btn-lab-all .full-start__button span{display:inline!important}' +
+            '.sui-btn-lab-none .full-start__button:not(.button--play) span{display:none!important}';
+    }
+    function openBtnOrder() {
+        var known = jget('btned_known', {});
+        var keys = Object.keys(known);
+        if (!keys.length) return Lampa.Noty.show('Спершу відкрийте будь-який фільм, щоб плагін побачив кнопки');
+        var order = jget('btned_order', []).filter(function (k) { return keys.indexOf(k) >= 0; });
+        keys.forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
+        var show = function (picked) {
+            var hidden = jget('btned_hidden', []);
+            Lampa.Select.show({
+                title: 'Порядок і видимість кнопок',
+                items: order.map(function (k, i) { return { title: (i + 1) + '. ' + known[k] + (hidden.indexOf(k) >= 0 ? '  (сховано)' : ''), key: k, selected: k === picked }; }),
+                onSelect: function (it) {
+                    var hid = hidden.indexOf(it.key) >= 0;
+                    Lampa.Select.show({
+                        title: known[it.key],
+                        items: [{ title: 'Вгору', a: -1 }, { title: 'Вниз', a: 1 }, { title: 'На початок', a: 'top' }, { title: hid ? 'Показати' : 'Сховати', a: 'hide' }],
+                        onSelect: function (x) {
+                            if (x.a === 'hide') { var h = jget('btned_hidden', []); if (hid) h.splice(h.indexOf(it.key), 1); else h.push(it.key); setS('btned_hidden', h); }
+                            else { var i = order.indexOf(it.key), j = x.a === 'top' ? 0 : i + x.a; if (j >= 0 && j < order.length) { order.splice(i, 1); order.splice(j, 0, it.key); setS('btned_order', order); } }
+                            show(it.key);
+                        },
+                        onBack: function () { show(it.key); }
+                    });
+                },
+                onBack: function () { Lampa.Noty.show('Збережено — відкрийте фільм знову'); Lampa.Controller.toggle('settings_component'); }
+            });
+        };
+        show(null);
+    }
+
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_styles', 'stylish_ui_style_cardify', 'stylish_ui_style_obsidian', 'stylish_ui_style_appletv', 'stylish_ui_style_netflix'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_cardify', 'stylish_ui_style_obsidian', 'stylish_ui_style_appletv', 'stylish_ui_style_netflix'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -3792,6 +3904,7 @@
         sel(UAT, 'ua_ml', 'Відступ зліва', 'Тільки для повної сторінки', MLEFT, '0px');
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
+        sel(UAT, 'ua_look', 'Вигляд значків', '', { 'new': 'Новий (іконки)', classic: 'Класичний' }, 'new');
         sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
 
 
@@ -3822,12 +3935,21 @@
             });
             inp(comp, 'style_url_' + st.id, 'Адреса плагіна', st.url ? 'За замовчуванням: ' + st.url : 'Вкажіть адресу плагіна автора');
         });
+
+        // ---- 4. Редактор кнопок ----
+        Lampa.Template.add('settings_' + BTNED, '<div></div>');
+        ttl(BTNED, 'btned_head', 'Редактор кнопок');
+        trg(BTNED, 'btned_on', 'Увімкнути редактор', 'Застосовувати порядок, приховування й підписи кнопок на сторінці фільму', true);
+        btn(BTNED, 'btned_open', 'Порядок і видимість кнопок', 'Переставити або сховати будь-яку кнопку (Дивитись, Торенти, Онлайн, Закладки, Трейлер…)', openBtnOrder);
+        sel(BTNED, 'btned_labels', 'Підписи кнопок', '', { lampa: 'Як у Lampa', all: 'Завжди з підписом', none: 'Лише іконки' }, 'lampa');
+        btn(BTNED, 'btned_reset', 'Скинути', 'Повернути стандартний порядок і показати всі кнопки', function () { setS('btned_order', []); setS('btned_hidden', []); Lampa.Noty.show('Кнопки скинуто'); });
     }
 
     function start() {
         addMenus();
         lookCss();
         styleCss();
+        btnEdCss();
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
