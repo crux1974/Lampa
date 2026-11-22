@@ -131,10 +131,13 @@
     } else if (mode === 'log') {
       box.appendChild(el('div', 'am-hint', 'Сфотографуйте й надішліть · OK — назад'));
       var get = function (k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
-      var cur = (window.ALCO_LOG || []).slice(-30), prev = get('alco_log_prev').slice(-14);
+      var imp = /Plugins.*(load list|clear list|cache)|Extensions|Quota|Пам|error|fail|warn:/i;
+      var cur = (window.ALCO_LOG || []).filter(function (l) { return imp.test(l) && !/StorageWorker|Premiere|Content row/.test(l); }).slice(-16);
+      var pl = '';
+      try { pl = (JSON.parse(localStorage.getItem('plugins') || '[]') || []).map(function (p) { return (p.status ? '✓ ' : '✗ ') + String(p.url || p).replace(/^https?:\/\//, ''); }).join('\n'); } catch (e) { pl = 'помилка читання: ' + e.message; }
       var pre = el('div', 'am-hint', '');
-      pre.style.cssText = 'white-space:pre-wrap;font:18px/1.35 monospace;max-height:70vh;overflow:hidden;text-align:left';
-      pre.textContent = '— Зараз —\n' + cur.join('\n') + '\n\n— Минулий запуск —\n' + prev.join('\n');
+      pre.style.cssText = 'white-space:pre-wrap;font:17px/1.3 monospace;max-height:72vh;overflow:hidden;text-align:left';
+      pre.textContent = '— Розширення в пам\u2019яті —\n' + (pl || '(порожньо)') + '\n\n— Запуск —\n' + cur.join('\n');
       box.appendChild(pre);
       var bk = el('div', 'am-btn am-main', 'Назад');
       var r0 = el('div', 'am-row'); r0.appendChild(bk); box.appendChild(r0);
