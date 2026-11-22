@@ -64,6 +64,7 @@
         });
     } catch (e) { }
 
+    var SUI_STYLE = (function () { try { return String(Lampa.Storage.get('sui_style_active', '') || ''); } catch (e) { return ''; } })();
     var IFX_TITLE_SIZE_DEFAULT = 0.75;
     var IFX_TMDB_UA_TTL_MS = 1000 * 60 * 60 * 24 * 2;
     var IFX_TMDB_UA_CACHE_PREFIX = 'ifx_tmdb_ua_title_v1.7:';
@@ -599,8 +600,9 @@
         mobile_center: getBool('interface_mod_new_mobile_center', false),
         hide_tagline: getBool('interface_mod_new_hide_tagline', false),
         colored_ratings: getBool('interface_mod_new_colored_ratings', false),
-        show_status: getBool('interface_mod_new_show_status', true),
-        show_age: getBool('interface_mod_new_show_age', true),
+        // зі «Стилем Cardify» статус і віковий рейтинг керуються його власними пунктами
+        show_status: SUI_STYLE === 'cardify' ? true : getBool('interface_mod_new_show_status', true),
+        show_age: SUI_STYLE === 'cardify' ? true : getBool('interface_mod_new_show_age', true),
         colored_status: getBool('interface_mod_new_colored_status', false),
         colored_age: getBool('interface_mod_new_colored_age', false),
         mono_mode: getBool('interface_mod_new_mono_mode', false),
@@ -1005,6 +1007,7 @@
             param: { name: 'interface_mod_new_colored_bookmarks', type: 'trigger', values: true, default: true },
             field: { name: 'Кольорові іконки закладок', description: 'Підсвічувати кольорами іконки (Закладки, Історія, Пізніше)' }
         });
+        if (SUI_STYLE !== 'cardify') {
         add({   // 6a
             component: SUI_INFO,
             param: { name: 'interface_mod_new_show_status', type: 'trigger', values: true, default: true },
@@ -1015,6 +1018,7 @@
             param: { name: 'interface_mod_new_show_age', type: 'trigger', values: true, default: true },
             field: { name: 'Показувати віковий рейтинг', description: 'Відображати або приховувати плашку вікового рейтингу (PG)' }
         });
+        } else add({ component: SUI_INFO, param: { name: 'sui_status_hidden', type: 'title' }, field: { name: 'Статус і віковий рейтинг керує «Стиль Cardify» (розділ 3)' } });
         add({   // 8a
             component: SUI_INFO,
             param: { name: 'interface_mod_new_colored_age', type: 'trigger', values: true, default: false },
@@ -3133,6 +3137,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3250,10 +3255,10 @@
             '.sui-glass.is-lite{background:rgba(30,32,40,.7);-webkit-backdrop-filter:none;backdrop-filter:none}' +
             '.sui-neg>*+*{margin-left:var(--sui-neg)}';
         // 1) слоган
-        if (on('slogan')) css += '.full-start-new__tagline,.full-start__tagline,.full-start-new [class*="tagline"],.full-start [class*="tagline"]{display:none!important}';
+        if (on('slogan') && !styleIs('cardify')) css += '.full-start-new__tagline,.full-start__tagline,.full-start-new [class*="tagline"],.full-start [class*="tagline"]{display:none!important}';
         // 3) кнопки
         var bst = S('btn_style', 'normal'), bsz = S('btn_size', '1em'), bmt = S('btn_mt', '1em');
-        if (bmt !== 'auto') css += '.full-start-new__buttons,.full-start__buttons{margin-top:' + bmt + '!important}';
+        if (bmt !== 'auto' && !styleIs('cardify')) css += '.full-start-new__buttons,.full-start__buttons{margin-top:' + bmt + '!important}';
         if (bst !== 'normal') {
             css += '.full-start-new__buttons,.full-start__buttons{display:flex!important;flex-wrap:wrap;gap:.6em;align-items:center}' +
                 '.full-start-new__buttons .full-start__button,.full-start__buttons .full-start__button{font-size:' + bsz + ';margin:0!important;padding:.55em 1.2em!important;border-radius:999px!important;color:#fff;border:1px solid rgba(255,255,255,.18)!important;' +
@@ -3537,7 +3542,7 @@
         uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
     }
     function uatorCard(el) {
-        if (!on('uator') || !el || el.__sui_ua || styleIs('obsidian') || styleIs('netflix')) return;
+        if (!on('uator') || !el || el.__sui_ua || styleIs('obsidian')) return;
         var d = el.card_data;
         if (!d || !d.id) return;
         el.__sui_ua = true;
@@ -3557,7 +3562,7 @@
         if (!d || !view) return;
         var old = view.querySelectorAll('.sui-bot,.sui-rate');
         for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
-        if (S('bot_panel', false) !== true || styleIs('obsidian') || styleIs('netflix')) return;
+        if (S('bot_panel', false) !== true || styleIs('obsidian')) return;
         var st = S('bot_style', 'standard'), pos = S('bot_rate_pos', 'br'), parts = [];
         if (S('bot_year', true) !== false) {
             var y = String(d.release_date || d.first_air_date || '').slice(0, 4);
@@ -3699,6 +3704,7 @@
 
         // ---- 13a / 14a: у кінці «Інформаційної панелі» ----
         var INFO = 'stylish_ui_info';
+        if (!styleIs('obsidian')) {
         ttl(INFO, 'bot_head', 'Нижня інформаційна панель');
         trg(INFO, 'bot_panel', 'Увімкнути', 'Плашка внизу постера з роком, сезоном і рейтингом', false);
         sel(INFO, 'bot_style', 'Стиль', 'Вигляд бейджів на постері', { standard: 'Стандартний', glass: 'Скло (Apple)', neon: 'Неон' }, 'standard');
@@ -3710,6 +3716,7 @@
         trg(INFO, 'bot_season', 'Бейдж сезону/серії', 'Для серіалів: S3 · E8 (якщо Lampa знає сезон)', true);
         trg(INFO, 'bot_rating', 'Бейдж рейтингу (TMDB)', 'Оцінка TMDB кольором', true);
         trg(INFO, 'native_vote', 'Рейтинги на картці', 'Стандартна оцінка Lampa на постері', true);
+        } else ttl(INFO, 'bot_hidden', 'Бейджі на постерах малює «Стиль Obsidian» (розділ 3)');
 
         // ---- 2. Зовнішній вигляд (як у Yarik's Mod) ----
         [LOGO, XT, BTNS, STUD, UAT].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
@@ -3725,7 +3732,7 @@
         var clear = function (store, txt) { return function () { Lampa.Storage.set(store, {}); Lampa.Noty.show(txt); }; };
 
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
-        trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
+        if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
         btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
         btn(LOOK, 'go_xtitle', 'Додаткова назва', 'Оригінальна назва, рік, країна', function () { open(XT); });
         btn(LOOK, 'go_btns', 'Кнопки карток', 'Зовнішній вигляд кнопок дій', function () { open(BTNS); });
@@ -3759,7 +3766,8 @@
         ttl(BTNS, 'btns_head', 'Кнопки карток');
         sel(BTNS, 'btn_style', 'Стиль кнопок', 'Зовнішній вигляд кнопок плеєра, закладок тощо', { normal: 'Звичайний (Lampa)', apple: 'Apple Style (Розмиття)', apple_lite: 'Apple Lite (Без розмиття)' }, 'normal');
         sel(BTNS, 'btn_size', 'Розмір кнопок', 'Працює для Apple стилів', { '0.8em': '0.8em (Міні)', '0.9em': '0.9em (Дрібні)', '1em': '1em (Стандарт)', '1.1em': '1.1em (Більші)', '1.2em': '1.2em (Великі)', '1.4em': '1.4em (Гігантські)' }, '1em');
-        sel(BTNS, 'btn_mt', 'Відступ зверху (до кнопок)', 'Відстань між деталями фільму та кнопками', MARG, '1em');
+        if (!styleIs('cardify')) sel(BTNS, 'btn_mt', 'Відступ зверху (до кнопок)', 'Відстань між деталями фільму та кнопками', MARG, '1em');
+        else ttl(BTNS, 'btn_mt_hidden', 'Відступ кнопок задає «Стиль Cardify» (розділ 3)');
 
         ttl(STUD, 'st_head', 'Лого студій');
         trg(STUD, 'studios', 'Увімкнути плагін', 'Відображати логотипи студій', true);
