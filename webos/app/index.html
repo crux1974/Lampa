@@ -213,18 +213,10 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     // і саме туди Lampa повертається після «Очистити кеш». Меню ◀ підвантажує сервер (Lampac).
     mode = 'direct';
     try { window.name = JSON.stringify({ alco: 1, start: window.ALCO_START, def: window.ALCO_DEFAULT_URL, cur: u, list: (function () { try { return JSON.parse(localStorage.getItem('mylampa_list') || '[]'); } catch (e) { return []; } })() }); } catch (e) {}
-    if (mode === 'direct') {                    // цей сервер працює лише напряму
-      var t0 = Date.now();
-      $('status').textContent = 'Натисніть ◀ — змінити сервер';
-      document.addEventListener('keydown', function onLeft(e) {   // на старті досить натиснути ◀
-        if (e.keyCode === 37 && window.AlcoMenu && !window.AlcoMenu.isOpen()) { window.AlcoMenu.open(); document.removeEventListener('keydown', onLeft, true); }
-      }, true);
+    if (mode === 'direct') {                    // одразу відкриваємо сервер, без підказки й очікування
       return ping(u, function (ok) {
-        // 1,5 с, щоб встигнути натиснути ◀ і змінити адресу
-        setTimeout(function () {
-          if (window.AlcoMenu && window.AlcoMenu.isOpen()) return;
-          if (ok) window.location.replace(u); else show('error');
-        }, Math.max(0, 1500 - (Date.now() - t0)));
+        if (window.AlcoMenu && window.AlcoMenu.isOpen()) return;
+        if (ok) window.location.replace(u); else show('error');
       });
     }
     loadInside(u, function (reason) {
