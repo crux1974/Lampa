@@ -8,6 +8,18 @@
 
   var KEY = 'mylampa_url2';
   var LIST = 'mylampa_list';
+  // Режим «напряму»: сторінка з сервера, дані застосунку передані через window.name
+  var NAMED = null;
+  try { NAMED = JSON.parse(window.name || 'null'); } catch (e) {}
+  var DIRECT = !!(NAMED && NAMED.alco && /^https?:/i.test(window.location.protocol));
+  if (DIRECT) {
+    window.ALCO_START = window.ALCO_START || NAMED.start;
+    window.ALCO_DEFAULT_URL = window.ALCO_DEFAULT_URL || NAMED.def;
+    try {
+      if (NAMED.cur) window.localStorage.setItem(KEY, NAMED.cur);
+      if (NAMED.list && NAMED.list.length) window.localStorage.setItem(LIST, JSON.stringify(NAMED.list));
+    } catch (e) {}
+  }
   var DEFAULT_URL = window.ALCO_DEFAULT_URL || 'http://92-5-178-165.sslip.io';
   var LONG_MS = 1000;
   var BACK = { 461: 1, 8: 1, 27: 1 };
@@ -43,6 +55,14 @@
 
   function restart() {
     var start = window.ALCO_START || (window.location.href.split('#')[0]);
+    if (DIRECT) {
+      // повертаємось у застосунок, щоб він запам'ятав нову адресу; якщо телевізор не пустить — відкриваємо її напряму
+      var nu = current();
+      try { NAMED.cur = nu; NAMED.list = list(); window.name = JSON.stringify(NAMED); } catch (e) {}
+      setTimeout(function () { try { window.location.replace(nu); } catch (e) {} }, 1500);
+      try { window.location.replace(start + '?srv=' + encodeURIComponent(nu)); } catch (e) {}
+      return;
+    }
     try { window.location.replace(start); } catch (e) { window.location.reload(); }
   }
 
@@ -115,6 +135,10 @@
           { node: del, act: function () { remove(u); } }
         ]);
       });
+      var lRow = el('div', 'am-row');
+      var lb = el('div', 'am-btn am-main', '📋 Журнал запуску');
+      lRow.appendChild(lb); box.appendChild(lRow);
+      grid.push([{ node: lb, act: function () { mode = 'log'; render(0, 0); } }]);
       var tRow = el('div', 'am-row');
       var tb = el('div', 'am-btn am-main', '🔍 Перевірка пульта');
       tRow.appendChild(tb); box.appendChild(tRow);
@@ -124,6 +148,20 @@
       addRow.appendChild(add);
       box.appendChild(addRow);
       grid.push([{ node: add, act: function () { edit(null); } }]);
+    } else if (mode === 'log') {
+      box.appendChild(el('div', 'am-hint', 'Сфотографуйте й надішліть · OK — назад'));
+      var get = function (k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
+      var imp = /Plugins.*(load list|clear list|cache)|Extensions|Quota|Пам|error|fail|warn:/i;
+      var cur = (window.ALCO_LOG || []).filter(function (l) { return imp.test(l) && !/StorageWorker|Premiere|Content row/.test(l); }).slice(-16);
+      var pl = '';
+      try { pl = (JSON.parse(localStorage.getItem('plugins') || '[]') || []).map(function (p) { return (p.status ? '✓ ' : '✗ ') + String(p.url || p).replace(/^https?:\/\//, ''); }).join('\n'); } catch (e) { pl = 'помилка читання: ' + e.message; }
+      var pre = el('div', 'am-hint', '');
+      pre.style.cssText = 'white-space:pre-wrap;font:17px/1.3 monospace;max-height:72vh;overflow:hidden;text-align:left';
+      pre.textContent = '— Розширення в пам\u2019яті —\n' + (pl || '(порожньо)') + '\n\n— Запуск —\n' + cur.join('\n');
+      box.appendChild(pre);
+      var bk = el('div', 'am-btn am-main', 'Назад');
+      var r0 = el('div', 'am-row'); r0.appendChild(bk); box.appendChild(r0);
+      grid.push([{ node: bk, act: function () { mode = 'list'; render(0, 0); } }]);
     } else {
       box.appendChild(el('div', 'am-hint', editing ? 'Змініть адресу і натисніть «Зберегти»' : 'Введіть адресу сервера, наприклад http://92-5-178-165.sslip.io'));
       var inp = document.createElement('input');
@@ -376,12 +414,7 @@
     var started = Date.now();
     (function watch() {
       if (window.appready) { ls('mylampa_mode_' + hostOf(current()), 'inside'); return; }
-      if (Date.now() - started > 20000) {
-        if (isOpen()) return setTimeout(watch, 2000);   // користувач у меню адрес — не заважаємо
-        ls('mylampa_mode_' + hostOf(current()), 'direct');
-        try { window.location.replace(current()); } catch (e) {}
-        return;
-      }
+      if (Date.now() - started > 90000) return;      // більше не перемикаємося «напряму»: інша пам'ять — губились розширення
       setTimeout(watch, 1000);
     })();
   }

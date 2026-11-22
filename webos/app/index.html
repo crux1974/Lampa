@@ -45,6 +45,27 @@
   </div>
 </div>
 <script>
+/* Журнал запуску: важливі повідомлення Lampa й помилки — для діагностики (меню ◀ → «Журнал запуску») */
+(function () {
+  var L = window.ALCO_LOG = [], t0 = Date.now();
+  try { localStorage.setItem('alco_log_prev', localStorage.getItem('alco_log') || '[]'); } catch (e) {}
+  var saveT = null;
+  function save() { clearTimeout(saveT); saveT = setTimeout(function () { try { localStorage.setItem('alco_log', JSON.stringify(L.slice(-80))); } catch (e) {} }, 500); }
+  function push(kind, args) {
+    var txt = '';
+    try { txt = Array.prototype.map.call(args, function (a) { return typeof a === 'string' ? a : (a && a.message) ? a.message : JSON.stringify(a); }).join(' '); } catch (e) { txt = String(args[0]); }
+    if (kind === 'log' && !/Plugins|Extensions|Storage|SUI|Quota|error|fail/i.test(txt)) return;
+    L.push(((Date.now() - t0) / 1000).toFixed(1) + 's ' + kind + ': ' + txt.slice(0, 220)); save();
+  }
+  ['log', 'warn', 'error'].forEach(function (k) {
+    var o = console[k];
+    console[k] = function () { push(k, arguments); try { return o.apply(console, arguments); } catch (e) {} };
+  });
+  window.addEventListener('error', function (e) { push('error', [(e.message || 'error') + ' @ ' + (e.filename || '').split('/').pop() + ':' + e.lineno]); }, true);
+  try { var n = 0; for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; } push('warn', ['Пам\u2019ять localStorage: ' + Math.round(n / 1024) + ' К символів']); } catch (e) {}
+})();
+</script>
+<script>
 /* Пам'ять телевізора: коли localStorage майже повний, Lampa переносить дані в резерв і після
    перезапуску «губить» розширення. Перед запуском чистимо лише кеші плагінів (не налаштування). */
 (function () {
@@ -164,6 +185,15 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
   }
 
   function start() {
+    try {
+      var sm = window.location.search.match(/[?&]srv=([^&]+)/);
+      if (sm) {
+        var su = decodeURIComponent(sm[1]);
+        window.localStorage.setItem('mylampa_url2', su);
+        var sl = []; try { sl = JSON.parse(window.localStorage.getItem('mylampa_list') || '[]'); } catch (e) {}
+        if (sl.indexOf(su) < 0) { sl.push(su); window.localStorage.setItem('mylampa_list', JSON.stringify(sl)); }
+      }
+    } catch (e) {}
     var u = norm(getUrl());
     $('url').textContent = u.replace(/^https?:\/\//, '');
     show(null);
@@ -179,7 +209,10 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     } catch (e) {}
     var hm = (u.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
     var mode = null;
-    try { mode = window.localStorage.getItem('mylampa_mode_' + hm.toLowerCase()); } catch (e) {}
+    // Завжди відкриваємо Lampa напряму з сервера: там ваша пам'ять (розширення, Stylish, CUB),
+    // і саме туди Lampa повертається після «Очистити кеш». Меню ◀ підвантажує сервер (Lampac).
+    mode = 'direct';
+    try { window.name = JSON.stringify({ alco: 1, start: window.ALCO_START, def: window.ALCO_DEFAULT_URL, cur: u, list: (function () { try { return JSON.parse(localStorage.getItem('mylampa_list') || '[]'); } catch (e) { return []; } })() }); } catch (e) {}
     if (mode === 'direct') {                    // цей сервер працює лише напряму
       var t0 = Date.now();
       $('status').textContent = 'Натисніть ◀ — змінити сервер';
@@ -196,10 +229,7 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     }
     loadInside(u, function (reason) {
       try { window.localStorage.setItem('mylampa_fail', reason); } catch (e) {}
-      ping(u, function (ok) {
-        if (ok) window.location.replace(u);
-        else show('error');
-      });
+      show('error');
     });
   }
   var directTimer = null;
