@@ -3152,6 +3152,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3693,19 +3694,39 @@
     function styleUrl(s) { return trim(S('style_url_' + s.id, '')) || s.url; }
     function styleIs(id) { var a = activeStyle(); return !!(a && a.id === id); }
 
+    // Сторінка через https не може завантажити плагін з http-адреси (браузер блокує «змішаний вміст»)
+    var HTTPS_MIRROR = { cardify: 'https://crux1974.github.io/Lampa/ycardmod.js' };
+    function effectiveUrl(st) {
+        var u = styleUrl(st);
+        if (location.protocol === 'https:' && /^http:\/\//i.test(u)) u = HTTPS_MIRROR[st.id] || u.replace(/^http:/i, 'https:');
+        return u;
+    }
+    window.__sui_style_state = 'none';
     // Завантаження активного стилю якомога раніше (до появи головної сторінки)
     (function loadStyle() {
         var st = activeStyle();
         if (!st || window.__sui_style_loaded) return;
         window.__sui_style_loaded = st.id;
+        window.__sui_style_state = 'loading';
         document.documentElement.className += ' sui-style-' + st.id;
         try { if (document.body) document.body.classList.add('sui-style-' + st.id); } catch (e) { }
-        var url = styleUrl(st);
+        var url = effectiveUrl(st);
+        window.__sui_style_url = url;
         try {
-            if (Lampa.Utils && Lampa.Utils.putScriptAsync) Lampa.Utils.putScriptAsync([url], function () { });
-            else { var sc = document.createElement('script'); sc.src = url; document.head.appendChild(sc); }
-        } catch (e) { console.log('SUI style', e); }
+            var sc = document.createElement('script');
+            sc.src = url;
+            sc.onload = function () { window.__sui_style_state = 'ok'; };
+            sc.onerror = function () { window.__sui_style_state = 'error'; console.log('SUI style: не вдалося завантажити', url); };
+            (document.head || document.documentElement).appendChild(sc);
+        } catch (e) { window.__sui_style_state = 'error'; }
     })();
+    function openStyleSettings(st, back) {
+        var stt = window.__sui_style_state;
+        if (stt === 'error') return Lampa.Noty.show('Стиль не завантажився з адреси ' + window.__sui_style_url + '. Перевірте «Адреси плагінів»');
+        if (stt === 'loading') return Lampa.Noty.show('Стиль ще завантажується, спробуйте за кілька секунд');
+        try { Lampa.Settings.create(st.comp, { onBack: back }); }
+        catch (e) { Lampa.Noty.show('Стиль завантажився, але його меню не знайдено'); }
+    }
 
     function setStyle(id) {
         var prev = S('style_active', '');
@@ -3918,7 +3939,7 @@
         var actSt = activeStyle(), mark = function (on) { return on ? '✓ ' : ''; };
         ttl(STYLES_C, 'styles_status', actSt ? 'Активний: ' + actSt.name : 'Активний: без стилю (стандартна Lampa)');
         if (actSt && actSt.comp) btn(STYLES_C, 'style_settings', '⚙ Налаштування: ' + actSt.name, 'Власне меню активного стилю від автора', function () {
-            try { Lampa.Settings.create(actSt.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+            openStyleSettings(actSt, function () { open(STYLES_C); });
         });
         btn(STYLES_C, 'style_go_none', mark(!actSt) + 'Без стилю', !actSt ? 'Активний' : 'Стандартний вигляд Lampa. Lampa перезапуститься', function () {
             if (!actSt) return Lampa.Noty.show('Уже без стилю');
@@ -3931,7 +3952,7 @@
                 function () {
                     if (isOn) {
                         if (!st.comp) return Lampa.Noty.show('У цього стилю немає власних налаштувань');
-                        try { Lampa.Settings.create(st.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+                        openStyleSettings(st, function () { open(STYLES_C); });
                         return;
                     }
                     if (!styleUrl(st)) return Lampa.Noty.show('Немає адреси плагіна — вкажіть її в «Адреси плагінів»');
@@ -3967,12 +3988,14 @@
             var tries = 0, t = setInterval(function () {
                 tries++;
                 var ready = false;
-                try { ready = !!document.querySelector('.settings-folder[data-component="' + st.comp + '"]') || (Lampa.SettingsApi.getComponent && Lampa.SettingsApi.getComponent(st.comp)); } catch (e) { }
+                ready = window.__sui_style_state === 'ok';
+                if (window.__sui_style_state === 'error') { clearInterval(t); return Lampa.Noty.show('Стиль не завантажився з адреси ' + window.__sui_style_url); }
                 if (!ready && tries < 20) return;
                 clearInterval(t);
+                if (!ready) return;
                 try {
                     Lampa.Controller.toggle('settings');
-                    setTimeout(function () { try { Lampa.Settings.create(st.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { } }, 400);
+                    setTimeout(function () { openStyleSettings(st, function () { open(STYLES_C); }); }, 1200);
                     Lampa.Noty.show('Увімкнено: ' + st.name + ' — налаштування стилю');
                 } catch (e) { }
             }, 500);
