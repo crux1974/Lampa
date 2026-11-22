@@ -3158,6 +3158,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3575,7 +3576,7 @@
         var st = S('ua_style', 'normal'), gap = S('ua_gap', '0.45em');
         var box = $('<div class="sui-uat' + (st !== 'normal' ? ' sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') : '') + '"></div>').css({ 'font-size': S('ua_size', '1.1em'), 'margin-left': S('ua_ml', '0px') });
         if (neg(gap)) box.addClass('sui-neg').css('--sui-neg', gap); else box.css('gap', gap);
-        var pos = S('ua_pos', 'status'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        var pos = S('ua_pos', 'br'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
         if (pos === 'status') {
             // в один рядок зі статусом («Випущено»), без фону — як на фото
             var stEl = root.find('.full-start__status, .full-start-new__status').filter(function () { return $(this).css('display') !== 'none'; }).first();
@@ -3706,14 +3707,16 @@
         });
     }
     function rateCss() {
-        return '.sui-rt2{display:flex;align-items:center;flex-wrap:wrap;gap:.2em 1.1em}' +
-            '.sui-rt2 .full-start__rate{display:inline-flex!important;flex-direction:row-reverse;align-items:center;gap:.35em;background:none!important;padding:0!important;margin:0!important;border:0!important;font-size:1.25em}' +
-            '.sui-rt2 .full-start__rate>div{margin:0!important;padding:0!important;background:none!important}' +
-            '.sui-rv{font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
+        return '.sui-rt2{display:flex!important;align-items:center;flex-wrap:wrap;gap:.4em 1.4em;height:auto!important;min-height:2.2em;overflow:visible!important;margin-bottom:1.1em!important;position:relative;z-index:2}' +
+            '.sui-rt2 .full-start__rate{display:inline-flex!important;flex-direction:row-reverse;align-items:center;gap:.4em;background:none!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important;font-size:1.5em!important;line-height:1!important;height:auto!important;opacity:1!important}' +
+            '.sui-rt2 .full-start__rate.hide{display:none!important}' +
+            '.sui-rt2 .full-start__rate>div{margin:0!important;padding:0!important;background:none!important;border:0!important;line-height:1!important;font-size:1em!important;opacity:1!important}' +
+            '.sui-rv{font:800 1em/1 Arial,sans-serif!important;text-shadow:0 1px 4px rgba(0,0,0,.9)}' +
             '.sui-rs{display:inline-flex;align-items:center}' +
-            '.sui-rl--tmdb{display:inline-flex;flex-direction:column;font:900 .42em/.95 Arial,sans-serif;letter-spacing:.02em;background:linear-gradient(90deg,#90cea1,#01b4e4);-webkit-background-clip:text;background-clip:text;color:transparent}' +
-            '.sui-rl--imdb{background:#f5c518;color:#000;font:900 .6em/1 Arial,sans-serif;padding:.18em .3em;border-radius:.2em}' +
-            '.sui-rl-svg{width:1.4em!important;height:1.05em!important}';
+            '.sui-rl--tmdb{display:inline-flex;flex-direction:column;font:900 .5em/.92 Arial,sans-serif;letter-spacing:.02em;background:linear-gradient(90deg,#90cea1,#01b4e4);-webkit-background-clip:text;background-clip:text;color:transparent}' +
+            '.sui-rl--imdb{background:#f5c518;color:#000;font:900 .62em/1 Arial,sans-serif;padding:.2em .32em;border-radius:.2em}' +
+            '.sui-rl-svg{width:1.45em!important;height:1.1em!important;max-width:none}' +
+            'body .sui-rt2~.cardify__details .full-start-new__details,body .sui-rt2~.full-start-new__details,body .sui-rt2~.full-start__details{margin-top:.2em!important}';
     }
 
     function onFullLook(e) {
@@ -3997,7 +4000,7 @@
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
         sel(UAT, 'ua_look', 'Вигляд значків', '', { 'new': 'Новий (іконки)', classic: 'Класичний' }, 'new');
-        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { status: 'В рядку зі статусом', br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'status');
+        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', status: 'В рядку зі статусом', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
 
 
         // ---- 3. Стилі: вибір одним натисканням ----
@@ -4048,6 +4051,7 @@
     }
 
     function start() {
+        if (S('ua_pos_v2', false) !== true) { setS('ua_pos', 'br'); setS('ua_pos_v2', true); }
         addMenus();
         lookCss();
         styleCss();
