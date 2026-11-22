@@ -3139,6 +3139,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3256,6 +3257,8 @@
             '.sui-glass.is-lite{background:rgba(30,32,40,.7);-webkit-backdrop-filter:none;backdrop-filter:none}' +
             '.sui-neg>*+*{margin-left:var(--sui-neg)}';
         // 1) слоган
+        // постер зліва в повній картці
+        if (S('full_poster', true) === false && !styleIs('cardify')) css += '.full-start-new__left,.full-start__left,.full-start__poster{display:none!important}.full-start-new__right{padding-left:0!important}';
         if (on('slogan') && !styleIs('cardify')) css += '.full-start-new__tagline,.full-start__tagline,.full-start-new [class*="tagline"],.full-start [class*="tagline"]{display:none!important}';
         // 3) кнопки
         var bst = S('btn_style', 'normal'), bsz = S('btn_size', '1em'), bmt = S('btn_mt', '1em');
@@ -3752,6 +3755,7 @@
         var clear = function (store, txt) { return function () { Lampa.Storage.set(store, {}); Lampa.Noty.show(txt); }; };
 
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
+        if (!styleIs('cardify')) trg(LOOK, 'full_poster', 'Постер у повній картці', 'Показувати постер зліва на сторінці фільму', true);
         if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
         if (!styleIs('appletv')) {
             btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
