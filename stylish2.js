@@ -975,7 +975,7 @@
         add({
             component: SUI,
             param: { name: 'stylish_ui_open_styles', type: 'button' },
-            field: { name: '3. Стилі', description: 'Cardify, Obsidian, Apple TV, Netflix — одночасно лише один' },
+            field: { name: '3. Стилі', description: 'Увімкнено: ' + ({ cardify: 'Стиль Cardify', obsidian: 'Стиль Obsidian', appletv: 'Стиль Apple TV', netflix: 'Стиль Netflix' }[SUI_STYLE] || 'жоден стиль') },
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_styles'); }
         });
 
@@ -3149,6 +3149,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3910,6 +3911,8 @@
 
         // ---- 3. Стилі ----
         Lampa.Template.add('settings_' + STYLES_C, '<div></div>');
+        var actSt = activeStyle();
+        ttl(STYLES_C, 'styles_status', actSt ? 'Зараз увімкнено: ' + actSt.name : 'Зараз увімкнено: жоден стиль (стандартна Lampa)');
         ttl(STYLES_C, 'styles_head', 'Стилі');
         btn(STYLES_C, 'styles_info', 'Як це працює', 'Одночасно може бути увімкнений лише один стиль. Після зміни Lampa перезапуститься', function () { });
         STYLE_LIST.forEach(function (st) {
