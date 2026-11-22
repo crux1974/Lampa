@@ -2,7 +2,7 @@
  * Стильний інтерфейс 2.0 — плагін для Lampa
  * https://github.com/crux1974/Lampa
  *
- * Розділи «Рейтинги» і «Зовнішній вигляд» — власний код плагіна.
+ * Розділ «Зовнішній вигляд» — власний код плагіна.
  * Розділ «Інформаційна панель» побудовано на основі плагіна
  * «Інтерфейс +» (interface+.js) автора ko31k — https://github.com/ko31k/LMP
  * Код змінено: власне меню українською, прибрано функції, які не ввійшли
@@ -971,12 +971,6 @@
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_look'); }
         });
 
-        add({
-            component: SUI,
-            param: { name: 'stylish_ui_open_rt', type: 'button' },
-            field: { name: '3. Рейтинги', description: 'IMDb, Rotten Tomatoes, Metacritic, Trakt, Letterboxd, нагороди' },
-            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_rt'); }
-        });
         // ---- 1. Інформаційна панель (підменю) ----
         Lampa.Template.add('settings_' + SUI_INFO, '<div></div>');
         add({ component: SUI_INFO, param: { name: 'stylish_ui_info_head', type: 'title' }, field: { name: 'Інформаційна панель' } });
@@ -3129,8 +3123,9 @@
 
 
 
+
 /* ==========================================================================
- * Стильний інтерфейс 2.0 — розділи «Рейтинги» та «Зовнішній вигляд».
+ * Стильний інтерфейс 2.0 — розділ «Зовнішній вигляд».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
  * ========================================================================== */
 (function () {
@@ -3139,7 +3134,7 @@
     window.__sui_extra = true;
 
     var P = 'sui_';
-    var SUI = 'stylish_ui', RT = 'stylish_ui_rt', RT_SEL = 'stylish_ui_rt_sel', LOOK = 'stylish_ui_look';
+    var SUI = 'stylish_ui', LOOK = 'stylish_ui_look';
 
     function S(k, d) {
         var v = Lampa.Storage.get(P + k, d);
@@ -3208,155 +3203,11 @@
     function isTv(m) { return !!(m && (m.name || m.first_air_date || m.number_of_seasons || /tv/i.test(m.media_type || m.type || ''))); }
 
     /* ======================================================================
-     * 3. РЕЙТИНГИ
-     * ==================================================================== */
-    var RATINGS = [
-        { key: 'tmdb', name: 'TMDB', color: '#01b4e4' },
-        { key: 'imdb', name: 'IMDb', color: '#f5c518' },
-        { key: 'rt', name: 'Rotten Tomatoes', short: 'RT', color: '#fa320a' },
-        { key: 'popcorn', name: 'RT Audience', short: 'RT 🍿', color: '#ffb000' },
-        { key: 'mc', name: 'Metacritic', short: 'MC', color: '#66cc33' },
-        { key: 'trakt', name: 'Trakt', color: '#ed1c24' },
-        { key: 'letterboxd', name: 'Letterboxd', short: 'LB', color: '#40bcf4' },
-        { key: 'mdblist', name: 'MDBList Score', short: 'MDB', color: '#4284f5' },
-        { key: 'awards', name: 'Нагороди', short: '🏆', color: '#e5b80b' }
-    ];
-    function rtOn(key) { return S('rt_show_' + key, true) !== false; }
-
-    function scoreColor(v10) {
-        if (v10 == null || isNaN(v10)) return '#ddd';
-        if (v10 >= 7.5) return '#3fd16b';
-        if (v10 >= 6) return '#f5c518';
-        if (v10 >= 4) return '#ff9b3d';
-        return '#ff5a5a';
-    }
-
-    function rtCss() {
-        var id = 'sui-rt-css', el = document.getElementById(id);
-        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-        var size = S('rt_size', '1.1em'), gap = S('rt_gap', '0.5em'), ml = S('rt_ml', '0em'), mt = S('rt_mt', '10px'), sat = S('rt_sat', '100%');
-        el.textContent =
-            '.sui-rt{display:flex;flex-wrap:wrap;align-items:center;gap:' + gap + ';margin:' + mt + ' 0 ' + mt + ' ' + ml + ';font-size:' + size + ';filter:saturate(' + sat + ')}' +
-            '.sui-rt__i{display:inline-flex;align-items:center;gap:.35em;padding:.25em .6em;border-radius:.45em;line-height:1.2;white-space:nowrap}' +
-            '.sui-rt--normal .sui-rt__i{background:rgba(0,0,0,.45)}' +
-            '.sui-rt--apple .sui-rt__i{background:rgba(255,255,255,.12);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.18)}' +
-            '.sui-rt--apple_lite .sui-rt__i{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18)}' +
-            '.sui-rt__n{font-weight:700;font-size:.8em;letter-spacing:.02em}' +
-            '.sui-rt__v{font-weight:700}';
-    }
-
-    // отримати IMDb id: з картки, або через TMDB external_ids
-    function imdbIdFor(m, cb) {
-        if (m.imdb_id) return cb(m.imdb_id);
-        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
-        var c = cacheGet('sui_imdb', ck, 30 * 864e5);
-        if (c) return cb(c);
-        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/external_ids'), function (j) {
-            var id = j && j.imdb_id;
-            if (id) cacheSet('sui_imdb', ck, id, 30 * 864e5);
-            cb(id || '');
-        }, function () { cb(''); });
-    }
-
-    function fetchMdb(m, cb) {
-        var key = trim(S('rt_mdb_key', ''));
-        if (!key) return cb(null);
-        var url = 'https://mdblist.com/api/?apikey=' + encodeURIComponent(key) + '&tm=' + m.id + '&m=' + (isTv(m) ? 'show' : 'movie');
-        getJSON(url, function (j) {
-            if (!j || j.response === false) return cb(null);
-            var out = { imdbid: j.imdbid };
-            (j.ratings || []).forEach(function (r) {
-                if (r.value == null || r.value === 0) return;
-                var map = { imdb: 'imdb', tomatoes: 'rt', tomatoesaudience: 'popcorn', popcorn: 'popcorn', metacritic: 'mc', trakt: 'trakt', letterboxd: 'letterboxd' };
-                var k = map[r.source];
-                if (k) out[k] = r.value;
-            });
-            if (j.score) out.mdblist = j.score;
-            cb(out);
-        }, function () { cb(null); });
-    }
-
-    function fetchOmdb(imdb, cb) {
-        var key = trim(S('rt_omdb_key', ''));
-        if (!key || !imdb) return cb(null);
-        getJSON('https://www.omdbapi.com/?apikey=' + encodeURIComponent(key) + '&i=' + imdb, function (j) {
-            if (!j || j.Response === 'False') return cb(null);
-            var out = {};
-            if (j.imdbRating && j.imdbRating !== 'N/A') out.imdb = parseFloat(j.imdbRating);
-            (j.Ratings || []).forEach(function (r) {
-                if (r.Source === 'Rotten Tomatoes') out.rt = parseInt(r.Value, 10);
-                if (r.Source === 'Metacritic') out.mc = parseInt(r.Value, 10);
-            });
-            if (j.Awards && j.Awards !== 'N/A') out.awards = j.Awards;
-            cb(out);
-        }, function () { cb(null); });
-    }
-
-    function collectRatings(m, cb) {
-        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
-        var cached = cacheGet('sui_rt_cache', ck, 3 * 864e5);
-        if (cached) return cb(cached);
-        var res = {};
-        fetchMdb(m, function (md) {
-            if (md) for (var k in md) res[k] = md[k];
-            var imdb = (md && md.imdbid) || m.imdb_id;
-            var next = function (id) {
-                fetchOmdb(id, function (om) {
-                    if (om) for (var k2 in om) if (res[k2] == null) res[k2] = om[k2];
-                    if (Object.keys(res).length) cacheSet('sui_rt_cache', ck, res, 3 * 864e5);
-                    cb(res);
-                });
-            };
-            if (imdb) next(imdb); else imdbIdFor(m, next);
-        });
-    }
-
-    function pl(n, one, few, many) { n = Math.abs(n) % 100; if (n >= 5 && n <= 20) return many; n = n % 10; if (n === 1) return one; if (n >= 2 && n <= 4) return few; return many; }
-    function awardsText(a) {
-        var s = String(a || '');
-        var oscar = s.match(/Won (\d+) Oscar/i), wins = s.match(/(\d+) wins?/i), noms = s.match(/(\d+) nomination/i);
-        if (oscar) return oscar[1] + ' ' + pl(+oscar[1], 'Оскар', 'Оскари', 'Оскарів') + (wins ? ' · ' + wins[1] + ' ' + pl(+wins[1], 'перемога', 'перемоги', 'перемог') : '');
-        if (wins) return wins[1] + ' ' + pl(+wins[1], 'перемога', 'перемоги', 'перемог') + (noms ? ' · ' + noms[1] + ' номін.' : '');
-        if (noms) return noms[1] + ' ' + pl(+noms[1], 'номінація', 'номінації', 'номінацій');
-        return '';
-    }
-
-    function renderRatings(root, m, data) {
-        root.find('.sui-rt').remove();
-        var items = [];
-        RATINGS.forEach(function (r) {
-            if (!rtOn(r.key)) return;
-            var v = r.key === 'tmdb' ? (m.vote_average ? Math.round(m.vote_average * 10) / 10 : null) : data[r.key];
-            if (v == null || v === '' || (typeof v === 'number' && isNaN(v))) return;
-            var shown, v10;
-            if (r.key === 'awards') { shown = awardsText(v); if (!shown) return; v10 = 8; }
-            else if (r.key === 'rt' || r.key === 'popcorn' || r.key === 'mc' || r.key === 'mdblist' || r.key === 'trakt') { shown = Math.round(v) + (r.key === 'mc' || r.key === 'mdblist' ? '' : '%'); v10 = v / 10; }
-            else if (r.key === 'letterboxd') { shown = (Math.round(v * 10) / 10).toFixed(1); v10 = v * 2; }
-            else { shown = (Math.round(v * 10) / 10).toFixed(1); v10 = v; }
-            items.push('<span class="sui-rt__i"><span class="sui-rt__n" style="color:' + r.color + '">' + esc(r.short || r.name) + '</span><span class="sui-rt__v" style="color:' + scoreColor(v10) + '">' + esc(shown) + '</span></span>');
-        });
-        if (!items.length) return;
-        var box = $('<div class="sui-rt sui-rt--' + esc(S('rt_style', 'normal')) + '">' + items.join('') + '</div>');
-        var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
-        if (line.length) line.after(box); else root.find('.full-start-new__title, .full-start__title').first().after(box);
-    }
-
-    function onFullRatings(e) {
-        if (S('rt_enable', true) === false) return;
-        var m = e.data && e.data.movie;
-        if (!m || !m.id) return;
-        var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.full-start-new').closest('.activity');
-        rtCss();
-        renderRatings(root, m, {});                     // TMDB одразу
-        collectRatings(m, function (data) { renderRatings(root, m, data || {}); });
-    }
-
-    /* ======================================================================
      * 2. ЗОВНІШНІЙ ВИГЛЯД — пункти меню як у Yarik's Mod (код власний)
      * ==================================================================== */
     var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
     var PARENT = {};
-    PARENT[RT_SEL] = RT; PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
+    PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
     function on(key) { return S(key, true) !== false; }
     function landscape() { return window.innerWidth >= window.innerHeight; }
@@ -3786,7 +3637,7 @@
     function sizes(list) { var o = {}; list.forEach(function (v) { o[v] = v; }); return o; }
 
     function addMenus() {
-        [RT, RT_SEL, LOOK].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
+        [LOOK].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
 
         // ---- 13a / 14a: у кінці «Інформаційної панелі» ----
         var INFO = 'stylish_ui_info';
@@ -3801,23 +3652,6 @@
         trg(INFO, 'bot_season', 'Бейдж сезону/серії', 'Для серіалів: S3 · E8 (якщо Lampa знає сезон)', true);
         trg(INFO, 'bot_rating', 'Бейдж рейтингу (TMDB)', 'Оцінка TMDB кольором', true);
         trg(INFO, 'native_vote', 'Рейтинги на картці', 'Стандартна оцінка Lampa на постері', true);
-
-        // ---- 3. Рейтинги ----
-        ttl(RT, 'rt_head', 'Рейтинги');
-        trg(RT, 'rt_enable', 'Показувати рейтинги', 'Рейтинги IMDb, Rotten Tomatoes, Metacritic та інших у повній картці', true);
-        inp(RT, 'rt_omdb_key', 'OMDB API ключ', 'Безкоштовний ключ: omdbapi.com/apikey.aspx — IMDb, Rotten Tomatoes, Metacritic, нагороди');
-        inp(RT, 'rt_mdb_key', 'MDBList API ключ', 'Безкоштовний ключ: mdblist.com → Preferences → API — усі джерела одразу');
-        sel(RT, 'rt_style', 'Стиль блоку', 'Зовнішній вигляд рейтингів', { normal: 'Звичайний', apple: 'Apple (скло з розмиттям)', apple_lite: 'Apple Lite (без розмиття)' }, 'normal');
-        sel(RT, 'rt_size', 'Розмір рейтингів', '', sizes(['0.8em', '0.9em', '1em', '1.1em', '1.2em', '1.3em', '1.5em']), '1.1em');
-        sel(RT, 'rt_gap', 'Відстань між рейтингами', '', sizes(['0.2em', '0.3em', '0.5em', '0.7em', '1em']), '0.5em');
-        sel(RT, 'rt_ml', 'Відступ зліва', '', sizes(['0em', '0.5em', '1em', '1.5em', '2em']), '0em');
-        sel(RT, 'rt_mt', 'Відступ до інших рядків', '', sizes(['0px', '5px', '10px', '15px', '20px']), '10px');
-        sel(RT, 'rt_sat', 'Насиченість', '', { '100%': '100% (стандарт)', '75%': '75%', '50%': '50%', '25%': '25%', '0%': '0% (Ч/Б)' }, '100%');
-        btn(RT, 'rt_sel_open', 'Вибір рейтингів', 'Увімкнути або вимкнути джерела', function () { open(RT_SEL); });
-        btn(RT, 'rt_clear', 'Очистити кеш рейтингів', 'Якщо рейтинги застаріли', function () { Lampa.Storage.set('sui_rt_cache', {}); Lampa.Noty.show('Кеш рейтингів очищено'); });
-
-        ttl(RT_SEL, 'rt_sel_head', 'Вибір рейтингів');
-        RATINGS.forEach(function (r) { trg(RT_SEL, 'rt_show_' + r.key, r.name, '', true); });
 
         // ---- 2. Зовнішній вигляд (як у Yarik's Mod) ----
         [LOGO, XT, BTNS, STUD, UAT].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
@@ -3890,17 +3724,14 @@
     function start() {
         addMenus();
         lookCss();
-        rtCss();
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
-            try { onFullRatings(e); } catch (er) { }
             try { onFullLook(e); } catch (er) { console.log('SUI look', er); }
         });
         Lampa.Storage.listener.follow('change', function (e) {
             var n = String(e.name || '');
             if (n.indexOf(P) !== 0) return;
-            if (n.indexOf(P + 'rt_') === 0) return rtCss();
             lookCss();
             if (/^sui_(bot_|native_vote|uator)/.test(n)) refreshCards();
         });
