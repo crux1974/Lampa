@@ -1,14 +1,14 @@
 {
     "id": "com.crux1974.lampa",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "vendor": "crux1974",
     "type": "web",
     "main": "index.html",
     "title": "Alcopac UA",
     "icon": "icon.png",
     "largeIcon": "largeIcon.png",
-    "bgColor": "#0d1022",
-    "iconColor": "#0d1022",
+    "bgColor": "#0a1430",
+    "iconColor": "#0a1430",
     "resolution": "1920x1080",
     "disableBackHistoryAPI": true,
     "requiredPermissions": []
