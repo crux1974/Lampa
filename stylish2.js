@@ -3156,6 +3156,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3749,7 +3750,7 @@
         setS('style_active', id);
         setS('style_just', id || '');
         Lampa.Noty.show(id ? 'Стиль змінено — перезапуск Lampa…' : 'Стиль вимкнено — перезапуск Lampa…');
-        setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 1500);
+        setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 600);
     }
     function styleCss() {
         var id = 'sui-styles-css', el = document.getElementById(id);
@@ -4013,27 +4014,7 @@
         lookCss();
         styleCss();
         btnEdCss();
-        // після перемикання стилю — одразу показати його налаштування
-        (function () {
-            var just = S('style_just', ''), st = activeStyle();
-            if (!just) return;
-            setS('style_just', '');
-            if (!st || st.id !== just || !st.comp) return;
-            var tries = 0, t = setInterval(function () {
-                tries++;
-                var ready = false;
-                ready = window.__sui_style_state === 'ok';
-                if (window.__sui_style_state === 'error') { clearInterval(t); return Lampa.Noty.show('Стиль не завантажився з адреси ' + window.__sui_style_url); }
-                if (!ready && tries < 20) return;
-                clearInterval(t);
-                if (!ready) return;
-                try {
-                    Lampa.Controller.toggle('settings');
-                    setTimeout(function () { openStyleSettings(st, function () { open(STYLES_C); }); }, 1200);
-                    Lampa.Noty.show('Увімкнено: ' + st.name + ' — налаштування стилю');
-                } catch (e) { }
-            }, 500);
-        })();
+        setS('style_just', '');
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;

@@ -115,6 +115,10 @@
           { node: del, act: function () { remove(u); } }
         ]);
       });
+      var lRow = el('div', 'am-row');
+      var lb = el('div', 'am-btn am-main', '📋 Журнал запуску');
+      lRow.appendChild(lb); box.appendChild(lRow);
+      grid.push([{ node: lb, act: function () { mode = 'log'; render(0, 0); } }]);
       var tRow = el('div', 'am-row');
       var tb = el('div', 'am-btn am-main', '🔍 Перевірка пульта');
       tRow.appendChild(tb); box.appendChild(tRow);
@@ -124,6 +128,17 @@
       addRow.appendChild(add);
       box.appendChild(addRow);
       grid.push([{ node: add, act: function () { edit(null); } }]);
+    } else if (mode === 'log') {
+      box.appendChild(el('div', 'am-hint', 'Сфотографуйте й надішліть · OK — назад'));
+      var get = function (k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };
+      var cur = (window.ALCO_LOG || []).slice(-30), prev = get('alco_log_prev').slice(-14);
+      var pre = el('div', 'am-hint', '');
+      pre.style.cssText = 'white-space:pre-wrap;font:18px/1.35 monospace;max-height:70vh;overflow:hidden;text-align:left';
+      pre.textContent = '— Зараз —\n' + cur.join('\n') + '\n\n— Минулий запуск —\n' + prev.join('\n');
+      box.appendChild(pre);
+      var bk = el('div', 'am-btn am-main', 'Назад');
+      var r0 = el('div', 'am-row'); r0.appendChild(bk); box.appendChild(r0);
+      grid.push([{ node: bk, act: function () { mode = 'list'; render(0, 0); } }]);
     } else {
       box.appendChild(el('div', 'am-hint', editing ? 'Змініть адресу і натисніть «Зберегти»' : 'Введіть адресу сервера, наприклад http://92-5-178-165.sslip.io'));
       var inp = document.createElement('input');
