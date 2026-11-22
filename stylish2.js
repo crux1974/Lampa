@@ -651,8 +651,7 @@
         var css = `
   .full-start-new__details{
     color:#fff !important;
-    margin:-0.45em !important;
-    margin-bottom:1em !important;
+    margin:0.35em 0 1em -0.45em !important;
     display:flex !important;
     align-items:center !important;
     flex-wrap:wrap !important;
@@ -1172,7 +1171,7 @@
             'flex-direction': 'column',
             width: '100%',
             gap: '0em',
-            margin: '-1.0em 0 0.2em 0.45em'
+            margin: '0.35em 0 0.2em 0.45em'
         });
         var row1 = $('<div>').css({ display: 'flex', 'flex-wrap': 'wrap', gap: '0.2em', 'align-items': 'center', margin: '0 0 0.2em 0' });
         var row2 = $('<div>').css({ display: 'flex', 'flex-wrap': 'wrap', gap: '0.2em', 'align-items': 'center', margin: '0 0 0.2em 0' });
