@@ -200,7 +200,9 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     } catch (e) {}
     var hm = (u.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
     var mode = null;
-    try { mode = window.localStorage.getItem('mylampa_mode_' + hm.toLowerCase()); } catch (e) {}
+    // Завжди відкриваємо Lampa всередині застосунку: одна пам'ять налаштувань і розширень.
+    // (Раніше при повільному старті застосунок перемикався «напряму» — і там була інша пам'ять.)
+    mode = 'inside';
     if (mode === 'direct') {                    // цей сервер працює лише напряму
       var t0 = Date.now();
       $('status').textContent = 'Натисніть ◀ — змінити сервер';
@@ -217,10 +219,7 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     }
     loadInside(u, function (reason) {
       try { window.localStorage.setItem('mylampa_fail', reason); } catch (e) {}
-      ping(u, function (ok) {
-        if (ok) window.location.replace(u);
-        else show('error');
-      });
+      show('error');
     });
   }
   var directTimer = null;

@@ -394,12 +394,7 @@
     var started = Date.now();
     (function watch() {
       if (window.appready) { ls('mylampa_mode_' + hostOf(current()), 'inside'); return; }
-      if (Date.now() - started > 20000) {
-        if (isOpen()) return setTimeout(watch, 2000);   // користувач у меню адрес — не заважаємо
-        ls('mylampa_mode_' + hostOf(current()), 'direct');
-        try { window.location.replace(current()); } catch (e) {}
-        return;
-      }
+      if (Date.now() - started > 90000) return;      // більше не перемикаємося «напряму»: інша пам'ять — губились розширення
       setTimeout(watch, 1000);
     })();
   }
