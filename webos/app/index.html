@@ -45,6 +45,19 @@
   </div>
 </div>
 <script>
+/* Пам'ять телевізора: коли localStorage майже повний, Lampa переносить дані в резерв і після
+   перезапуску «губить» розширення. Перед запуском чистимо лише кеші плагінів (не налаштування). */
+(function () {
+  try {
+    var ls = window.localStorage, n = 0, i, k;
+    for (i = 0; i < ls.length; i++) { k = ls.key(i); n += k.length + (ls.getItem(k) || '').length; }
+    if (n < 1500000) return;
+    var rx = /^(sui_(img|full|uat|lang|rt_cache|tv_cache|svc_cache)$|obsidian_(quality|poster|episode)_cache$|img_cache_v3_|title_cache_hybrid|netflix_card_cache$|applecation_ratings_cache$|cardify_.*cache)/;
+    for (i = ls.length - 1; i >= 0; i--) { k = ls.key(i); if (k && rx.test(k)) ls.removeItem(k); }
+  } catch (e) {}
+})();
+</script>
+<script>
 window.ALCO_DEFAULT_URL = 'http://92-5-178-165.sslip.io';
 window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
 </script>
