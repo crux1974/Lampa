@@ -972,9 +972,9 @@
 
         add({
             component: SUI,
-            param: { name: 'stylish_ui_open_card', type: 'button' },
-            field: { name: '3. Головна сторінка', description: 'Повноекранна картка фільму, слайд-шоу фонів, трейлери' },
-            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_card'); }
+            param: { name: 'stylish_ui_open_styles', type: 'button' },
+            field: { name: '3. Стилі', description: 'Cardify, Obsidian, Apple TV, Netflix — одночасно лише один' },
+            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_styles'); }
         });
 
         // ---- 1. Інформаційна панель (підменю) ----
@@ -3131,8 +3131,10 @@
 
 
 
+
+
 /* ==========================================================================
- * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Головна сторінка».
+ * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
  * ========================================================================== */
 (function () {
@@ -3214,7 +3216,8 @@
      * ==================================================================== */
     var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
     var PARENT = {};
-    PARENT['stylish_ui_card'] = 'stylish_ui';
+    PARENT['stylish_ui_styles'] = 'stylish_ui';
+    ['cardify', 'obsidian', 'appletv', 'netflix'].forEach(function (k) { PARENT['stylish_ui_style_' + k] = 'stylish_ui_styles'; });
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
     function on(key) { return S(key, true) !== false; }
@@ -3534,7 +3537,7 @@
         uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
     }
     function uatorCard(el) {
-        if (!on('uator') || !el || el.__sui_ua) return;
+        if (!on('uator') || !el || el.__sui_ua || styleIs('obsidian') || styleIs('netflix')) return;
         var d = el.card_data;
         if (!d || !d.id) return;
         el.__sui_ua = true;
@@ -3554,7 +3557,7 @@
         if (!d || !view) return;
         var old = view.querySelectorAll('.sui-bot,.sui-rate');
         for (var i = 0; i < old.length; i++) old[i].parentNode.removeChild(old[i]);
-        if (S('bot_panel', false) !== true) return;
+        if (S('bot_panel', false) !== true || styleIs('obsidian') || styleIs('netflix')) return;
         var st = S('bot_style', 'standard'), pos = S('bot_rate_pos', 'br'), parts = [];
         if (S('bot_year', true) !== false) {
             var y = String(d.release_date || d.first_air_date || '').slice(0, 4);
@@ -3625,273 +3628,56 @@
     }
 
     /* ======================================================================
-     * 3. ГОЛОВНА СТОРІНКА — повноекранна картка фільму: слайд-шоу фонів,
-     * трейлери (TMDB/YouTube, IMDb, Netflix), опис праворуч.
-     * Власний код; назви пунктів меню — як у YCard Mod.
+     * 3. СТИЛІ — підключення стилів сторонніх авторів з їхніх адрес.
+     * Код стилів не копіюється: завантажується оригінальний плагін автора.
+     * Одночасно активний лише один стиль; після зміни — перезапуск Lampa.
      * ==================================================================== */
-    var CARD = 'stylish_ui_card';
-    function cardOn() { return String(S('card_enable', '0')) === '1'; }
-    function horiz() { return window.innerWidth > window.innerHeight; }
-    function num(v, d) { var n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? d : n; }
+    var STYLES_C = 'stylish_ui_styles';
+    var STYLE_LIST = [
+        { id: 'cardify', no: '3.1', name: 'Стиль Cardify', author: 'YCard Mod (lampalampa.free.nf)', url: 'http://lampalampa.free.nf/ycardmod.js', comp: 'cardify' },
+        { id: 'obsidian', no: '3.2', name: 'Стиль Obsidian', author: '@levende', url: 'https://levende.github.io/lampa-plugins/obsidian.js', comp: 'obsidian_settings' },
+        { id: 'appletv', no: '3.3', name: 'Стиль Apple TV', author: '@llowmikee', url: '', comp: '' },
+        { id: 'netflix', no: '3.4', name: 'Стиль Netflix', author: '@adambenhassen', url: 'https://adambenhassen.github.io/netflix.js', comp: 'netflix' }
+    ];
+    function styleById(id) { for (var i = 0; i < STYLE_LIST.length; i++) if (STYLE_LIST[i].id === id) return STYLE_LIST[i]; return null; }
+    function activeStyle() { var s = styleById(S('style_active', '')); return s && styleUrl(s) ? s : null; }
+    function styleUrl(s) { return trim(S('style_url_' + s.id, '')) || s.url; }
+    function styleIs(id) { var a = activeStyle(); return !!(a && a.id === id); }
 
-    function cardCss() {
-        var id = 'sui-card-css', el = document.getElementById(id);
+    // Завантаження активного стилю якомога раніше (до появи головної сторінки)
+    (function loadStyle() {
+        var st = activeStyle();
+        if (!st || window.__sui_style_loaded) return;
+        window.__sui_style_loaded = st.id;
+        document.documentElement.className += ' sui-style-' + st.id;
+        try { if (document.body) document.body.classList.add('sui-style-' + st.id); } catch (e) { }
+        var url = styleUrl(st);
+        try {
+            if (Lampa.Utils && Lampa.Utils.putScriptAsync) Lampa.Utils.putScriptAsync([url], function () { });
+            else { var sc = document.createElement('script'); sc.src = url; document.head.appendChild(sc); }
+        } catch (e) { console.log('SUI style', e); }
+    })();
+
+    function setStyle(id) {
+        var prev = S('style_active', '');
+        if (prev === id) return;
+        setS('style_active', id);
+        Lampa.Noty.show(id ? 'Стиль змінено — перезапуск Lampa…' : 'Стиль вимкнено — перезапуск Lampa…');
+        setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 1500);
+    }
+    function styleCss() {
+        var id = 'sui-styles-css', el = document.getElementById(id);
         if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-        $('body').toggleClass('sui-card', cardOn() && horiz()).toggleClass('sui-card-m', cardOn() && !horiz() && S('card_transparent_mobile', false) === true);
-        if (!cardOn()) { el.textContent = ''; return; }
-        var blur = num(S('card_trailers_blur', '0'), 0), zoom = num(S('card_trailers_zoom', '0'), 0);
-        el.textContent =
-            // фон на весь екран і затемнення
-            'body.sui-card .full-start-new__left{display:none!important}' +
-            'body.sui-card .full-start__background{height:100vh!important;opacity:1;-webkit-mask-image:none!important;mask-image:none!important;object-fit:cover}' +
-            '.sui-card-stage{position:absolute;left:0;top:0;width:100%;height:100vh;z-index:0;overflow:hidden;pointer-events:none}' +
-            '.sui-card-stage img,.sui-card-stage video,.sui-card-stage iframe,.sui-card-stage .sui-card-yt{position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover;border:0;transition:opacity 1.5s ease}' +
-            '.sui-card-stage .sui-card-media{filter:blur(' + blur + 'px);transform:scale(' + (1 + zoom / 100) + ')}' +
-            '.sui-card-shade{position:absolute;left:0;top:0;width:100%;height:100vh;z-index:0;pointer-events:none;' +
-            'background:linear-gradient(90deg,rgba(0,0,0,.85) 0%,rgba(0,0,0,.45) 45%,rgba(0,0,0,0) 75%),linear-gradient(0deg,rgba(0,0,0,.9) 0%,rgba(0,0,0,0) 45%)}' +
-            'body.sui-card .full-start-new{position:relative;z-index:1}' +
-            'body.sui-card .full-start-new__body{min-height:calc(100vh - 7em);display:flex;align-items:flex-end;box-sizing:border-box}' +
-            'body.sui-card .full-start-new__right{max-width:58vw}' +
-            'body.sui-card .full-start-new__buttons{position:relative;bottom:' + num(S('card_buttons_margin_bottom', '0.0'), 0) + 'em}' +
-            (S('card_show_status', false) === true ? '' : 'body.sui-card .full-start__status{opacity:0!important}') +
-            (S('card_show_pg', false) === true ? '' : 'body.sui-card .full-start__pg{opacity:0!important}') +
-            // опис праворуч угорі
-            '.sui-card-desc{position:absolute;z-index:2;width:40vw;pointer-events:none;box-sizing:border-box;line-height:1.4;color:#fff;text-shadow:1px 1px 3px rgba(0,0,0,.9)}' +
-            '.sui-card-desc .full-descr__text{margin:0;color:#fff}' +
-            // режим «тільки трейлер»
-            'body.sui-card-fs .activity--active .full-start-new{opacity:0;transition:opacity .6s}' +
-            'body.sui-card-fs .activity--active .sui-card-shade{opacity:0;transition:opacity .6s}' +
-            // прозора картка для телефону (вертикальний екран)
-            'body.sui-card-m .full-start-new__right{background:rgba(0,0,0,.35)!important;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-radius:0!important}' +
-            'body.sui-card-m .full-start-new__poster,body.sui-card-m .full-start-new__poster img{border-radius:0!important}' +
-            'body.sui-card-m .full-start-new .card--tv,body.sui-card-m .full-start-new__poster .card__type{display:none!important}' +
-            '.sui-imdb-btn svg{width:1.6em;height:1.6em}';
-    }
-
-    /* ---- стан поточної картки ---- */
-    var cur = null; // { root, m, timers:[], player, slides }
-    function stopCard() {
-        if (!cur) return;
-        cur.dead = true;
-        cur.timers.forEach(function (t) { clearInterval(t); clearTimeout(t); });
-        try { if (cur.yt && cur.yt.destroy) cur.yt.destroy(); } catch (e) { }
-        try { if (cur.video) { cur.video.pause(); cur.video.removeAttribute('src'); cur.video.load(); } } catch (e) { }
-        $(document).off('keydown.suicard');
-        $('body').removeClass('sui-card-fs');
-        cur = null;
-    }
-    function pauseMedia(p) {
-        if (!cur) return;
-        try { if (cur.yt) { if (p) cur.yt.pauseVideo(); else cur.yt.playVideo(); } } catch (e) { }
-        try { if (cur.video) { if (p) cur.video.pause(); else cur.video.play(); } } catch (e) { }
-    }
-
-    /* ---- слайд-шоу фонів ---- */
-    function slideshow(c) {
-        if (S('card_run_slideshow', true) === false) return;
-        var q = S('card_slideshow_quality', 'w1280'), dur = num(S('card_slideshow_duration', 8000), 8000);
-        getJSON(tmdbUrl((isTv(c.m) ? 'tv/' : 'movie/') + c.m.id + '/images?include_image_language=null,uk,en'), function (j) {
-            if (c.dead || c.trailer) return;
-            var list = ((j && j.backdrops) || []).sort(function (a, b) { return (a.iso_639_1 ? 1 : 0) - (b.iso_639_1 ? 1 : 0) || b.vote_average - a.vote_average; }).slice(0, 12);
-            if (list.length < 2) return;
-            var i = 0, layers = [], stage = c.stage;
-            for (var k = 0; k < 2; k++) { var im = document.createElement('img'); im.className = 'sui-card-slide'; im.style.opacity = 0; stage.appendChild(im); layers.push(im); }
-            var show = function () {
-                if (c.dead || c.trailer) return;
-                var top = layers[i % 2], src = 'https://image.tmdb.org/t/p/' + q + list[i % list.length].file_path;
-                try { if (Lampa.TMDB && Lampa.TMDB.image) src = Lampa.TMDB.image('t/p/' + q + list[i % list.length].file_path); } catch (e) { }
-                top.onload = function () { top.style.opacity = 1; layers[(i + 1) % 2].style.opacity = 0; c.root.find('.full-start__background').css('opacity', 0); };
-                top.src = src;
-                i++;
-            };
-            show();
-            c.timers.push(setInterval(show, Math.max(3000, dur)));
-        });
-    }
-
-    /* ---- трейлери ---- */
-    function ytApi(cb) {
-        if (window.YT && window.YT.Player) return cb();
-        (window.__sui_yt_cbs = window.__sui_yt_cbs || []).push(cb);
-        if (window.__sui_yt_loading) return;
-        window.__sui_yt_loading = true;
-        var prev = window.onYouTubeIframeAPIReady;
-        window.onYouTubeIframeAPIReady = function () {
-            if (prev) try { prev(); } catch (e) { }
-            (window.__sui_yt_cbs || []).forEach(function (f) { try { f(); } catch (e) { } });
-            window.__sui_yt_cbs = [];
-        };
-        var s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; document.head.appendChild(s);
-    }
-    function srcTmdb(m, cb) {
-        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/videos?include_video_language=uk,en,null'), function (j) {
-            var v = ((j && j.results) || []).filter(function (x) { return x.site === 'YouTube' && /Trailer|Teaser/.test(x.type); });
-            v.sort(function (a, b) { return (a.iso_639_1 === 'uk' ? 0 : 1) - (b.iso_639_1 === 'uk' ? 0 : 1) || (a.type === 'Trailer' ? 0 : 1) - (b.type === 'Trailer' ? 0 : 1); });
-            cb(v[0] ? { yt: v[0].key } : null);
-        }, function () { cb(null); });
-    }
-    function imdbIdOf(m, cb) {
-        if (m.imdb_id) return cb(m.imdb_id);
-        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/external_ids'), function (j) { cb(j && j.imdb_id); }, function () { cb(null); });
-    }
-    var QORDER = { '1080': ['DEF_1080p', 'DEF_720p', 'DEF_480p', 'DEF_SD'], '720': ['DEF_720p', 'DEF_480p', 'DEF_1080p', 'DEF_SD'], '480': ['DEF_480p', 'DEF_SD', 'DEF_720p', 'DEF_1080p'], sd: ['DEF_SD', 'DEF_480p', 'DEF_720p', 'DEF_1080p'], auto: ['DEF_1080p', 'DEF_720p', 'DEF_480p', 'DEF_SD'] };
-    function srcImdb(m, quality, cb) {
-        imdbIdOf(m, function (tt) {
-            if (!tt) return cb(null);
-            var q = 'query{title(id:"' + tt + '"){primaryVideos(first:5){edges{node{contentType{id} playbackURLs{url videoMimeType videoDefinition}}}}}}';
-            var url = 'https://caching.graphql.imdb.com/?query=' + encodeURIComponent(q);
-            var proxy = trim(S('card_imdb_proxy', ''));
-            if (proxy) url = proxy + url;
-            getJSON(url, function (j) {
-                var edges = (((j || {}).data || {}).title || {}).primaryVideos;
-                edges = (edges && edges.edges) || [];
-                var node = null;
-                edges.forEach(function (e) { var n = e.node; if (!node && n && n.contentType && /trailer/i.test(n.contentType.id || '')) node = n; });
-                if (!node && edges[0]) node = edges[0].node;
-                var urls = (node && node.playbackURLs) || [], by = {};
-                urls.forEach(function (u) { if (u && u.url && /mp4/i.test(u.videoMimeType || '')) by[u.videoDefinition] = u.url; });
-                var pick = null;
-                (QORDER[quality] || QORDER.auto).some(function (k) { if (by[k]) { pick = by[k]; return true; } return false; });
-                if (!pick && urls[0]) pick = urls[0].url;
-                cb(pick ? { mp4: pick } : null);
-            }, function () { cb(null); });
-        });
-    }
-    function srcNetflix(m, cb) {
-        var server = trim(Lampa.Storage.get('netflix_server', '') || 'https://lampa-netflix.adambh.dev').replace(/\/+$/, '');
-        var lang = String(Lampa.Storage.get('language', 'uk') || 'uk').slice(0, 2);
-        getJSON(server + '/api/title/' + (isTv(m) ? 'tv' : 'movie') + '/' + m.id + '?lang=' + lang, function (j) {
-            var u = j && j.trailer && j.trailer.url;
-            cb(u ? (/youtu/.test(u) ? { yt: (u.match(/(?:v=|be\/|embed\/)([\w-]{11})/) || [])[1] } : { mp4: u }) : null);
-        }, function () { cb(null); });
-    }
-    function findTrailer(m, cb) {
-        var src = S('card_trailer_source', 'tmdb');
-        var order = src === 'all' ? String(S('card_trailer_source_order', 'tmdb,imdb,netflix')).split(',') : [src];
-        var q = S('card_trailer_quality', 'auto'), i = 0;
-        var next = function () {
-            if (i >= order.length) return cb(null);
-            var s = order[i++], done = function (r) { if (r && (r.yt || r.mp4)) cb(r); else next(); };
-            if (s === 'tmdb') srcTmdb(m, done); else if (s === 'imdb') srcImdb(m, q, done); else if (s === 'netflix') srcNetflix(m, done); else next();
-        };
-        next();
-    }
-    function playTrailer(c, fs) {
-        findTrailer(c.m, function (r) {
-            if (c.dead || !r) return;
-            c.trailer = true;
-            var start = num(S('card_trailer_start_time', '9'), 0);
-            var sound = fs || S('card_bg_trailer_sound', false) === true;
-            var ready = function () { c.stage.querySelectorAll('.sui-card-slide').forEach(function (x) { x.style.opacity = 0; }); c.root.find('.full-start__background').css('opacity', 0); };
-            if (r.mp4) {
-                var v = document.createElement('video');
-                v.className = 'sui-card-media'; v.autoplay = true; v.loop = true; v.playsInline = true; v.muted = true; v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-                v.style.opacity = 0;
-                v.addEventListener('loadedmetadata', function () { try { if (start && v.duration > start + 5) v.currentTime = start; } catch (e) { } });
-                v.addEventListener('playing', function () { v.style.opacity = 1; ready(); if (sound) { v.muted = false; } });
-                v.src = r.mp4;
-                c.stage.appendChild(v); c.video = v;
-                try { var p = v.play(); if (p && p.catch) p.catch(function () { }); } catch (e) { }
-            } else if (r.yt) {
-                ytApi(function () {
-                    if (c.dead) return;
-                    var box = document.createElement('div'); box.className = 'sui-card-yt sui-card-media'; box.style.opacity = 0;
-                    var inner = document.createElement('div'); box.appendChild(inner); c.stage.appendChild(box);
-                    c.yt = new window.YT.Player(inner, {
-                        width: '100%', height: '100%', videoId: r.yt, host: 'https://www.youtube.com',
-                        playerVars: { autoplay: 1, controls: 0, disablekb: 1, fs: 0, rel: 0, modestbranding: 1, playsinline: 1, iv_load_policy: 3, mute: 1, start: start, loop: 1, playlist: r.yt },
-                        events: {
-                            onReady: function (e) { try { e.target.mute(); e.target.playVideo(); } catch (er) { } },
-                            onStateChange: function (e) {
-                                if (e.data === 1) { box.style.opacity = 1; ready(); if (sound) try { e.target.unMute(); } catch (er) { } }
-                            },
-                            onError: function () { box.parentNode && box.parentNode.removeChild(box); c.trailer = false; }
-                        }
-                    });
-                });
-            }
-        });
-    }
-    // «Показувати трейлери»: через 5 с бездіяльності трейлер на весь екран, будь-яка клавіша повертає інтерфейс
-    function idleTrailer(c) {
-        var started = false, t = null;
-        var arm = function () {
-            clearTimeout(t);
-            t = setTimeout(function () {
-                if (c.dead || !isActive(c)) return;
-                $('body').addClass('sui-card-fs');
-                if (!started) { started = true; playTrailer(c, true); } else pauseMedia(false);
-            }, 5000);
-            c.timers.push(t);
-        };
-        $(document).on('keydown.suicard', function () {
-            if ($('body').hasClass('sui-card-fs')) { $('body').removeClass('sui-card-fs'); try { if (c.yt) c.yt.mute(); if (c.video) c.video.muted = true; } catch (e) { } }
-            arm();
-        });
-        arm();
-    }
-    function isActive(c) { try { var a = Lampa.Activity.active(); return a && a.activity && $(a.activity.render())[0] === c.root[0]; } catch (e) { return true; } }
-
-    /* ---- опис праворуч ---- */
-    function moveDesc(c) {
-        if (S('card_move_text', true) === false || !horiz()) return;
-        var tries = 0, tm = setInterval(function () {
-            if (c.dead || ++tries > 20) return clearInterval(tm);
-            var d = c.root.find('.full-descr__text').first(), body = c.root.find('.full-start-new__body').first();
-            if (!d.length || !body.length || c.root.find('.sui-card-desc').length) return;
-            clearInterval(tm);
-            body.css('position', 'relative');
-            c.root.find('.items-line__title').each(function () { if (/^(детально|подробно|details)$/i.test(trim($(this).text()))) $(this).closest('.items-line__head').hide(); });
-            var w = $('<div class="sui-card-desc"></div>').css({ top: num(S('card_desc_margin_top', '0'), 0) + 'em', right: num(S('card_desc_margin_right', '0'), 0) + 'em', 'font-size': num(S('card_desc_size', '1.2'), 1.2) + 'em' });
-            w.append(d); body.append(w);
-        }, 300);
-        c.timers.push(tm);
-    }
-
-    /* ---- кнопка «IMDB трейлер» ---- */
-    function imdbButton(c) {
-        if (S('card_show_imdb_button', false) !== true || c.root.find('.sui-imdb-btn').length) return;
-        var bar = c.root.find('.full-start-new__buttons').first();
-        if (!bar.length) return;
-        var b = $('<div class="full-start__button selector sui-imdb-btn"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg><span>IMDB трейлер</span></div>');
-        b.on('hover:enter', function () {
-            Lampa.Noty.show('Шукаю трейлер IMDB…');
-            srcImdb(c.m, S('card_button_imdb_quality', 'auto'), function (r) {
-                if (!r) return Lampa.Noty.show('Трейлер IMDB не знайдено');
-                pauseMedia(true);
-                Lampa.Player.play({ url: r.mp4, title: (c.m.title || c.m.name || '') + ' — трейлер' });
-            });
-        });
-        var opt = bar.find('.button--options');
-        if (opt.length) opt.before(b); else bar.append(b);
-        try { var en = Lampa.Controller.enabled(); if (en && /full/.test(en.name || '')) en.collection = c.root.find('.selector'); } catch (e) { }
-    }
-
-    function onFullCard(e) {
-        stopCard();
-        cardCss();
-        if (!cardOn()) return;
-        var m = e.data && e.data.movie;
-        if (!m || !m.id) return;
-        var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.activity--active');
-        var c = cur = { root: root, m: m, timers: [], dead: false };
-        root.find('.sui-card-stage,.sui-card-shade').remove();
-        if (horiz()) {
-            var stage = $('<div class="sui-card-stage"></div>'), shade = $('<div class="sui-card-shade"></div>');
-            var anchor = root.find('.full-start-new').first();
-            if (anchor.length) { anchor.before(stage); anchor.before(shade); } else root.prepend(shade).prepend(stage);
-            c.stage = stage[0];
-            if (S('card_trailers_bg', false) === true) playTrailer(c, false); else slideshow(c);
-            if (S('card_run_trailers', false) === true) idleTrailer(c);
-            moveDesc(c);
-        }
-        imdbButton(c);
+        // налаштування стилів відкриваються з «Стильного інтерфейсу», тож ховаємо їхні окремі пункти в корені налаштувань
+        el.textContent = STYLE_LIST.filter(function (s) { return s.comp; }).map(function (s) {
+            return '.settings-folder[data-component="' + s.comp + '"]';
+        }).join(',') + '{display:none!important}';
     }
 
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_card'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_styles', 'stylish_ui_style_cardify', 'stylish_ui_style_obsidian', 'stylish_ui_style_appletv', 'stylish_ui_style_netflix'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -3992,71 +3778,48 @@
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
 
-        // ---- 3. Головна сторінка (як у YCard Mod) ----
-        Lampa.Template.add('settings_' + CARD, '<div></div>');
-        var MARG = { '-5': '-5 em', '-4': '-4 em', '-3': '-3 em', '-2': '-2 em', '-1': '-1 em', '0': '0 em', '1': '1 em', '2': '2 em', '3': '3 em', '4': '4 em', '5': '5 em', '6': '6 em', '8': '8 em', '10': '10 em' };
-        var BTNM = {}; for (var bi = -5; bi <= 5.001; bi += 0.5) BTNM[bi.toFixed(1)] = bi.toFixed(1) + ' em';
-        var QUAL = { '1080': '1080p', '720': '720p', '480': '480p', sd: 'SD', auto: 'Auto' };
-        ttl(CARD, 'card_head', 'Головна сторінка');
-        sel(CARD, 'card_enable', 'Головна сторінка', 'Повноекранна картка фільму: фон на весь екран, слайд-шоу, трейлери', { '1': 'Так', '0': 'Ні' }, '0');
-        ttl(CARD, 'card_head_tr', 'Трейлери');
-        trg(CARD, 'card_run_trailers', 'Показувати трейлери', 'Запускати трейлер через 5 сек бездіяльності (замість фону та інтерфейсу)', false);
-        trg(CARD, 'card_trailers_bg', 'Трейлери замість слайдшоу', 'Завантажити трейлер на задній фон одразу', false);
-        trg(CARD, 'card_bg_trailer_sound', 'Звук фонового трейлеру', 'Увімкнути звук для трейлеру, що грає на фоні замість фото/слайдшоу', false);
-        sel(CARD, 'card_trailer_start_time', 'Початковий час трейлеру', 'З якої секунди запускати фоновий трейлер (за замовчуванням 9 сек)', { '0': 'З початку (0 сек)', '3': '3 секунди', '5': '5 секунд', '7': '7 секунд', '9': '9 секунд', '10': '10 секунд', '15': '15 секунд' }, '9');
-        sel(CARD, 'card_trailer_source', 'Джерело трейлерів', 'Звідки завантажувати трейлери', { all: 'Усі джерела', imdb: 'IMDB', tmdb: 'TMDB (YouTube)', netflix: 'Netflix' }, 'tmdb');
-        sel(CARD, 'card_trailer_source_order', 'Порядок джерел (Всі джерела)', "Пріоритет пошуку, якщо обрано 'Усі джерела'", { 'imdb,tmdb,netflix': 'IMDB -> TMDB -> Netflix', 'imdb,netflix,tmdb': 'IMDB -> Netflix -> TMDB', 'tmdb,imdb,netflix': 'TMDB -> IMDB -> Netflix', 'tmdb,netflix,imdb': 'TMDB -> Netflix -> IMDB', 'netflix,imdb,tmdb': 'Netflix -> IMDB -> TMDB', 'netflix,tmdb,imdb': 'Netflix -> TMDB -> IMDB' }, 'tmdb,imdb,netflix');
-        sel(CARD, 'card_trailer_quality', 'Якість фонового трейлеру IMDB', 'Працює лише якщо джерело - IMDB', QUAL, 'auto');
-        trg(CARD, 'card_show_imdb_button', 'Показувати кнопку трейлер IMDB', 'Додає додаткову кнопку для перегляду IMDB трейлерів', false);
-        sel(CARD, 'card_button_imdb_quality', 'Якість кнопки IMDB Trailer', 'Якість відео при ручному запуску трейлеру з кнопки', QUAL, 'auto');
-        inp(CARD, 'card_imdb_proxy', 'Корс проксі для IMDB', 'Використовувати проксі для запитів до API (напр. https://cors.bwa.workers.dev/)');
-        sel(CARD, 'card_trailers_blur', 'Розмиття трейлеру', 'Налаштуйте рівень розмиття фонового трейлеру', { '0': 'Вимкнено (0%)', '1': '1%', '2': '2%', '3': '3%', '4': '4%', '5': '5%', '10': '10%' }, '0');
-        sel(CARD, 'card_trailers_zoom', 'Ступінь розтягнення трейлеру', 'Прибирає чорні полоси відео (за замовчуванням 0%)', { '0': 'Вимкнено (0%)', '25': '25%', '33': '33%', '40': '40%', '45': '45%', '50': '50%' }, '0');
-        ttl(CARD, 'card_head_sl', 'Слайд-шоу');
-        trg(CARD, 'card_run_slideshow', 'Слайд-шоу', 'Плавно змінювати фонові зображення', true);
-        sel(CARD, 'card_slideshow_quality', 'Якість зображень', '', { w780: 'Стандартна (w780)', w1280: 'Висока (w1280)', original: 'Оригінал (original)' }, 'w1280');
-        sel(CARD, 'card_slideshow_duration', 'Тривалість фото (сек)', '', { '5000': '5 секунд', '8000': '8 секунд', '10000': '10 секунд', '15000': '15 секунд' }, '8000');
-        ttl(CARD, 'card_head_ds', 'Опис і кнопки');
-        trg(CARD, 'card_move_text', 'Переносити текст опису', 'Перемістити опис у правий верхній кут (лише гориз. екрани)', true);
-        sel(CARD, 'card_desc_margin_top', 'Опис: Відступ зверху', '', MARG, '0');
-        sel(CARD, 'card_desc_margin_right', 'Опис: Відступ справа', '', MARG, '0');
-        sel(CARD, 'card_desc_size', 'Опис: Розмір тексту', '', { '0.8': '0.8 em', '1.0': '1.0 em', '1.2': '1.2 em', '1.4': '1.4 em', '1.6': '1.6 em', '1.8': '1.8 em', '2.0': '2.0 em', '2.5': '2.5 em' }, '1.2');
-        sel(CARD, 'card_buttons_margin_bottom', 'Відступ кнопок від нижнього краю', 'Додатковий відступ для блоку кнопок (дивитись, торент)', BTNM, '0.0');
-        trg(CARD, 'card_show_status', 'Показувати статус', '', false);
-        trg(CARD, 'card_show_pg', 'Показувати віковий рейтинг', '', false);
-        trg(CARD, 'card_transparent_mobile', 'Прозора картка для телефону', 'Прозорий розмитий фон під назвою, без заокруглень картинки та без бейджа ТВ (для вертикального екрану)', false);
+
+        // ---- 3. Стилі ----
+        Lampa.Template.add('settings_' + STYLES_C, '<div></div>');
+        ttl(STYLES_C, 'styles_head', 'Стилі');
+        btn(STYLES_C, 'styles_info', 'Як це працює', 'Одночасно може бути увімкнений лише один стиль. Після зміни Lampa перезапуститься', function () { });
+        STYLE_LIST.forEach(function (st) {
+            var comp = 'stylish_ui_style_' + st.id;
+            Lampa.Template.add('settings_' + comp, '<div></div>');
+            btn(STYLES_C, 'style_go_' + st.id, st.no + ' ' + st.name, 'Автор: ' + st.author + (S('style_active', '') === st.id ? ' · увімкнено' : ''), function () { open(comp); });
+            ttl(comp, 'style_t_' + st.id, st.no + ' ' + st.name);
+            Lampa.SettingsApi.addParam({
+                component: comp,
+                param: { name: P + 'style_on_' + st.id, type: 'select', values: { '1': 'Так', '0': 'Ні' }, 'default': S('style_active', '') === st.id ? '1' : '0' },
+                field: { name: 'Увімкнути стиль', description: 'Інші стилі вимкнуться. Lampa перезапуститься' },
+                onChange: function (v) {
+                    if (String(v) === '1') {
+                        if (!styleUrl(st)) { setS('style_on_' + st.id, '0'); return Lampa.Noty.show('Спершу вкажіть адресу плагіна нижче'); }
+                        STYLE_LIST.forEach(function (o) { if (o.id !== st.id) setS('style_on_' + o.id, '0'); });
+                        setStyle(st.id);
+                    } else if (S('style_active', '') === st.id) setStyle('');
+                }
+            });
+            btn(comp, 'style_set_' + st.id, 'Налаштування стилю', 'Власне меню стилю від автора', function () {
+                if (!st.comp || S('style_active', '') !== st.id) return Lampa.Noty.show('Спершу увімкніть цей стиль');
+                try { Lampa.Settings.create(st.comp, { onBack: function () { open(comp); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+            });
+            inp(comp, 'style_url_' + st.id, 'Адреса плагіна', st.url ? 'За замовчуванням: ' + st.url : 'Вкажіть адресу плагіна автора');
+        });
     }
 
     function start() {
         addMenus();
         lookCss();
-        cardCss();
+        styleCss();
         watchCards();
-        $(window).on('resize', function () { cardCss(); });
-        Lampa.Listener.follow('activity', function (a) {
-            if (!a || !a.object) return;
-            var r = null; try { r = a.object.activity ? $(a.object.activity.render())[0] : null; } catch (e) { }
-            if (a.type === 'destroy') { if (cur && r && cur.root[0] === r) stopCard(); return; }
-            if (a.type !== 'start') return;
-            if (a.object.component !== 'full') { stopCard(); return; }
-            // повернення «Назад» на вже відкриту картку — запустити фон заново
-            if ((!cur || cur.root[0] !== r) && r && a.object.card && $(r).find('.full-start-new').length) {
-                setTimeout(function () { try { onFullCard({ data: { movie: a.object.card }, object: a.object }); } catch (e) { } }, 200);
-            }
-        });
-        if (Lampa.Player && Lampa.Player.listener) {
-            Lampa.Player.listener.follow('ready', function () { pauseMedia(true); });
-            Lampa.Player.listener.follow('destroy', function () { setTimeout(function () { if (cur && isActive(cur)) pauseMedia(false); }, 300); });
-        }
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
             try { onFullLook(e); } catch (er) { console.log('SUI look', er); }
-            try { onFullCard(e); } catch (er) { console.log('SUI card', er); }
         });
         Lampa.Storage.listener.follow('change', function (e) {
             var n = String(e.name || '');
             if (n.indexOf(P) !== 0) return;
-            if (n.indexOf(P + 'card_') === 0) { cardCss(); if (n === P + 'card_enable' && !cardOn()) stopCard(); return; }
             lookCss();
             if (/^sui_(bot_|native_vote|uator)/.test(n)) refreshCards();
         });
