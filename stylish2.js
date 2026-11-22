@@ -3150,6 +3150,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3234,7 +3235,7 @@
     var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
     var PARENT = {};
     PARENT['stylish_ui_styles'] = 'stylish_ui';
-    ['cardify', 'obsidian', 'appletv', 'netflix'].forEach(function (k) { PARENT['stylish_ui_style_' + k] = 'stylish_ui_styles'; });
+    PARENT['stylish_ui_style_urls'] = 'stylish_ui_styles';
     PARENT['stylish_ui_btned'] = 'stylish_ui';
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
@@ -3806,7 +3807,7 @@
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_cardify', 'stylish_ui_style_obsidian', 'stylish_ui_style_appletv', 'stylish_ui_style_netflix'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -3909,34 +3910,33 @@
         sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
 
 
-        // ---- 3. Стилі ----
+        // ---- 3. Стилі: вибір одним натисканням ----
         Lampa.Template.add('settings_' + STYLES_C, '<div></div>');
-        var actSt = activeStyle();
-        ttl(STYLES_C, 'styles_status', actSt ? 'Зараз увімкнено: ' + actSt.name : 'Зараз увімкнено: жоден стиль (стандартна Lampa)');
-        ttl(STYLES_C, 'styles_head', 'Стилі');
-        btn(STYLES_C, 'styles_info', 'Як це працює', 'Одночасно може бути увімкнений лише один стиль. Після зміни Lampa перезапуститься', function () { });
+        Lampa.Template.add('settings_stylish_ui_style_urls', '<div></div>');
+        var actSt = activeStyle(), mark = function (on) { return on ? '✓ ' : ''; };
+        ttl(STYLES_C, 'styles_status', actSt ? 'Активний: ' + actSt.name : 'Активний: без стилю (стандартна Lampa)');
+        btn(STYLES_C, 'style_go_none', mark(!actSt) + 'Без стилю', !actSt ? 'Активний' : 'Стандартний вигляд Lampa. Lampa перезапуститься', function () {
+            if (!actSt) return Lampa.Noty.show('Уже без стилю');
+            setStyle('');
+        });
         STYLE_LIST.forEach(function (st) {
-            var comp = 'stylish_ui_style_' + st.id;
-            Lampa.Template.add('settings_' + comp, '<div></div>');
-            btn(STYLES_C, 'style_go_' + st.id, st.name, 'Автор: ' + st.author + (S('style_active', '') === st.id ? ' · увімкнено' : ''), function () { open(comp); });
-            ttl(comp, 'style_t_' + st.id, st.name);
-            Lampa.SettingsApi.addParam({
-                component: comp,
-                param: { name: P + 'style_on_' + st.id, type: 'select', values: { '1': 'Так', '0': 'Ні' }, 'default': S('style_active', '') === st.id ? '1' : '0' },
-                field: { name: 'Увімкнути стиль', description: 'Інші стилі вимкнуться. Lampa перезапуститься' },
-                onChange: function (v) {
-                    if (String(v) === '1') {
-                        if (!styleUrl(st)) { setS('style_on_' + st.id, '0'); return Lampa.Noty.show('Спершу вкажіть адресу плагіна нижче'); }
-                        STYLE_LIST.forEach(function (o) { if (o.id !== st.id) setS('style_on_' + o.id, '0'); });
-                        setStyle(st.id);
-                    } else if (S('style_active', '') === st.id) setStyle('');
-                }
-            });
-            btn(comp, 'style_set_' + st.id, 'Налаштування стилю', 'Власне меню стилю від автора', function () {
-                if (!st.comp || S('style_active', '') !== st.id) return Lampa.Noty.show('Спершу увімкніть цей стиль');
-                try { Lampa.Settings.create(st.comp, { onBack: function () { open(comp); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
-            });
-            inp(comp, 'style_url_' + st.id, 'Адреса плагіна', st.url ? 'За замовчуванням: ' + st.url : 'Вкажіть адресу плагіна автора');
+            var isOn = !!(actSt && actSt.id === st.id);
+            btn(STYLES_C, 'style_go_' + st.id, mark(isOn) + st.name,
+                isOn ? 'Активний · натисніть, щоб відкрити його налаштування' : 'Автор: ' + st.author + '. Натисніть, щоб увімкнути — Lampa перезапуститься',
+                function () {
+                    if (isOn) {
+                        if (!st.comp) return Lampa.Noty.show('У цього стилю немає власних налаштувань');
+                        try { Lampa.Settings.create(st.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+                        return;
+                    }
+                    if (!styleUrl(st)) return Lampa.Noty.show('Немає адреси плагіна — вкажіть її в «Адреси плагінів»');
+                    setStyle(st.id);
+                });
+        });
+        btn(STYLES_C, 'style_urls', 'Адреси плагінів', 'Змінити адресу, якщо автор переніс плагін', function () { open('stylish_ui_style_urls'); });
+        ttl('stylish_ui_style_urls', 'style_urls_head', 'Адреси плагінів');
+        STYLE_LIST.forEach(function (st) {
+            inp('stylish_ui_style_urls', 'style_url_' + st.id, st.name, st.url ? 'За замовчуванням: ' + st.url : 'Вкажіть адресу плагіна автора');
         });
 
         // ---- 4. Редактор кнопок ----
