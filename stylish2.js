@@ -3159,6 +3159,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3242,11 +3243,12 @@
     /* ======================================================================
      * 2. ЗОВНІШНІЙ ВИГЛЯД — пункти меню як у Yarik's Mod (код власний)
      * ==================================================================== */
-    var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
+    var RTS = 'stylish_ui_rates', LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
     var PARENT = {};
     PARENT['stylish_ui_styles'] = 'stylish_ui';
     PARENT['stylish_ui_style_urls'] = 'stylish_ui_styles';
     PARENT['stylish_ui_btned'] = 'stylish_ui';
+    PARENT['stylish_ui_rates'] = 'stylish_ui_look';
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
     function on(key) { return S(key, true) !== false; }
@@ -3685,38 +3687,39 @@
     }
 
 
-    /* ---- рейтинги в повній картці з логотипами (TMDB / IMDb / КП / CUB) ---- */
-    var RT_LOGO = {
-        tmdb: '<span class="sui-rl sui-rl--tmdb"><b>THE</b><b>MOVIE</b><b>DB</b></span>',
-        imdb: '<span class="sui-rl sui-rl--imdb">IMDb</span>',
-        kp: '<svg class="sui-rl-svg" viewBox="0 0 32 24"><rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="#f5a623" stroke-width="2"/><rect x="5" y="5" width="22" height="14" rx="1.5" fill="#f5a623" opacity=".35"/><g fill="#f5a623"><rect x="3" y="3" width="2" height="2"/><rect x="3" y="19" width="2" height="2"/><rect x="27" y="3" width="2" height="2"/><rect x="27" y="19" width="2" height="2"/></g></svg>',
-        cub: '<svg class="sui-rl-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg>'
+    /* ---- рейтинги в повній картці: іконка + кольорова оцінка (вигляд як у ymod) ---- */
+    var RT_ICON = {
+        tmdb: '<img src="https://upload.wikimedia.org/wikipedia/commons/8/89/Tmdb.new.logo.svg">',
+        imdb: '<img src="https://upload.wikimedia.org/wikipedia/commons/5/53/IMDB_-_SuperTinyIcons.svg">',
+        cub: '<img src="https://raw.githubusercontent.com/yumata/lampa/9381985ad4371d2a7d5eb5ca8e3daf0f32669eb7/img/logo-icon.svg">',
+        kp: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="12" fill="#f60"/><path d="M7 5h3v5.2L14.2 5h3.6l-4.6 6.2L18.4 19h-3.7L10 12.4V19H7z" fill="#fff"/></svg>'
     };
-    function rtColor(v) { return v >= 7 ? '#4cd964' : v >= 5.5 ? '#f5c518' : v > 0 ? '#ff6b5a' : '#fff'; }
+    var RT_ORDER = ['tmdb', 'imdb', 'kp', 'cub'];
+    function rtColor(v) { return !v ? '#fff' : v < 3 ? '#ff4d4d' : v < 5 ? '#ff9f43' : v < 7 ? '#feca57' : '#2ecc71'; }
     function applyRateLogos(root) {
         var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
-        line.toggleClass('sui-rt2', on('rate_logos'));
-        if (!on('rate_logos')) return;
-        line.find('.full-start__rate').each(function () {
-            var $r = $(this), cls = this.className, key = /tmdb/.test(cls) ? 'tmdb' : /imdb/.test(cls) ? 'imdb' : /kp/.test(cls) ? 'kp' : /cub/.test(cls) ? 'cub' : '';
-            if (!key) return;
-            var kids = $r.children(), val = kids.eq(0), src = kids.eq(1);
-            var v = parseFloat(String(val.text()).replace(',', '.'));
-            val.addClass('sui-rv').css('color', rtColor(v));
-            if (src.length && !src.hasClass('sui-rs')) src.addClass('sui-rs').html(RT_LOGO[key]);
+        root.find('.sui-rates').remove();
+        line.removeClass('sui-rt-hide');
+        if (!on('rate_logos') || !line.length) return;
+        var box = $('<div class="sui-rates"></div>').css('gap', S('rt_gap', '0.5em'));
+        RT_ORDER.forEach(function (key) {
+            var r = line.find('.full-start__rate.rate--' + key).first();
+            if (!r.length || r.hasClass('hide')) return;
+            var v = parseFloat(String(r.children().eq(0).text()).replace(',', '.'));
+            if (!(v > 0)) return;
+            box.append('<div class="sui-rate-i" style="font-size:' + S('rt_size', '1.1em') + '"><span class="sui-rate-i__ic" style="filter:saturate(' + S('rt_sat', '75%') + ')">' + RT_ICON[key] + '</span><span class="sui-rate-i__v" style="color:' + (S('rt_sat', '75%') === '0%' ? '#ccc' : rtColor(v)) + '">' + v.toFixed(1) + '</span></div>');
         });
+        if (!box.children().length) return;
+        line.addClass('sui-rt-hide').before(box);
     }
     function rateCss() {
-        return '.sui-rt2{display:flex!important;align-items:center;flex-wrap:wrap;gap:.4em 1.4em;height:auto!important;min-height:2.2em;overflow:visible!important;margin-bottom:1.1em!important;position:relative;z-index:2}' +
-            '.sui-rt2 .full-start__rate{display:inline-flex!important;flex-direction:row-reverse;align-items:center;gap:.4em;background:none!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important;font-size:1.5em!important;line-height:1!important;height:auto!important;opacity:1!important}' +
-            '.sui-rt2 .full-start__rate.hide{display:none!important}' +
-            '.sui-rt2 .full-start__rate>div{margin:0!important;padding:0!important;background:none!important;border:0!important;line-height:1!important;font-size:1em!important;opacity:1!important}' +
-            '.sui-rv{font:800 1em/1 Arial,sans-serif!important;text-shadow:0 1px 4px rgba(0,0,0,.9)}' +
-            '.sui-rs{display:inline-flex;align-items:center}' +
-            '.sui-rl--tmdb{display:inline-flex;flex-direction:column;font:900 .5em/.92 Arial,sans-serif;letter-spacing:.02em;background:linear-gradient(90deg,#90cea1,#01b4e4);-webkit-background-clip:text;background-clip:text;color:transparent}' +
-            '.sui-rl--imdb{background:#f5c518;color:#000;font:900 .62em/1 Arial,sans-serif;padding:.2em .32em;border-radius:.2em}' +
-            '.sui-rl-svg{width:1.45em!important;height:1.1em!important;max-width:none}' +
-            'body .sui-rt2~.cardify__details .full-start-new__details,body .sui-rt2~.full-start-new__details,body .sui-rt2~.full-start__details{margin-top:.2em!important}';
+        return '.sui-rates{display:flex;flex-wrap:wrap;align-items:center;width:100%;min-height:1.6em;margin:10px 0!important;position:relative;z-index:2}' +
+            '.sui-rate-i{display:inline-flex;align-items:center;gap:.3em;white-space:nowrap;flex-shrink:0}' +
+            '.sui-rate-i__ic{width:1.1em;height:1.1em;display:flex;align-items:center;justify-content:center}' +
+            '.sui-rate-i__ic img,.sui-rate-i__ic svg{width:100%!important;height:100%!important;object-fit:contain;display:block}' +
+            '.sui-rate-i__v{font-weight:bold;line-height:1;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
+            '.sui-rt-hide .full-start__rate{display:none!important}' +
+            '.sui-rt-hide.rate-fix{display:none!important}';
     }
 
     function onFullLook(e) {
@@ -3727,7 +3730,7 @@
         applyUatorFull(root, m);
         applyXTitle(root);
         try { applyRateLogos(root); } catch (e) { }
-        setTimeout(function () { try { applyRateLogos(root); } catch (e) { } }, 2500);
+        [1500, 4000].forEach(function (t) { setTimeout(function () { try { applyRateLogos(root); } catch (e) { } }, t); });
         try { applyBtnEditor(root); } catch (e) { }
         setTimeout(function () { try { applyBtnEditor(root); } catch (e) { } }, 1500);
         if (on('studios')) tmdbFull(m, function (d) { applyStudios(root, m, d); });
@@ -3899,7 +3902,7 @@
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [RTS, LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -3949,7 +3952,7 @@
         var clear = function (store, txt) { return function () { Lampa.Storage.set(store, {}); Lampa.Noty.show(txt); }; };
 
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
-        trg(LOOK, 'rate_logos', 'Рейтинги з логотипами', 'TMDB, IMDb, КП, CUB — логотипи й кольорові оцінки замість плашок', true);
+        btn(LOOK, 'go_rates', 'Рейтинги', 'Іконки TMDB, IMDb, КП, CUB і кольорові оцінки', function () { open(RTS); });
         if (!styleIs('cardify')) trg(LOOK, 'full_poster', 'Постер у повній картці', 'Показувати постер зліва на сторінці фільму', true);
         if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
         if (!styleIs('appletv')) {
@@ -3976,6 +3979,13 @@
         sel(LOGO, 'logo_sat', 'Насиченість', '', SAT1, '1');
         btn(LOGO, 'logo_clear', 'Очистити кеш картинок', 'Очистити кеш плагіну', clear('sui_img', 'Кеш картинок очищено'));
 
+
+        Lampa.Template.add('settings_' + RTS, '<div></div>');
+        ttl(RTS, 'rt_head', 'Рейтинги');
+        trg(RTS, 'rate_logos', 'Увімкнути', 'Іконки й кольорові оцінки замість стандартних плашок', true);
+        sel(RTS, 'rt_size', 'Розмір', '', SIZES, '1.1em');
+        sel(RTS, 'rt_gap', 'Відстань між рейтингами', '', GAPS, '0.5em');
+        sel(RTS, 'rt_sat', 'Насиченість', '', SATP, '75%');
 
         ttl(BTNS, 'btns_head', 'Кнопки карток');
         sel(BTNS, 'btn_style', 'Стиль кнопок', 'Зовнішній вигляд кнопок плеєра, закладок тощо', { normal: 'Звичайний (Lampa)', apple: 'Apple Style (Розмиття)', apple_lite: 'Apple Lite (Без розмиття)' }, 'normal');
