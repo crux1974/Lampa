@@ -3155,6 +3155,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3301,6 +3302,7 @@
             '.sui-uat--br{right:1.5em;bottom:1.4em}.sui-uat--tr{right:1.5em;top:1em}' +
             '.sui-uat--abs .sui-uat__b,.sui-uat--under .sui-uat__b{background:transparent;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:0 .25em}' +
             '.sui-uat--under{margin-top:.8em}' +
+            '.sui-uat--inline{display:inline-flex;margin:.2em 0 .2em .6em;vertical-align:middle;background:none!important;border:0!important;padding:0!important}.sui-uat--inline .sui-uat__b{background:transparent;padding:0 .2em;text-shadow:0 1px 3px rgba(0,0,0,.9)}' +
             '.sui-uat__b svg{flex-shrink:0}.sui-uat__b{gap:.3em}' +
             '.sui-dv{display:inline-flex;align-items:center;gap:.15em}.sui-dv__t{display:inline-flex;flex-direction:column;line-height:.85}' +
             '.sui-dv__t b{font:800 .72em/1 Arial,sans-serif;letter-spacing:-.02em}.sui-dv__t i{font:700 .38em/1 Arial,sans-serif;letter-spacing:.12em;font-style:normal;text-align:center}' +
@@ -3570,7 +3572,16 @@
         var st = S('ua_style', 'normal'), gap = S('ua_gap', '0.45em');
         var box = $('<div class="sui-uat' + (st !== 'normal' ? ' sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') : '') + '"></div>').css({ 'font-size': S('ua_size', '1.1em'), 'margin-left': S('ua_ml', '0px') });
         if (neg(gap)) box.addClass('sui-neg').css('--sui-neg', gap); else box.css('gap', gap);
-        var pos = S('ua_pos', 'br'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        var pos = S('ua_pos', 'status'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        if (pos === 'status') {
+            // в один рядок зі статусом («Випущено»), без фону — як на фото
+            var stEl = root.find('.full-start__status, .full-start-new__status').filter(function () { return $(this).css('display') !== 'none'; }).first();
+            box.removeClass('sui-glass is-lite').addClass('sui-uat--inline').css('margin-left', 0);
+            if (stEl.length) { stEl.after(box); stEl.parent().css({ display: 'flex', 'flex-wrap': 'wrap', 'align-items': 'center' }); }
+            else if (line.length) line.after(box); else root.find('.full-start__info').append(box);
+            uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
+            return;
+        }
         if (!landscape()) pos = 'rate';
         if (pos === 'br' || pos === 'tr') {
             var body = root.find('.full-start-new__body, .full-start__body').first();
@@ -3947,7 +3958,7 @@
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
         sel(UAT, 'ua_look', 'Вигляд значків', '', { 'new': 'Новий (іконки)', classic: 'Класичний' }, 'new');
-        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
+        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { status: 'В рядку зі статусом', br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'status');
 
 
         // ---- 3. Стилі: вибір одним натисканням ----
