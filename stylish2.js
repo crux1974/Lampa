@@ -3138,6 +3138,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3275,6 +3276,12 @@
             '.sui-studio__dot{opacity:.4;font-size:.6em;margin:0 .4em}';
         // 5) Uator
         css += '.sui-uat{display:flex;align-items:center;flex-wrap:wrap}' +
+            '.sui-uat--abs{position:absolute;z-index:3;justify-content:flex-end;max-width:45%}' +
+            '.sui-uat--br{right:1.5em;bottom:1.4em}.sui-uat--tr{right:1.5em;top:1em}' +
+            '.sui-uat--abs .sui-uat__b,.sui-uat--under .sui-uat__b{background:transparent;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:0 .25em}' +
+            '.sui-uat--under{margin-top:.8em}' +
+            '.sui-uat__dv span{font:italic 800 .75em/1 Arial,sans-serif;letter-spacing:-.02em}' +
+            '.sui-uat__hdr span{border:2px solid currentColor;border-radius:.25em;padding:0 .25em;font-size:.8em;opacity:.9}' +
             '.sui-uat__b{display:inline-flex;align-items:center;gap:.3em;padding:.2em .55em;border-radius:.4em;background:rgba(0,0,0,.45);font:700 .9em/1.2 Arial,sans-serif;color:#fff;white-space:nowrap}' +
             '.sui-glass .sui-uat__b{background:transparent;padding:0 .45em}' +
             '.sui-uat__ua{display:inline-block;width:1.3em;height:.9em;border-radius:.15em;background:linear-gradient(#0057b7 50%,#ffd700 50%)}' +
@@ -3335,6 +3342,7 @@
         placeTitle(root, t);
     }
     function applyLogo(root, m) {
+        if (styleIs('appletv')) return;
         var t = titleEl(root);
         if (!t.length) return;
         if (t.data('sui-orig') == null) t.data('sui-orig', t.html());
@@ -3402,7 +3410,7 @@
     }
     function applyXTitle(root, m, d) {
         root.find('.sui-xtitle').remove();
-        if (!on('xtitle') || !d) return;
+        if (!on('xtitle') || !d || styleIs('appletv')) return;
         var sz = XT_SIZE[S('xt_size', 'xs')] || XT_SIZE.xs;
         var name = S('xt_mode', 'smart') === 'smart' && d.ukImg && on('logo') ? d.en : d.uk;
         var info = [d.year].concat(d.countries.length ? [d.countries.join(' / ')] : []).filter(Boolean);
@@ -3420,7 +3428,7 @@
     /* ---- Лого студій ---- */
     function applyStudios(root, m, d) {
         root.find('.sui-studios').remove();
-        if (!on('studios')) return;
+        if (!on('studios') || styleIs('appletv')) return;
         var list = (d && d.companies) || (m.production_companies || []).slice(0, 3).map(function (c) { return { id: c.id, name: c.name, logo: c.logo_path || '' }; });
         if (!list.length) return;
         var st = S('st_style', 'normal'), glass = st !== 'normal', bg = !glass && on('st_bg');
@@ -3526,8 +3534,8 @@
         if (!r.ukr) return b(flag, 'немає', 'sui-uat__no');
         var out = b(flag, r.best) + b(UI.top, r.pop) + b(UI.seed, r.seeds);
         if (r.audio) out += b(UI.snd, r.audio);
-        if (r.dv) out += b('', 'DV');
-        if (r.hdr) out += b('', 'HDR');
+        if (r.dv) out += b('', 'Dolby Vision', 'sui-uat__dv');
+        if (r.hdr) out += b('', 'HDR', 'sui-uat__hdr');
         return out;
     }
     function applyUatorFull(root, m) {
@@ -3536,9 +3544,21 @@
         var st = S('ua_style', 'normal'), gap = S('ua_gap', '0.45em');
         var box = $('<div class="sui-uat' + (st !== 'normal' ? ' sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') : '') + '"></div>').css({ 'font-size': S('ua_size', '1.1em'), 'margin-left': S('ua_ml', '0px') });
         if (neg(gap)) box.addClass('sui-neg').css('--sui-neg', gap); else box.css('gap', gap);
-        var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
-        if (!landscape()) { var t = titleEl(root); if (t.length) t.after(box); else line.after(box); }
-        else if (line.length) line.after(box); else root.find('.full-start__info').append(box);
+        var pos = S('ua_pos', 'br'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        if (!landscape()) pos = 'rate';
+        if (pos === 'br' || pos === 'tr') {
+            var body = root.find('.full-start-new__body, .full-start__body').first();
+            if (!body.length) pos = 'rate';
+            else { body.css('position', 'relative'); box.addClass('sui-uat--abs sui-uat--' + pos).css('margin-left', 0); body.append(box); }
+        }
+        if (pos === 'buttons') {
+            var bar = root.find('.full-start-new__buttons, .full-start__buttons').first();
+            if (bar.length) bar.after(box.addClass('sui-uat--under')); else pos = 'rate';
+        }
+        if (pos === 'rate') {
+            if (!landscape()) { var t = titleEl(root); if (t.length) t.after(box); else line.after(box); }
+            else if (line.length) line.after(box); else root.find('.full-start__info').append(box);
+        }
         uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
     }
     function uatorCard(el) {
@@ -3641,7 +3661,7 @@
     var STYLE_LIST = [
         { id: 'cardify', no: '3.1', name: 'Стиль Cardify', author: 'YCard Mod (lampalampa.free.nf)', url: 'http://lampalampa.free.nf/ycardmod.js', comp: 'cardify' },
         { id: 'obsidian', no: '3.2', name: 'Стиль Obsidian', author: '@levende', url: 'https://levende.github.io/lampa-plugins/obsidian.js', comp: 'obsidian_settings' },
-        { id: 'appletv', no: '3.3', name: 'Стиль Apple TV', author: '@llowmikee', url: '', comp: '' },
+        { id: 'appletv', no: '3.3', name: 'Стиль Apple TV', author: 'Applecation, @darkestclouds', url: 'https://darkestclouds.github.io/plugins/applecation/applecation.min.js', comp: 'applecation_settings' },
         { id: 'netflix', no: '3.4', name: 'Стиль Netflix', author: '@adambenhassen', url: 'https://adambenhassen.github.io/netflix.js', comp: 'netflix' }
     ];
     function styleById(id) { for (var i = 0; i < STYLE_LIST.length; i++) if (STYLE_LIST[i].id === id) return STYLE_LIST[i]; return null; }
@@ -3733,10 +3753,12 @@
 
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
         if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
-        btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
-        btn(LOOK, 'go_xtitle', 'Додаткова назва', 'Оригінальна назва, рік, країна', function () { open(XT); });
+        if (!styleIs('appletv')) {
+            btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
+            btn(LOOK, 'go_xtitle', 'Додаткова назва', 'Оригінальна назва, рік, країна', function () { open(XT); });
+        } else ttl(LOOK, 'look_hidden_atv', 'Лого, назву й студії малює «Стиль Apple TV» (розділ 3)');
         btn(LOOK, 'go_btns', 'Кнопки карток', 'Зовнішній вигляд кнопок дій', function () { open(BTNS); });
-        btn(LOOK, 'go_studios', 'Лого студій', 'Відображення виробничих компаній', function () { open(STUD); });
+        if (!styleIs('appletv')) btn(LOOK, 'go_studios', 'Лого студій', 'Відображення виробничих компаній', function () { open(STUD); });
         btn(LOOK, 'go_uator', 'Uator', 'Налаштування маркерів UA контенту', function () { open(UAT); });
 
         ttl(LOGO, 'logo_head', 'Лого / Постер (Smart)');
@@ -3785,6 +3807,7 @@
         sel(UAT, 'ua_ml', 'Відступ зліва', 'Тільки для повної сторінки', MLEFT, '0px');
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
+        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
 
 
         // ---- 3. Стилі ----
@@ -3794,8 +3817,8 @@
         STYLE_LIST.forEach(function (st) {
             var comp = 'stylish_ui_style_' + st.id;
             Lampa.Template.add('settings_' + comp, '<div></div>');
-            btn(STYLES_C, 'style_go_' + st.id, st.no + ' ' + st.name, 'Автор: ' + st.author + (S('style_active', '') === st.id ? ' · увімкнено' : ''), function () { open(comp); });
-            ttl(comp, 'style_t_' + st.id, st.no + ' ' + st.name);
+            btn(STYLES_C, 'style_go_' + st.id, st.name, 'Автор: ' + st.author + (S('style_active', '') === st.id ? ' · увімкнено' : ''), function () { open(comp); });
+            ttl(comp, 'style_t_' + st.id, st.name);
             Lampa.SettingsApi.addParam({
                 component: comp,
                 param: { name: P + 'style_on_' + st.id, type: 'select', values: { '1': 'Так', '0': 'Ні' }, 'default': S('style_active', '') === st.id ? '1' : '0' },
