@@ -967,7 +967,7 @@
         add({
             component: SUI,
             param: { name: 'stylish_ui_open_look', type: 'button' },
-            field: { name: '2. Зовнішній вигляд', description: 'Розмір карток, головна сторінка, мітки на картках, сторінка фільму' },
+            field: { name: '2. Зовнішній вигляд', description: 'Слоган, лого / постер, додаткова назва, кнопки, лого студій, Uator' },
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_look'); }
         });
 
@@ -3128,6 +3128,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Рейтинги» та «Зовнішній вигляд».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3207,7 +3208,7 @@
     function isTv(m) { return !!(m && (m.name || m.first_air_date || m.number_of_seasons || /tv/i.test(m.media_type || m.type || ''))); }
 
     /* ======================================================================
-     * 2. РЕЙТИНГИ
+     * 3. РЕЙТИНГИ
      * ==================================================================== */
     var RATINGS = [
         { key: 'tmdb', name: 'TMDB', color: '#01b4e4' },
@@ -3351,25 +3352,75 @@
     }
 
     /* ======================================================================
-     * 2. ЗОВНІШНІЙ ВИГЛЯД (картки)
+     * 2. ЗОВНІШНІЙ ВИГЛЯД — пункти меню як у Yarik's Mod (код власний)
      * ==================================================================== */
+    var LOGO = 'stylish_ui_logo', XT = 'stylish_ui_xtitle', BTNS = 'stylish_ui_btns', STUD = 'stylish_ui_studios', UAT = 'stylish_ui_uator';
+    var PARENT = {};
+    PARENT[RT_SEL] = RT; PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
+
+    function on(key) { return S(key, true) !== false; }
+    function landscape() { return window.innerWidth >= window.innerHeight; }
+    function neg(v) { return String(v).charAt(0) === '-'; }
+
+    // Темне лого на темному фоні: якщо майже всі непрозорі пікселі темні — робимо біле
+    function whiten(img) {
+        try {
+            var w = Math.min(img.naturalWidth || img.width, 200), h = Math.round((img.naturalHeight || img.height) * w / (img.naturalWidth || img.width || 1));
+            if (!w || !h) return;
+            var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+            var cx = cv.getContext('2d'); cx.drawImage(img, 0, 0, w, h);
+            var px = cx.getImageData(0, 0, w, h).data, all = 0, dark = 0;
+            for (var i = 0; i < px.length; i += 16) {
+                if (px[i + 3] < 16) continue;
+                all++;
+                if (0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2] < 110) dark++;
+            }
+            if (all && dark / all > 0.8) img.style.filter = (img.style.filter || '') + ' brightness(0) invert(1)';
+        } catch (e) { }
+    }
+
     function lookCss() {
         var id = 'sui-look-css', el = document.getElementById(id);
         if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-        var size = S('card_size', '1');
-        var css = '';
-        if (size !== '1') css += '.items-line .card:not(.card--wide):not(.card--collection){font-size:' + size + 'em}';
-        css +=
-            '.sui-badges{position:absolute;left:.4em;top:.4em;z-index:3;display:flex;flex-direction:column;gap:.25em;pointer-events:none}' +
-            '.sui-badge{display:inline-flex;align-items:center;justify-content:center;min-width:1.9em;height:1.25em;padding:0 .35em;border-radius:.3em;font:700 .75em/1 Arial,sans-serif;color:#fff;box-shadow:0 1px 3px rgba(0,0,0,.6)}' +
-            '.sui-badge--ua.sui-badge--flag{background:linear-gradient(#0057b7 50%,#ffd700 50%);color:transparent;width:1.9em}' +
-            '.sui-badge--pl.sui-badge--flag{background:linear-gradient(#fff 50%,#dc143c 50%);color:transparent;width:1.9em}' +
-            '.sui-badge--ua.sui-badge--text{background:#0057b7;color:#ffd700}' +
-            '.sui-badge--pl.sui-badge--text{background:#dc143c;color:#fff}' +
-            '.sui-logo{max-width:min(28em,90%);max-height:6em;display:block;object-fit:contain;object-position:left center}' +
-            '.sui-hidden{display:none!important}';
-        // ---- нижня інформаційна панель на постерах ----
-        var bs = S('bot_size', '0.8em'), st = S('bot_style', 'standard'), design = S('card_design', 'classic');
+        var css = '.sui-hidden{display:none!important}';
+        // скло (Apple) для студій / Uator
+        css += '.sui-glass{display:inline-flex;align-items:center;flex-wrap:nowrap;padding:.35em .6em;border-radius:999px;background:rgba(255,255,255,.12);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.18)}' +
+            '.sui-glass.is-lite{background:rgba(30,32,40,.7);-webkit-backdrop-filter:none;backdrop-filter:none}' +
+            '.sui-neg>*+*{margin-left:var(--sui-neg)}';
+        // 1) слоган
+        if (on('slogan')) css += '.full-start-new__tagline,.full-start__tagline,.full-start-new [class*="tagline"],.full-start [class*="tagline"]{display:none!important}';
+        // 3) кнопки
+        var bst = S('btn_style', 'normal'), bsz = S('btn_size', '1em'), bmt = S('btn_mt', '1em');
+        if (bmt !== 'auto') css += '.full-start-new__buttons,.full-start__buttons{margin-top:' + bmt + '!important}';
+        if (bst !== 'normal') {
+            css += '.full-start-new__buttons,.full-start__buttons{display:flex!important;flex-wrap:wrap;gap:.6em;align-items:center}' +
+                '.full-start-new__buttons .full-start__button,.full-start__buttons .full-start__button{font-size:' + bsz + ';margin:0!important;padding:.55em 1.2em!important;border-radius:999px!important;color:#fff;border:1px solid rgba(255,255,255,.18)!important;' +
+                (bst === 'apple' ? 'background:rgba(255,255,255,.13)!important;-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px)}' : 'background:rgba(40,42,52,.75)!important}') +
+                '.full-start-new__buttons .full-start__button.focus,.full-start__buttons .full-start__button.focus,.full-start__button:hover{background:#fff!important;color:#000!important}' +
+                '.full-start__button.focus svg,.full-start__button:hover svg{color:#000;fill:currentColor}';
+        }
+        // 4) студії
+        css += '.sui-studios{display:flex;align-items:center;flex-wrap:wrap;margin:.6em 0 .3em}' +
+            '.sui-studio{display:inline-flex;align-items:center;height:2.2em;border-radius:.5em;cursor:pointer}' +
+            '.sui-studio img{display:block;width:auto;object-fit:contain}' +
+            '.sui-studio__t{font-weight:600;white-space:nowrap}' +
+            '.sui-studio.focus{outline:2px solid #fff;outline-offset:2px}' +
+            '.sui-studio__dot{opacity:.4;font-size:.6em;margin:0 .4em}';
+        // 5) Uator
+        css += '.sui-uat{display:flex;align-items:center;flex-wrap:wrap}' +
+            '.sui-uat__b{display:inline-flex;align-items:center;gap:.3em;padding:.2em .55em;border-radius:.4em;background:rgba(0,0,0,.45);font:700 .9em/1.2 Arial,sans-serif;color:#fff;white-space:nowrap}' +
+            '.sui-glass .sui-uat__b{background:transparent;padding:0 .45em}' +
+            '.sui-uat__ua{display:inline-block;width:1.3em;height:.9em;border-radius:.15em;background:linear-gradient(#0057b7 50%,#ffd700 50%)}' +
+            '.sui-uat__no{opacity:.6}' +
+            '.sui-uat-card{position:absolute;left:.4em;top:.4em;z-index:3;display:flex;gap:.25em;pointer-events:none;font-size:.8em}' +
+            '.sui-uat-card .sui-uat__b{background:rgba(0,0,0,.65);box-shadow:0 1px 3px rgba(0,0,0,.6)}' +
+            '.sui-badges--tr{left:auto;right:.4em}';
+        // 6) логотип
+        css += '.sui-logo-img{display:inline-block;max-width:100%}' +
+            '.sui-logo-moved{position:absolute!important;z-index:5;pointer-events:none;margin:0!important}' +
+            '.sui-xtitle{margin:.3em 0 .4em;color:#fff;line-height:1.25}.sui-xtitle__t{opacity:.85}.sui-xtitle__i{opacity:.55;margin-left:.4em}';
+        // нижня інформаційна панель на постерах (розділ 1)
+        var bs = S('bot_size', '0.8em'), design = S('card_design', 'classic');
         css +=
             '.sui-bot{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;flex-wrap:wrap;gap:.3em;align-items:flex-end;padding:1.6em .45em .45em;font-size:' + bs + ';pointer-events:none;border-radius:0 0 .5em .5em}' +
             '.sui-bot--standard{background:linear-gradient(transparent,rgba(0,0,0,.75))}' +
@@ -3379,107 +3430,266 @@
             '.sui-bot--neon .sui-bot__b{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
             '.sui-bot__sp{flex:1}' +
             '.sui-rate{position:absolute;z-index:4;font-size:' + bs + ';padding:.15em .45em;border-radius:.35em;font:700 1em/1.2 Arial,sans-serif;pointer-events:none}' +
-            '.sui-rate{font-size:' + bs + '}' +
-            '.sui-bot--standard ~ .sui-rate,.sui-rate.sui-rate--standard{background:rgba(0,0,0,.65)}' +
+            '.sui-rate--standard{background:rgba(0,0,0,.65)}' +
             '.sui-rate--glass{background:rgba(255,255,255,.16);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,.25)}' +
             '.sui-rate--neon{background:rgba(10,12,24,.75);border:1px solid currentColor;box-shadow:0 0 .4em currentColor}' +
-            '.sui-rate--tl{left:.4em;top:.4em}.sui-rate--tr{right:.4em;top:.4em}.sui-rate--bl{left:.4em;bottom:.4em}.sui-rate--br{right:.4em;bottom:.4em}' +
-            '.sui-badges--tr{left:auto;right:.4em;align-items:flex-end}';
+            '.sui-rate--tl{left:.4em;top:.4em}.sui-rate--tr{right:.4em;top:.4em}.sui-rate--bl{left:.4em;bottom:.4em}.sui-rate--br{right:.4em;bottom:.4em}';
         if (S('native_vote', true) === false) css += '.card .card__vote{display:none!important}';
         if (design === 'square') css += '.card .card__view,.card .card__img{border-radius:0!important}';
         if (design === 'shadow') css += '.card .card__view{box-shadow:0 .5em 1.2em rgba(0,0,0,.65)}';
         if (design === 'minimal') css += '.card .card__title,.card .card__age{display:none!important}';
-        css += marksCss();
         el.textContent = css;
     }
 
-    /* ---- мітки UA / PL на картках (дані — з парсера торентів) ---- */
-    var RX_UA = /(^|[^a-z0-9])(ukr|ua|ukrainian)([^a-z0-9]|$)|ukr[ _-]?(dub|aud|voice)|(^|[^а-яіїєґa-z])укр(\.|[^а-яіїєґ]|$)|українськ|украинск/i;
-    var RX_PL = /(^|[^a-z0-9])(pl|pol|polish)([^a-z0-9]|$)|lektor|polsk|dubbing[ ._-]?pl|pl[ ._-]?dub/i;
-    var RX_SUBS = /(sub|субт|napisy)/i;
-
-    function langOf(it) {
-        var t = String(it.title || it.Title || ''), v = it.voices, l = it.languages;
-        var vs = v && v.join ? v.join(' | ') : String(v || ''), ls = l && l.join ? l.join(' ') : String(l || '');
-        var hay = t + ' | ' + vs;
-        return {
-            ua: RX_UA.test(hay) || /(^|[^a-z])(uk|ukr|ua)([^a-z]|$)/i.test(ls),
-            pl: (RX_PL.test(hay) && !RX_SUBS.test((hay.match(RX_PL) || [''])[0])) || /(^|[^a-z])(pl|pol)([^a-z]|$)/i.test(ls)
-        };
+    /* ---- Лого / Постер ---- */
+    function titleEl(root) { return root.find('.full-start-new__title, .full-start__title').first(); }
+    function restoreTitle(t) {
+        var h = t.data('sui-orig');
+        if (h != null) t.html(h);
+        t.removeClass('sui-logo-moved').attr('style', '');
     }
-
-    function parserHosts() {
-        var out = [], url = '', key = '';
-        try { url = trim(Lampa.Storage.get('jackett_url', '')).replace(/\/+$/, ''); key = trim(Lampa.Storage.get('jackett_key', '')); } catch (e) { }
-        if (url) {
-            if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
-            out.push({ base: url, v: 2, key: key });
-            out.push({ base: url, v: 1, key: key });
-        }
-        out.push({ base: 'https://jac.red', v: 1, key: '' });
-        return out;
-    }
-    function parserUrl(h, q, yr) {
-        if (h.v === 2) return h.base + '/api/v2.0/indexers/all/results?apikey=' + encodeURIComponent(h.key || '') + '&Query=' + encodeURIComponent(q) + (yr ? '&year=' + yr : '');
-        return h.base + '/api/v1.0/torrents?search=' + encodeURIComponent(q) + (yr ? '&year=' + yr : '') + '&exact=true';
-    }
-
-    var queue = [], running = 0, MAXRUN = 2;
-    function lookupLangs(d, cb) {
-        var title = d.original_title || d.original_name || d.title || d.name || '';
-        var yr = parseInt(String(d.release_date || d.first_air_date || '').slice(0, 4), 10) || 0;
-        var ck = (d.name ? 'tv' : 'movie') + ':' + (d.id || title) ;
-        var c = cacheGet('sui_lang', ck, 3 * 864e5);
-        if (c) return cb(c);
-        queue.push({ d: d, title: title, yr: yr, ck: ck, cb: cb });
-        pump();
-    }
-    function pump() {
-        while (running < MAXRUN && queue.length) (function (job) {
-            running++;
-            var hosts = parserHosts(), i = 0;
-            function next() {
-                if (i >= hosts.length) { running--; job.cb({ ua: false, pl: false }); return pump(); }
-                var h = hosts[i++];
-                getJSON(parserUrl(h, job.title, job.yr), function (j) {
-                    var arr = Array.isArray(j) ? j : ((j && (j.Results || j.results)) || []);
-                    var r = { ua: false, pl: false };
-                    for (var k = 0; k < arr.length; k++) { var l = langOf(arr[k] || {}); if (l.ua) r.ua = true; if (l.pl) r.pl = true; }
-                    cacheSet('sui_lang', job.ck, r, arr.length ? 3 * 864e5 : 12 * 36e5);
-                    running--; job.cb(r); pump();
-                }, next);
+    function placeTitle(root, t) {
+        t.css({ 'text-align': landscape() ? 'left' : 'center' });
+        var ml = S('logo_ml', '0px');
+        if (S('logo_move', false) === true && landscape()) {
+            var body = root.find('.full-start-new__body').first();
+            if (body.length) {
+                body.css('position', 'relative');
+                var mt = S('logo_mt', '0px'), mb = S('logo_mb', 'auto');
+                t.addClass('sui-logo-moved').css({ top: mt === 'auto' ? 'auto' : mt, left: ml, bottom: mb === 'auto' ? 'auto' : mb });
+                return;
             }
-            next();
-        })(queue.shift());
+        }
+        if (ml !== '0px') t.css('margin-left', ml);
+    }
+    function textTitle(root, t) {
+        var w = S('logo_w', 'auto'), h = S('logo_h', 'auto');
+        t.css({ 'font-size': S('logo_text_size', '3.0em'), 'white-space': 'normal', 'line-height': 1.2, 'max-width': w === 'auto' ? (landscape() ? '50vw' : '90vw') : w, 'max-height': h === 'auto' ? 'none' : h });
+        placeTitle(root, t);
+    }
+    function applyLogo(root, m) {
+        var t = titleEl(root);
+        if (!t.length) return;
+        if (t.data('sui-orig') == null) t.data('sui-orig', t.html());
+        restoreTitle(t);
+        if (!on('logo')) return;
+        if (String(S('logo_mode', '0')) === '1') return textTitle(root, t);
+        var type = S('logo_type', 'logo'), lang = S('logo_lang', 'uk') || Lampa.Storage.get('language', 'uk');
+        var kind = type.indexOf('poster') === 0 ? 'posters' : type.indexOf('backdrop') === 0 ? 'backdrops' : 'logos';
+        var ck = (isTv(m) ? 'tv' : 'movie') + m.id + '_' + type + '_' + lang;
+        var show = function (path) {
+            if (!path) return textTitle(root, t);
+            var src = 'https://image.tmdb.org/t/p/' + S('logo_quality', 'original') + path.replace(/\.svg$/, '.png');
+            try { if (Lampa.TMDB && Lampa.TMDB.image) src = Lampa.TMDB.image('t/p/' + S('logo_quality', 'original') + path.replace(/\.svg$/, '.png')); } catch (e) { }
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.className = 'sui-logo-img';
+            img.onload = function () {
+                var w = S('logo_w', 'auto'), h = S('logo_h', kind === 'logos' ? '15vh' : '40vh');
+                img.style.width = w === 'auto' ? 'auto' : w;
+                img.style.maxWidth = w === 'auto' ? (kind === 'logos' ? (landscape() ? '50vw' : '90vw') : '100%') : w;
+                img.style.maxHeight = h === 'auto' ? '60vh' : h;
+                if (kind !== 'logos') { img.style.height = h === 'auto' ? (kind === 'posters' ? '45vh' : '30vh') : h; img.style.aspectRatio = kind === 'posters' ? '2/3' : '16/9'; img.style.objectFit = 'cover'; img.style.borderRadius = '.6em'; }
+                img.style.filter = 'drop-shadow(2px 2px 4px rgba(0,0,0,.55)) saturate(' + S('logo_sat', '1') + ')';
+                if (kind === 'logos' && on('logo_white')) whiten(img);
+                t.empty().append(img);
+                placeTitle(root, t);
+            };
+            img.onerror = function () { cacheSet('sui_img', ck, '', 864e5); textTitle(root, t); };
+            img.src = src;
+        };
+        var c = cacheGet('sui_img', ck, 30 * 864e5);
+        if (c !== undefined && c !== null) return show(c);
+        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/images?include_image_language=' + lang + ',en,null'), function (j) {
+            var arr = (j && j[kind]) || [], want = type.slice(-3) === '_en' ? ['en'] : type.slice(-3) === '_ua' ? ['uk', 'en'] : [lang, 'en'];
+            var pick = null;
+            want.some(function (l) { for (var i = 0; i < arr.length; i++) if (arr[i].iso_639_1 === l) { pick = arr[i]; return true; } return false; });
+            if (!pick && arr.length) pick = arr[0];
+            var p = pick ? pick.file_path : '';
+            cacheSet('sui_img', ck, p, 30 * 864e5);
+            show(p);
+        }, function () { show(''); });
     }
 
-    function badgeHtml(r) {
-        var style = 'flag', out = '';
-        if (r.ua && S('badge_ua', true) !== false) out += '<span class="sui-badge sui-badge--ua sui-badge--' + style + '">UA</span>';
-        if (r.pl && S('badge_pl', true) !== false) out += '<span class="sui-badge sui-badge--pl sui-badge--' + style + '">PL</span>';
-        return out ? '<div class="sui-badges">' + out + '</div>' : '';
+    /* ---- Додаткова назва ---- */
+    var XT_SIZE = { xs: [1, .8], s: [1.2, .9], m: [1.4, 1], l: [1.7, 1.1], xl: [2, 1.2], xxl: [2.4, 1.3], giant: [3, 1.5] };
+    function tmdbFull(m, cb) {
+        var ck = (isTv(m) ? 'tv' : 'movie') + m.id;
+        var c = cacheGet('sui_full', ck, 7 * 864e5);
+        if (c) return cb(c);
+        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '?language=uk&append_to_response=translations,images&include_image_language=uk,en,null'), function (j) {
+            var tr = ((j.translations || {}).translations || []), uk = null, en = null;
+            tr.forEach(function (x) { if (x.iso_639_1 === 'uk') uk = x.data; if (x.iso_639_1 === 'en' && (!en || x.iso_3166_1 === 'US')) en = x.data; });
+            var imgs = j.images || {};
+            var v = {
+                uk: (uk && (uk.title || uk.name)) || j.title || j.name || '',
+                en: (en && (en.title || en.name)) || j.original_title || j.original_name || '',
+                year: String(j.release_date || j.first_air_date || '').slice(0, 4),
+                countries: (j.production_countries || []).map(function (c) { return c.name; }),
+                ukImg: ['logos', 'posters', 'backdrops'].some(function (k) { return (imgs[k] || []).some(function (x) { return x.iso_639_1 === 'uk'; }); }),
+                companies: (j.production_companies || []).slice(0, 3).map(function (c) { return { id: c.id, name: c.name, logo: c.logo_path || '' }; })
+            };
+            cacheSet('sui_full', ck, v, 7 * 864e5);
+            cb(v);
+        }, function () { cb(null); });
     }
-
-    function uaOn() { return S('badge_ua', true) !== false || S('badge_pl', true) !== false; }
-    function decorateCard(el) {
-        if (!el || el.__sui_done) return;
-        var d = el.card_data;
-        if (!d || !d.id) return;
-        el.__sui_done = true;
-        lookupLangs(d, function (r) {
-            var view = el.querySelector('.card__view');
-            if (!view) return;
-            var old = view.querySelector('.sui-badges');
-            if (old) old.parentNode.removeChild(old);
-            var h = badgeHtml(r);
-            if (h) view.insertAdjacentHTML('beforeend', h);
-            var nb = view.querySelector('.sui-badges');
-            if (nb && view.querySelector('.sui-rate--tl')) nb.classList.add('sui-badges--tr');
+    function applyXTitle(root, m, d) {
+        root.find('.sui-xtitle').remove();
+        if (!on('xtitle') || !d) return;
+        var sz = XT_SIZE[S('xt_size', 'xs')] || XT_SIZE.xs;
+        var name = S('xt_mode', 'smart') === 'smart' && d.ukImg && on('logo') ? d.en : d.uk;
+        var info = [d.year].concat(d.countries.length ? [d.countries.join(' / ')] : []).filter(Boolean);
+        var h = $('<div class="sui-xtitle" style="margin-left:' + S('xt_ml', '0px') + '"><span class="sui-xtitle__t" style="font-size:' + sz[0] + 'em">' + esc(name) + '</span>' +
+            (info.length ? '<span class="sui-xtitle__i" style="font-size:' + sz[1] + 'em">• ' + esc(info.join(' • ')) + '</span>' : '') + '</div>');
+        var t = titleEl(root);
+        if (t.length) t.after(h);
+        // рік і країни вже показані — ховаємо дублікати в рядку деталей
+        root.find('.full-start-new__details span, .full-start__details span').each(function () {
+            var s = trim($(this).text());
+            if (s && (s === d.year || d.countries.indexOf(s) >= 0)) { $(this).addClass('sui-hidden'); $(this).next('.full-start-new__split').addClass('sui-hidden'); }
         });
     }
 
-    function voteColor(v) { return v >= 7.5 ? '#3fd16b' : v >= 6 ? '#f5c518' : v >= 4 ? '#ff9b3d' : '#ff5a5a'; }
+    /* ---- Лого студій ---- */
+    function applyStudios(root, m, d) {
+        root.find('.sui-studios').remove();
+        if (!on('studios')) return;
+        var list = (d && d.companies) || (m.production_companies || []).slice(0, 3).map(function (c) { return { id: c.id, name: c.name, logo: c.logo_path || '' }; });
+        if (!list.length) return;
+        var st = S('st_style', 'normal'), glass = st !== 'normal', bg = !glass && on('st_bg');
+        var gap = S('st_gap', '0.2em'), size = S('st_size', '0.7em'), sat = S('st_sat', '1');
+        var box = $('<div class="sui-studios" style="margin-left:' + S('st_ml', '0px') + '"></div>');
+        var inner = glass ? $('<div class="sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') + '"></div>') : box;
+        if (glass) box.append(inner);
+        if (neg(gap)) inner.addClass('sui-neg').css('--sui-neg', gap); else inner.css('gap', gap);
+        list.forEach(function (c, i) {
+            if (!bg && !glass && i && !neg(gap)) inner.append('<span class="sui-studio__dot">●</span>');
+            var it = $('<div class="sui-studio selector" data-id="' + c.id + '"></div>').css({ filter: 'saturate(' + sat + ')', padding: bg ? '.3em .8em' : '0 .3em', background: bg ? 'rgba(255,255,255,.08)' : 'transparent' });
+            if (c.logo) {
+                var img = new Image(); img.crossOrigin = 'anonymous'; img.alt = c.name; img.style.height = size === '0.7em' ? '1.4em' : 'calc(' + size + ' * 2)';
+                img.onload = function () { whiten(img); };
+                img.src = 'https://image.tmdb.org/t/p/h100' + c.logo;
+                it.append(img);
+            } else it.append('<span class="sui-studio__t" style="font-size:' + size + '">' + esc(c.name) + '</span>');
+            it.on('hover:enter', function () { Lampa.Activity.push({ url: 'movie', id: c.id, title: c.name, component: 'company', source: 'tmdb', page: 1 }); });
+            inner.append(it);
+        });
+        var after = root.find('.sui-xtitle').first();
+        if (!after.length) after = titleEl(root);
+        if (after.length) after.after(box);
+        setTimeout(function () {
+            try { var en = Lampa.Controller.enabled(); if (en && /full/.test(en.name || '')) en.collection = root.find('.selector'); } catch (e) { }
+        }, 600);
+    }
 
+    /* ---- Uator: українська доріжка, якість, роздачі ---- */
+    var RX_UA = /(^|[^a-zа-яіїєґ0-9])(ukr|ua|ukrainian|укр|україн[а-яіїєґ]*|украин[а-я]*)([^a-zа-яіїєґ0-9]|$)/i;
+    var RX_UA_SUB = /(ukr|укр|ua)[^|,/]{0,6}(sub|суб)|(sub|суб)[^|,/]{0,6}(ukr|укр|ua)/ig;
+    function resOf(it) {
+        var w = 0, t = String(it.Title || it.title || '');
+        (it.ffprobe || []).forEach(function (s) { if (s.codec_type === 'video' && s.width) w = Math.max(w, +s.width); });
+        if (!w) w = /2160|4k|uhd/i.test(t) ? 3840 : /1440|2k/i.test(t) ? 2560 : /1080/i.test(t) ? 1920 : /720/i.test(t) ? 1280 : 720;
+        return w;
+    }
+    function resLabel(w) { return w >= 3800 ? '4K' : w >= 2500 ? '2K' : w >= 1900 ? 'FHD' : w >= 1200 ? 'HD' : 'SD'; }
+    function analyze(arr, m) {
+        var yr = parseInt(String(m.release_date || m.first_air_date || '').slice(0, 4), 10) || 0, tv = isTv(m), ua = [];
+        arr.forEach(function (it) {
+            var t = String(it.Title || it.title || '');
+            if (yr && !tv) { var ys = t.match(/\b(19|20)\d{2}\b/g); if (ys && !ys.some(function (y) { return Math.abs(+y - yr) <= 1; })) return; }
+            var clean = t.replace(RX_UA_SUB, ' ').replace(/[a-z0-9-]+\.(ua|uk)\b/ig, ' ');
+            var hit = RX_UA.test(clean) || /toloka|mazepa/i.test(String(it.Tracker || it.tracker || ''));
+            if (!hit) hit = (it.ffprobe || []).some(function (s) { var l = String(s.tags && s.tags.language || '').toLowerCase(); return s.codec_type === 'audio' && (l === 'ukr' || l === 'uk' || RX_UA.test(String(s.tags && s.tags.title || ''))); });
+            if (hit) ua.push({ it: it, w: resOf(it), s: parseInt(it.Seeders || it.seeders || it.sid || 0, 10) || 0, t: t });
+        });
+        if (!ua.length) return { ukr: false };
+        var best = ua.slice().sort(function (a, b) { return b.w - a.w || b.s - a.s; })[0];
+        var pop = ua.slice().sort(function (a, b) { return b.s - a.s; })[0];
+        var ch = 0, hdr = false, dv = false;
+        ua.forEach(function (x) {
+            (x.it.ffprobe || []).forEach(function (s) { if (s.codec_type === 'audio' && s.channels) ch = Math.max(ch, +s.channels); });
+            ch = Math.max(ch, /7\.1|8ch/i.test(x.t) ? 8 : /5\.1|6ch/i.test(x.t) ? 6 : /2\.0/.test(x.t) ? 2 : 0);
+        });
+        if (/dolby\s*vision|\bdovi\b|\bdv\b/i.test(best.t)) dv = true;
+        if (/hdr/i.test(best.t)) hdr = true;
+        (best.it.ffprobe || []).forEach(function (s) { if (s.codec_type === 'video') { if (s.color_transfer === 'smpte2084') hdr = true; if (/vision|dovi/i.test(JSON.stringify(s.side_data_list || []))) dv = true; } });
+        return { ukr: true, best: resLabel(best.w), pop: resLabel(pop.w), seeds: pop.s, audio: ch >= 8 ? '7.1' : ch >= 6 ? '5.1' : ch >= 4 ? '4.0' : ch ? '2.0' : '', hdr: hdr, dv: dv };
+    }
+    var uq = [], urun = 0;
+    function uatorData(m, cb) {
+        var ck = (isTv(m) ? 'tv' : 'movie') + m.id;
+        var c = cacheGet('sui_uat', ck, 864e5);
+        if (c) return cb(c);
+        uq.push({ m: m, ck: ck, cb: cb });
+        upump();
+    }
+    function upump() {
+        while (urun < 2 && uq.length) (function (job) {
+            urun++;
+            var m = job.m, names = [m.title || m.name, m.original_title || m.original_name].filter(function (x, i, a) { return x && a.indexOf(x) === i; }), ni = 0;
+            var fin = function (r) { cacheSet('sui_uat', job.ck, r, r.ukr ? 864e5 : 6 * 36e5); urun--; job.cb(r); upump(); };
+            var tryNext = function () {
+                if (ni >= names.length) return fin({ ukr: false });
+                var q = names[ni++];
+                search(q, m, function (arr) { var r = analyze(arr || [], m); if (r.ukr) fin(r); else tryNext(); });
+            };
+            tryNext();
+        })(uq.shift());
+    }
+    function search(q, m, cb) {
+        if (Lampa.Parser && Lampa.Parser.get) {
+            try { return Lampa.Parser.get({ search: q, movie: m, page: 1 }, function (r) { cb((r && (r.Results || r.results)) || []); }, function () { cb([]); }); } catch (e) { }
+        }
+        var url = '', key = '';
+        try { url = trim(Lampa.Storage.get('jackett_url', '')).replace(/\/+$/, ''); key = trim(Lampa.Storage.get('jackett_key', '')); } catch (e) { }
+        if (!url) return cb([]);
+        if (!/^https?:\/\//i.test(url)) url = 'http://' + url;
+        getJSON(url + '/api/v2.0/indexers/all/results?apikey=' + encodeURIComponent(key) + '&Query=' + encodeURIComponent(q), function (j) { cb((j && (j.Results || j.results)) || (Array.isArray(j) ? j : [])); }, function () { cb([]); });
+    }
+    var UI = {
+        top: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="#ffb020"><path d="M12 2l3 7h7l-5.5 4.5L18.5 21 12 16.5 5.5 21l2-7.5L2 9h7z"/></svg>',
+        seed: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="#3fd16b"><path d="M12 3l7 8h-4v10h-6V11H5z"/></svg>',
+        snd: '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="#9fd3ff"><path d="M3 9v6h4l5 5V4L7 9zm13.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>'
+    };
+    function uatorHtml(r, card) {
+        var sat = S('ua_sat', '100%'), f = 'filter:saturate(' + sat + ')';
+        var b = function (ico, txt, cls) { return '<span class="sui-uat__b' + (cls ? ' ' + cls : '') + '" style="' + f + '">' + (ico || '') + (txt !== '' && txt != null ? '<span>' + esc(txt) + '</span>' : '') + '</span>'; };
+        var flag = sat === '0%' ? '<b>UA</b>' : '<i class="sui-uat__ua"></i>';
+        if (card) return r.ukr ? b(flag, r.best) : '';
+        if (!r.ukr) return b(flag, 'немає', 'sui-uat__no');
+        var out = b(flag, r.best) + b(UI.top, r.pop) + b(UI.seed, r.seeds);
+        if (r.audio) out += b(UI.snd, r.audio);
+        if (r.dv) out += b('', 'DV');
+        if (r.hdr) out += b('', 'HDR');
+        return out;
+    }
+    function applyUatorFull(root, m) {
+        root.find('.sui-uat').remove();
+        if (!on('uator')) return;
+        var st = S('ua_style', 'normal'), gap = S('ua_gap', '0.45em');
+        var box = $('<div class="sui-uat' + (st !== 'normal' ? ' sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') : '') + '"></div>').css({ 'font-size': S('ua_size', '1.1em'), 'margin-left': S('ua_ml', '0px') });
+        if (neg(gap)) box.addClass('sui-neg').css('--sui-neg', gap); else box.css('gap', gap);
+        var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        if (!landscape()) { var t = titleEl(root); if (t.length) t.after(box); else line.after(box); }
+        else if (line.length) line.after(box); else root.find('.full-start__info').append(box);
+        uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
+    }
+    function uatorCard(el) {
+        if (!on('uator') || !el || el.__sui_ua) return;
+        var d = el.card_data;
+        if (!d || !d.id) return;
+        el.__sui_ua = true;
+        uatorData(d, function (r) {
+            var view = el.querySelector('.card__view');
+            if (!view) return;
+            var o = view.querySelector('.sui-uat-card'); if (o) o.parentNode.removeChild(o);
+            var h = uatorHtml(r, true);
+            if (h) view.insertAdjacentHTML('beforeend', '<div class="sui-uat-card' + (view.querySelector('.sui-rate--tl') ? ' sui-badges--tr' : '') + '">' + h + '</div>');
+        });
+    }
+
+    /* ---- нижня інформаційна панель на постерах (розділ 1) ---- */
+    function voteColor(v) { return v >= 7.5 ? '#3fd16b' : v >= 6 ? '#f5c518' : v >= 4 ? '#ff9b3d' : '#ff5a5a'; }
     function infoCard(el) {
         var d = el && el.card_data, view = el && el.querySelector('.card__view');
         if (!d || !view) return;
@@ -3507,450 +3717,58 @@
         }
         if (parts.length) view.insertAdjacentHTML('beforeend', '<div class="sui-bot sui-bot--' + st + '">' + parts.join('') + '</div>');
         if (rateHtml) view.insertAdjacentHTML('beforeend', rateHtml);
-        var ua = view.querySelector('.sui-badges');
+        var ua = view.querySelector('.sui-uat-card');
         if (ua) ua.classList.toggle('sui-badges--tr', !!rateHtml && pos === 'tl');
     }
-    function refreshInfo() {
+    function refreshCards() {
         var list = document.querySelectorAll('.card');
-        for (var i = 0; i < list.length; i++) infoCard(list[i]);
+        for (var i = 0; i < list.length; i++) {
+            infoCard(list[i]);
+            if (!on('uator')) { var u = list[i].querySelector('.sui-uat-card'); if (u) u.parentNode.removeChild(u); list[i].__sui_ua = false; }
+        }
     }
 
-    var io = null;
-    var watching = false;
+    var io = null, watching = false;
     function watchCards() {
         if (watching) return;
         watching = true;
-        if (window.IntersectionObserver && !io) {
+        if (window.IntersectionObserver) {
             io = new IntersectionObserver(function (ents) {
-                ents.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); if (uaOn()) decorateCard(en.target); } });
+                ents.forEach(function (en) { if (en.isIntersecting) { io.unobserve(en.target); uatorCard(en.target); } });
             }, { rootMargin: '300px' });
         }
-        function scan(root) {
-            var list = (root.querySelectorAll ? root.querySelectorAll('.card') : []);
-            for (var i = 0; i < list.length; i++) {
-                if (list[i].__sui_seen) continue;
-                list[i].__sui_seen = true;
-                infoCard(list[i]);
-                markCard(list[i]); if (io) io.observe(list[i]); else if (uaOn()) decorateCard(list[i]);
-            }
-        }
+        var seen = function (c) {
+            if (c.__sui_seen) return;
+            c.__sui_seen = true;
+            infoCard(c);
+            if (io) io.observe(c); else uatorCard(c);
+        };
+        var scan = function (root) { var l = root.querySelectorAll ? root.querySelectorAll('.card') : []; for (var i = 0; i < l.length; i++) seen(l[i]); };
         scan(document);
         new MutationObserver(function (ms) {
             for (var i = 0; i < ms.length; i++) for (var j = 0; j < ms[i].addedNodes.length; j++) {
                 var n = ms[i].addedNodes[j];
                 if (n.nodeType !== 1) continue;
-                if (n.classList && n.classList.contains('card')) { if (!n.__sui_seen) { n.__sui_seen = true; infoCard(n); markCard(n); if (io) io.observe(n); else if (uaOn()) decorateCard(n); } }
-                else scan(n);
+                if (n.classList && n.classList.contains('card')) seen(n); else scan(n);
             }
         }).observe(document.body, { childList: true, subtree: true });
-    }
-    function refreshMarks() { var list = document.querySelectorAll('.card'); for (var i = 0; i < list.length; i++) markCard(list[i]); }
-    function refreshBadges() {
-        var list = document.querySelectorAll('.card');
-        for (var i = 0; i < list.length; i++) { list[i].__sui_done = false; var b = list[i].querySelector('.sui-badges'); if (b) b.parentNode.removeChild(b); decorateCard(list[i]); }
-    }
-
-    /* ---- сторінка фільму ---- */
-    function hideRows(root) {
-        var seasons = S('hide_seasons', false) === true, comments = S('comments', S('hide_comments', false) !== true) === false;
-        if (!seasons && !comments) return;
-        var tComments = '', tSeason = '', tSeries = '';
-        try { tComments = Lampa.Lang.translate('title_comments'); tSeason = Lampa.Lang.translate('torrent_serial_season'); tSeries = Lampa.Lang.translate('full_series_release'); } catch (e) { }
-        root.find('.items-line').each(function () {
-            var t = trim($(this).find('.items-line__title').first().text());
-            if (!t) return;
-            var isC = t === tComments || /^(коментар|комментар|comments)/i.test(t);
-            var isS = (tSeason && t.indexOf(tSeason) === 0) || t === tSeries || /^(сезон|season|сезони|seasons)/i.test(t);
-            if ((comments && isC) || (seasons && isS)) $(this).addClass('sui-hidden');
-        });
-    }
-
-    function applyLogo(root, m) {
-        if (S('logo', false) !== true) return;
-        var title = root.find('.full-start-new__title, .full-start__title').first();
-        if (!title.length || title.find('.sui-logo').length) return;
-        var ck = (isTv(m) ? 'tv' : 'movie') + ':' + m.id;
-        var put = function (path) {
-            if (!path) return;
-            var img = new Image();
-            img.className = 'sui-logo';
-            img.alt = title.text();
-            img.onload = function () { title.data('sui-text', title.html()); title.empty().append(img); };
-            img.src = tmdbImg(path);
-        };
-        var c = cacheGet('sui_logo', ck, 7 * 864e5);
-        if (c !== null) return put(c);
-        getJSON(tmdbUrl((isTv(m) ? 'tv/' : 'movie/') + m.id + '/images?include_image_language=uk,en,null'), function (j) {
-            var logos = (j && j.logos) || [], pick = null;
-            ['uk', 'en', null].some(function (lng) {
-                for (var i = 0; i < logos.length; i++) if ((logos[i].iso_639_1 || null) === lng) { pick = logos[i].file_path; return true; }
-                return false;
-            });
-            if (!pick && logos.length) pick = logos[0].file_path;
-            cacheSet('sui_logo', ck, pick || '', 7 * 864e5);
-            put(pick);
-        }, function () { });
-    }
-
-    /* ---- редактор кнопок ---- */
-    function btnId($b) {
-        var cls = ($b.attr('class') || '').split(/\s+/), i;
-        for (i = 0; i < cls.length; i++) if (/^(button|view)--/.test(cls[i])) return cls[i];
-        return 'txt:' + trim($b.text()).slice(0, 30);
-    }
-    function knownButtons() { var k = S('btn_known', '{}'); if (typeof k === 'string') { try { k = JSON.parse(k); } catch (e) { k = {}; } } return k || {}; }
-    function hiddenButtons() { var h = S('btn_hidden', '[]'); if (typeof h === 'string') { try { h = JSON.parse(h); } catch (e) { h = []; } } return h || []; }
-
-    function applyButtons(root) {
-        var known = knownButtons(), hidden = hiddenButtons(), changed = false;
-        root.find('.full-start-new__buttons .full-start__button, .full-start__buttons .full-start__button').each(function () {
-            var $b = $(this), id = btnId($b), name = trim($b.find('span').first().text()) || trim($b.text()) || ($b.hasClass('button--options') ? 'Додатково (⋯)' : id);
-            if (!known[id] || known[id] !== name) { known[id] = name; changed = true; }
-            $b.toggleClass('sui-hidden', hidden.indexOf(id) >= 0);
-        });
-        if (changed) setS('btn_known', known);
-    }
-
-    function openButtonEditor() {
-        var known = knownButtons(), hidden = hiddenButtons(), ids = Object.keys(known);
-        if (!ids.length) { Lampa.Noty.show('Спершу відкрийте будь-який фільм — кнопки з’являться тут'); return; }
-        var items = ids.map(function (id) { return { title: known[id], id: id, checkbox: true, checked: hidden.indexOf(id) < 0 }; });
-        Lampa.Select.show({
-            title: 'Кнопки на сторінці фільму',
-            items: items,
-            onCheck: function (a) {
-                var h = hiddenButtons(), i = h.indexOf(a.id);
-                if (a.checked) { if (i >= 0) h.splice(i, 1); } else if (i < 0) h.push(a.id);
-                setS('btn_hidden', h);
-            },
-            onBack: function () { Lampa.Controller.toggle('settings_component'); }
-        });
+        // після вмикання Uator — пройтися по видимих картках ще раз
+        setInterval(function () { if (!on('uator')) return; var l = document.querySelectorAll('.card'); for (var i = 0; i < l.length; i++) if (!l[i].__sui_ua && io) io.observe(l[i]); }, 4000);
     }
 
     function onFullLook(e) {
         var m = e.data && e.data.movie;
-        if (!m) return;
+        if (!m || !m.id) return;
         var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.activity--active');
         applyLogo(root, m);
-        applyButtons(root);
-        hideRows(root);
-        setTimeout(function () { hideRows(root); applyButtons(root); chronoCollection(root, m); }, 800);
-        setTimeout(function () { hideRows(root); chronoCollection(root, m); }, 2500);
-        setTimeout(function () { chronoCollection(root, m); }, 5000);
-    }
-
-    /* ======================================================================
-     * 2. ЗОВНІШНІЙ ВИГЛЯД — головна сторінка, мітки статусу, колекції
-     * (власний код; ідеї пунктів меню — з LMX Pack)
-     * ==================================================================== */
-    function readList(k) { var v = S(k, '[]'); if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = []; } } return Array.isArray(v) ? v : []; }
-    function readMap(k) { var v = S(k, '{}'); if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = {}; } } return v && typeof v === 'object' ? v : {}; }
-
-    // ---- сервіси (наші підбірки «Популярне на …») ----
-    var SERVICES = [
-        { id: 'netflix', name: 'Netflix', q: 'with_networks=213' },
-        { id: 'apple', name: 'Apple TV+', q: 'with_networks=2552' },
-        { id: 'hbo', name: 'HBO / Max', q: 'with_networks=49|3186' },
-        { id: 'amazon', name: 'Prime Video', q: 'with_networks=1024' },
-        { id: 'disney', name: 'Disney+', q: 'with_networks=2739' },
-        { id: 'paramount', name: 'Paramount+', q: 'with_networks=4330' },
-        { id: 'sky', name: 'SkyShowtime', q: 'with_networks=6783|67' },
-        { id: 'amc', name: 'AMC', q: 'with_networks=174' },
-        { id: 'hulu', name: 'Hulu', q: 'with_networks=453' }
-    ];
-    var SVC_DEF_HIDDEN = ['paramount', 'sky', 'amc', 'hulu'];
-    function svcOrder() {
-        var o = readList('svc_order').filter(function (id) { return SERVICES.some(function (s) { return s.id === id; }); });
-        SERVICES.forEach(function (s) { if (o.indexOf(s.id) < 0) o.push(s.id); });
-        return o;
-    }
-    function svcHidden() { var h = S('svc_hidden', null); return h == null ? SVC_DEF_HIDDEN.slice() : readList('svc_hidden'); }
-    function svcById(id) { for (var i = 0; i < SERVICES.length; i++) if (SERVICES[i].id === id) return SERVICES[i]; return null; }
-
-    function svcPart(s) {
-        var f = function (cb) {
-            if (svcHidden().indexOf(s.id) >= 0) return cb({ results: [] });
-            var url = tmdbUrl('discover/tv?' + s.q.replace(/\|/g, '%7C') + '&sort_by=popularity.desc&vote_count.gte=50');
-            var c = cacheGet('sui_svc_cache', s.id, 6 * 3600 * 1000);
-            var done = function (list) { cb({ results: list, title: 'Популярне на ' + s.name, source: 'tmdb', total_pages: 1 }); };
-            if (c) return done(c);
-            getJSON(url, function (j) {
-                var list = (j && j.results || []).filter(function (r) { return r.poster_path; }).slice(0, 20);
-                list.forEach(function (r) { r.source = 'tmdb'; });
-                if (list.length) cacheSet('sui_svc_cache', s.id, list, 6 * 3600 * 1000);
-                done(list);
-            }, function () { done([]); });
-        };
-        f.__sui = 'sui_svc_' + s.id;
-        return f;
-    }
-
-    // ---- порядок і видимість рядів головної ----
-    function rowTitles() { return readMap('home_titles'); }
-    function keyOf(c, coreIdx) { return (c && c.__sui) || (c && c.__sui_name) || ('core_' + coreIdx); }
-    function wrapTitle(c, key) {
-        if (typeof c !== 'function' || c.__sui_tw) return c;
-        var g = function (cb) {
-            var args = Array.prototype.slice.call(arguments);
-            if (typeof cb === 'function') args[0] = function (data) {
-                try {
-                    if (data && data.title && data.results && data.results.length) {
-                        var t = rowTitles();
-                        if (t[key] !== data.title) { t[key] = String(data.title); setS('home_titles', t); }
-                    }
-                } catch (e) { }
-                return cb.apply(this, arguments);
-            };
-            return c.apply(this, args);
-        };
-        for (var k in c) { try { g[k] = c[k]; } catch (e) { } }
-        g.__sui_tw = true;
-        return g;
-    }
-    function isOurs(key) { return key.indexOf('sui_svc_') === 0; }
-    function homeOrder(keys) {
-        var saved = readList('home_order');
-        keys.forEach(function (k) { if (saved.indexOf(k) < 0) saved.push(k); });
-        return saved;
-    }
-    function reorderMain(calls) {
-        if (!Array.isArray(calls) || !calls.length) return;
-        var coreIdx = 0, boxed = calls.map(function (c, i) {
-            var key = (c && (c.__sui || c.__sui_name)) ? keyOf(c) : keyOf(c, coreIdx++);
-            return { c: wrapTitle(c, key), key: key, i: i };
-        });
-        var known = readList('home_known'), changed = false;
-        boxed.forEach(function (b) { if (known.indexOf(b.key) < 0) { known.push(b.key); changed = true; } });
-        if (changed) setS('home_known', known);
-        var order = homeOrder(known), hidden = readList('home_hidden'), onlyMine = S('only_mine', false) === true;
-        boxed = boxed.filter(function (b) { return hidden.indexOf(b.key) < 0 && (!onlyMine || isOurs(b.key)); });
-        boxed.sort(function (a, b) { return order.indexOf(a.key) - order.indexOf(b.key) || a.i - b.i; });
-        calls.length = 0;
-        boxed.forEach(function (b) { calls.push(b.c); });
-    }
-    function patchRows() {
-        var CR = Lampa.ContentRows;
-        if (!CR || CR.__sui) return false;
-        if (typeof CR.add === 'function') {
-            var oAdd = CR.add;
-            CR.add = function (row) {
-                try {
-                    if (row && row.name && typeof row.call === 'function' && !row.call.__sui_w) {
-                        var oc = row.call, nm = row.name;
-                        row.call = function () { var f = oc.apply(this, arguments); if (typeof f === 'function') { try { f.__sui_name = nm; } catch (e) { } } return f; };
-                        row.call.__sui_w = true;
-                    }
-                } catch (e) { }
-                return oAdd.apply(this, arguments);
-            };
-        }
-        if (typeof CR.call === 'function') {
-            var oCall = CR.call;
-            CR.call = function (screen, params, calls) {
-                var r = oCall.apply(this, arguments);
-                if (screen === 'main') {
-                    try {
-                        svcOrder().forEach(function (id) { var s = svcById(id); if (s && svcHidden().indexOf(id) < 0) calls.push(svcPart(s)); });
-                        reorderMain(calls);
-                    } catch (e) { console.log('SUI rows', e); }
-                }
-                return r;
-            };
-        }
-        CR.__sui = true;
-        return true;
-    }
-    function rowLabel(key) {
-        var t = rowTitles()[key];
-        if (isOurs(key)) { var s = svcById(key.replace('sui_svc_', '')); return 'Популярне на ' + (s ? s.name : key); }
-        return t || ('Ряд ' + (parseInt(key.replace(/\D/g, ''), 10) + 1 || key));
-    }
-    function moveIn(list, key, dir) {
-        var i = list.indexOf(key); if (i < 0) return list;
-        var j = dir === 'top' ? 0 : i + dir; if (j < 0 || j >= list.length) return list;
-        list.splice(i, 1); list.splice(j, 0, key); return list;
-    }
-    function listEditor(o) {
-        // o: {title, keys(), label(key), hidden(), setHidden(arr), order(), setOrder(arr), note}
-        var back = function () { Lampa.Controller.toggle('settings_component'); };
-        var show = function (picked) {
-            var order = o.order(), hidden = o.hidden();
-            if (!order.length) { Lampa.Noty.show(o.empty || 'Список порожній'); return; }
-            Lampa.Select.show({
-                title: o.title,
-                items: order.map(function (k, i) { return { title: (i + 1) + '. ' + o.label(k) + (hidden.indexOf(k) >= 0 ? '  (сховано)' : ''), key: k, selected: k === picked }; }),
-                onSelect: function (it) {
-                    var hid = hidden.indexOf(it.key) >= 0;
-                    Lampa.Select.show({
-                        title: o.label(it.key),
-                        items: [{ title: 'Вгору', a: -1 }, { title: 'Вниз', a: 1 }, { title: 'На початок', a: 'top' }, { title: hid ? 'Показати' : 'Сховати', a: 'hide' }],
-                        onSelect: function (x) {
-                            if (x.a === 'hide') { var h = o.hidden(); if (hid) h.splice(h.indexOf(it.key), 1); else h.push(it.key); o.setHidden(h); }
-                            else o.setOrder(moveIn(o.order(), it.key, x.a));
-                            show(it.key);
-                        },
-                        onBack: function () { show(it.key); }
-                    });
-                },
-                onBack: function () { if (o.note) Lampa.Noty.show(o.note); back(); }
-            });
-        };
-        show(null);
-    }
-    function openRowsEditor() {
-        listEditor({
-            title: 'Порядок і видимість рядів',
-            empty: 'Спочатку відкрийте головну сторінку, щоб плагін побачив ряди',
-            note: 'Збережено. Поверніться на головну',
-            order: function () { return homeOrder(readList('home_known')).filter(function (k) { return rowTitles()[k] || isOurs(k); }); },
-            label: rowLabel,
-            hidden: function () { return readList('home_hidden'); },
-            setHidden: function (h) { setS('home_hidden', h); },
-            setOrder: function (ord) { var full = homeOrder(readList('home_known')), rest = full.filter(function (k) { return ord.indexOf(k) < 0; }); setS('home_order', ord.concat(rest)); }
-        });
-    }
-    function openSvcEditor() {
-        listEditor({
-            title: 'Порядок каталогів',
-            note: 'Збережено. Поверніться на головну',
-            order: svcOrder,
-            label: function (id) { var s = svcById(id); return s ? s.name : id; },
-            hidden: svcHidden,
-            setHidden: function (h) { setS('svc_hidden', h); },
-            setOrder: function (o) { setS('svc_order', o); }
-        });
-    }
-
-    // ---- пункт «Статистика» в меню ----
-    var GENRES = { 28: 'Бойовик', 12: 'Пригоди', 16: 'Мультфільм', 35: 'Комедія', 80: 'Кримінал', 99: 'Документальний', 18: 'Драма', 10751: 'Сімейний', 14: 'Фентезі', 36: 'Історичний', 27: 'Жахи', 10402: 'Музика', 9648: 'Детектив', 10749: 'Мелодрама', 878: 'Фантастика', 10770: 'Телефільм', 53: 'Трилер', 10752: 'Військовий', 37: 'Вестерн', 10759: 'Бойовик і пригоди', 10762: 'Дитячий', 10763: 'Новини', 10764: 'Реаліті', 10765: 'Фантастика і фентезі', 10766: 'Мильна опера', 10767: 'Ток-шоу', 10768: 'Війна і політика' };
-    var LANGS = { en: 'Англійська', uk: 'Українська', ru: 'Російська', pl: 'Польська', ja: 'Японська', ko: 'Корейська', fr: 'Французька', de: 'Німецька', es: 'Іспанська', it: 'Італійська', zh: 'Китайська', tr: 'Турецька', hi: 'Гінді', sv: 'Шведська', da: 'Данська', no: 'Норвезька' };
-    function topOf(map, n) { return Object.keys(map).map(function (k) { return [k, map[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, n); }
-    function statsHtml() {
-        var hist = [];
-        try { hist = Lampa.Favorite.get({ type: 'history' }) || []; } catch (e) { }
-        var secs = 0, fv = {};
-        try { fv = Lampa.Storage.get('file_view', {}) || {}; if (typeof fv === 'string') fv = JSON.parse(fv); } catch (e) { fv = {}; }
-        Object.keys(fv).forEach(function (k) { var t = parseFloat(fv[k] && fv[k].time); if (t > 0) secs += t; });
-        var g = {}, y = {}, l = {}, mv = 0, tv = 0;
-        hist.forEach(function (c) {
-            if (isTv(c)) tv++; else mv++;
-            (c.genre_ids || (c.genres || []).map(function (x) { return x.id; })).forEach(function (id) { if (GENRES[id]) g[GENRES[id]] = (g[GENRES[id]] || 0) + 1; });
-            var yr = String(c.release_date || c.first_air_date || '').slice(0, 3);
-            if (/^\d{3}$/.test(yr)) y[yr + '0-ті'] = (y[yr + '0-ті'] || 0) + 1;
-            if (c.original_language) { var ln = LANGS[c.original_language] || c.original_language; l[ln] = (l[ln] || 0) + 1; }
-        });
-        var hours = Math.round(secs / 360) / 10;
-        var row = function (a) { return '<div class="sui-st__r"><span>' + esc(a[0]) + '</span><b>' + a[1] + '</b></div>'; };
-        var block = function (t, arr) { return arr.length ? '<div class="sui-st__b"><div class="sui-st__t">' + t + '</div>' + arr.map(row).join('') + '</div>' : ''; };
-        if (!hist.length && !secs) return '<div class="sui-st"><div class="sui-st__empty">Історія порожня — подивіться щось, і тут з’явиться статистика</div></div>';
-        return '<div class="sui-st">' +
-            '<div class="sui-st__top"><div><b>' + hours + '</b><span>годин перегляду</span></div><div><b>' + mv + '</b><span>фільмів</span></div><div><b>' + tv + '</b><span>серіалів</span></div></div>' +
-            block('Улюблені жанри', topOf(g, 6)) + block('Мови оригіналу', topOf(l, 5)) + block('Роки', topOf(y, 5)) + '</div>';
-    }
-    function openStats() {
-        var enabled = Lampa.Controller.enabled().name;
-        Lampa.Modal.open({ title: 'Статистика', html: $(statsHtml()), size: 'medium', mask: true, onBack: function () { Lampa.Modal.close(); Lampa.Controller.toggle(enabled); } });
-    }
-    var ST_ICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>';
-    function addStatsMenu() {
-        if (S('stats_menu', true) === false || document.querySelector('.sui-stats-menu')) return;
-        if (Lampa.Menu && Lampa.Menu.addButton) {
-            var el = Lampa.Menu.addButton(ST_ICO, 'Статистика', openStats);
-            try { $(el).addClass('sui-stats-menu'); } catch (e) { }
-            return;
-        }
-        var list = $('.menu .menu__list').eq(0);
-        if (!list.length) return;
-        var li = $('<li class="menu__item selector sui-stats-menu"><div class="menu__ico">' + ST_ICO + '</div><div class="menu__text">Статистика</div></li>');
-        li.on('hover:enter', openStats);
-        list.append(li);
-    }
-
-    // ---- мітки статусу: «Нова серія», «Сьогодні», «Новинка», «Скоро» ----
-    var COLORS = { orange: ['Помаранчевий', '#ff8a1f'], red: ['Червоний', '#e5303a'], green: ['Зелений', '#22b35e'], blue: ['Синій', '#1e88e5'], purple: ['Фіолетовий', '#8e44ff'], yellow: ['Жовтий', '#f5c518'], pink: ['Рожевий', '#ff4f9a'] };
-    function colorNames() { var o = {}; Object.keys(COLORS).forEach(function (k) { o[k] = COLORS[k][0]; }); return o; }
-    function dayDiff(d) { if (!d) return null; var t = new Date(d + 'T00:00:00'), n = new Date(); n.setHours(0, 0, 0, 0); if (isNaN(t)) return null; return Math.round((t - n) / 86400000); }
-    var stQueue = [], stRun = 0;
-    function tvInfo(id, cb) {
-        var c = cacheGet('sui_tv_cache', id, 6 * 3600 * 1000);
-        if (c) return cb(c);
-        stQueue.push({ id: id, cb: cb });
-        (function pumpSt() {
-            while (stRun < 3 && stQueue.length) (function (job) {
-                stRun++;
-                getJSON(tmdbUrl('tv/' + job.id), function (j) {
-                    var v = { last: j && j.last_episode_to_air && j.last_episode_to_air.air_date || '', next: j && j.next_episode_to_air && j.next_episode_to_air.air_date || '' };
-                    cacheSet('sui_tv_cache', job.id, v, 6 * 3600 * 1000); stRun--; job.cb(v); pumpSt();
-                }, function () { stRun--; job.cb(null); pumpSt(); });
-            })(stQueue.shift());
-        })();
-    }
-    function putMark(el, text, cls) {
-        var view = el.querySelector('.card__view'); if (!view) return;
-        var o = view.querySelector('.sui-mark'); if (o) o.parentNode.removeChild(o);
-        if (text) view.insertAdjacentHTML('beforeend', '<span class="sui-mark sui-mark--' + cls + (view.querySelector('.sui-rate--tr') ? ' sui-mark--low' : '') + '">' + text + '</span>');
-    }
-    function markCard(el) {
-        var d = el && el.card_data;
-        if (!d || !d.id) return;
-        if (S('marks', true) === false) return putMark(el, '');
-        if (isTv(d)) {
-            if (!d.id || d.source && d.source !== 'tmdb') return;
-            tvInfo(d.id, function (v) {
-                if (!v) return;
-                var dl = dayDiff(v.last), dn = dayDiff(v.next);
-                if (dl === 0 || dn === 0) putMark(el, 'Сьогодні', 'today');
-                else if (dl !== null && dl < 0 && dl >= -7) putMark(el, 'Нова серія', 'new');
-                else putMark(el, '');
-            });
-        } else {
-            var dr = dayDiff(d.release_date);
-            if (dr === null) return;
-            if (dr > 0) putMark(el, 'Скоро', 'soon');
-            else if (dr >= -30) putMark(el, 'Новинка', 'fresh');
-        }
-    }
-    function marksCss() {
-        var c = (COLORS[S('mark_color', 'orange')] || COLORS.orange)[1];
-        return '.sui-mark{position:absolute;right:.4em;top:.4em;z-index:4;padding:.2em .5em;border-radius:.35em;font:700 .75em/1.2 Arial,sans-serif;color:#fff;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.6)}' +
-            '.sui-mark--low{top:2.2em}.sui-mark--new,.sui-mark--today{background:' + c + '}.sui-mark--fresh{background:#22b35e}.sui-mark--soon{background:#5a6478}' +
-            '.sui-st{padding:.5em 0}.sui-st__top{display:flex;gap:1em;margin-bottom:1em}.sui-st__top>div{flex:1;background:rgba(255,255,255,.07);border-radius:.6em;padding:.8em;text-align:center}' +
-            '.sui-st__top b{display:block;font-size:2em}.sui-st__top span{opacity:.7}.sui-st__b{margin-bottom:1em}.sui-st__t{font-weight:700;margin-bottom:.4em;opacity:.8}' +
-            '.sui-st__r{display:flex;justify-content:space-between;padding:.3em 0;border-bottom:1px solid rgba(255,255,255,.07)}.sui-st__empty{opacity:.7;padding:1em 0}';
-    }
-
-    // ---- колекція: хронологія подій ----
-    var ROMAN = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10 };
-    function chronoKey(c) {
-        var t = String(c.original_title || c.original_name || c.title || '');
-        var m = t.match(/episode\s+([ivx]+|\d+)/i) || t.match(/part\s+([ivx]+|\d+)/i) || t.match(/\s([ivx]+|\d{1,2})(\s*[:\-–]|$)/i);
-        if (!m) return null;
-        var v = m[1].toLowerCase();
-        return ROMAN[v] || parseInt(v, 10) || null;
-    }
-    function chronoCollection(root, m) {
-        if (S('coll_chrono', false) !== true || !m || !m.belongs_to_collection) return;
-        var name = trim(m.belongs_to_collection.name || '');
-        root.find('.items-line').each(function () {
-            var line = $(this), t = trim(line.find('.items-line__title').first().text());
-            if (!t || line.data('sui-chrono') || !(name && t.indexOf(name) >= 0 || /колекц|collection/i.test(t))) return;
-            var cards = line.find('.card'), arr = [];
-            cards.each(function () { arr.push({ el: this, k: chronoKey(this.card_data || {}), d: String((this.card_data || {}).release_date || '') }); });
-            var numbered = arr.filter(function (a) { return a.k !== null; }).length;
-            if (arr.length < 2 || numbered < 2) return;
-            var byDate = function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; };
-            var num = arr.filter(function (a) { return a.k !== null; }).sort(function (a, b) { return a.k - b.k || byDate(a, b); });
-            arr = num.concat(arr.filter(function (a) { return a.k === null; }).sort(byDate));
-            var parent = arr[0].el.parentNode;
-            arr.forEach(function (a) { parent.appendChild(a.el); });
-            line.data('sui-chrono', 1);
-        });
+        applyUatorFull(root, m);
+        if (on('xtitle') || on('studios')) tmdbFull(m, function (d) { applyXTitle(root, m, d); applyStudios(root, m, d); });
     }
 
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(id === RT_SEL ? RT : SUI); } }); }
+    function open(id) { [LOGO, XT, BTNS, STUD, UAT].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -4001,51 +3819,90 @@
         ttl(RT_SEL, 'rt_sel_head', 'Вибір рейтингів');
         RATINGS.forEach(function (r) { trg(RT_SEL, 'rt_show_' + r.key, r.name, '', true); });
 
-        // ---- 2. Зовнішній вигляд ----
+        // ---- 2. Зовнішній вигляд (як у Yarik's Mod) ----
+        [LOGO, XT, BTNS, STUD, UAT].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); });
+        var SIZES = sizes(['0.5em', '0.6em', '0.7em', '0.8em', '0.9em', '1.0em', '1.1em', '1.2em', '1.3em', '1.4em', '1.5em', '1.7em', '2.0em', '2.5em', '3.0em', '3.5em', '4.0em', '5.0em', '6.0em']);
+        var GAPS = sizes(['-2em', '-1.5em', '-1em', '-0.8em', '-0.5em', '-0.2em', '0px', '0.2em', '0.5em', '0.8em', '1.0em', '1.2em', '1.5em', '2.0em', '2.5em', '3.0em']);
+        var MARG = sizes(['auto', '-3em', '-2.5em', '-2em', '-1.5em', '-1em', '-0.8em', '-0.5em', '-0.2em', '0px', '5px', '10px', '15px', '20px', '0.5em', '1em', '1.5em', '2em', '3em']); MARG.auto = 'Авто';
+        var MLEFT = sizes(['0px', '5px', '10px', '15px', '20px', '30px', '40px', '50px', '0.5em', '1em', '1.5em', '2em', '2.5em', '3em', '4em', '5em', '6em', '8em', '10em', '15em', '20em', '5vw', '10vw', '15vw', '20vw', '25vw', '30vw', '40vw', '50vw']);
+        var WIDTHS = sizes(['auto', '10vw', '15vw', '20vw', '25vw', '30vw', '35vw', '40vw', '50vw', '60vw', '70vw', '80vw', '90vw', '100vw']); WIDTHS.auto = 'Авто';
+        var HEIGHTS = sizes(['auto', '5vh', '10vh', '15vh', '20vh', '25vh', '30vh', '40vh', '50vh', '60vh']); HEIGHTS.auto = 'Авто';
+        var SAT1 = { '1': '100%', '0.75': '75%', '0.5': '50%', '0.25': '25%', '0': '0% (Ч/Б)' };
+        var SATP = { '100%': '100% (Стандарт)', '75%': '75%', '50%': '50%', '25%': '25%', '0%': '0% (Ч/Б)' };
+        var STYLES = { normal: 'Звичайний', apple: 'Apple Style (Розмиття)', apple_lite: 'Apple Lite (Без розмиття)' };
+        var clear = function (store, txt) { return function () { Lampa.Storage.set(store, {}); Lampa.Noty.show(txt); }; };
+
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
-        sel(LOOK, 'card_size', 'Розмір карток', 'Ширина постерів у рядах', { '1': 'Стандартні', '1.1': 'Трохи більші', '1.25': 'Великі' }, '1');
+        trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
+        btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
+        btn(LOOK, 'go_xtitle', 'Додаткова назва', 'Оригінальна назва, рік, країна', function () { open(XT); });
+        btn(LOOK, 'go_btns', 'Кнопки карток', 'Зовнішній вигляд кнопок дій', function () { open(BTNS); });
+        btn(LOOK, 'go_studios', 'Лого студій', 'Відображення виробничих компаній', function () { open(STUD); });
+        btn(LOOK, 'go_uator', 'Uator', 'Налаштування маркерів UA контенту', function () { open(UAT); });
 
-        ttl(LOOK, 'look_home', 'Головна сторінка');
-        btn(LOOK, 'rows_editor', 'Порядок і видимість рядів', 'Переставити або сховати будь-який ряд головної', openRowsEditor);
-        btn(LOOK, 'svc_editor', 'Порядок каталогів', 'Ряди «Популярне на Netflix, Apple TV+, HBO…»: порядок і які показувати', openSvcEditor);
-        trg(LOOK, 'stats_menu', 'Пункт «Статистика» в меню', 'Години перегляду, улюблені жанри, мови й роки за вашою історією. З\u2019являється в лівому меню після перезапуску', true);
-        trg(LOOK, 'only_mine', 'Лише наші підбірки', 'Ховає стандартні ряди Lampa та ряди інших плагінів. Діє, коли ви повертаєтесь на головну', false);
+        ttl(LOGO, 'logo_head', 'Лого / Постер (Smart)');
+        trg(LOGO, 'logo', 'Увімкнути плагін', 'Відображати графічну назву', true);
+        trg(LOGO, 'logo_move', 'Перенести назву', 'Перемістити назву в лівий верхній кут (горизонтальні екрани)', false);
+        trg(LOGO, 'logo_white', 'Автоматичне біле лого', 'Робити темне лого білим', true);
+        sel(LOGO, 'logo_mode', 'Режим заміни', '', { '1': 'Текст (вимкнути картинку)', '0': 'Картинка (Лого/Постер)' }, '0');
+        sel(LOGO, 'logo_type', 'Що показувати?', 'Логотип або постер фільму', { logo: 'Логотип (текстовий дизайн)', poster_ua: 'Вертикальний постер (UA -> EN)', poster_en: 'Вертикальний постер (Тільки EN)', backdrop_ua: 'Горизонтальний постер (UA -> EN)', backdrop_en: 'Горизонтальний постер (Тільки EN)' }, 'logo');
+        sel(LOGO, 'logo_text_size', 'Розмір назви (текст)', "Якщо вибрано 'Текст'", SIZES, '3.0em');
+        sel(LOGO, 'logo_lang', 'Мова логотипа', 'Пріоритет мови', { '': 'Як у Lampa', en: 'English', uk: 'Українська' }, 'uk');
+        sel(LOGO, 'logo_quality', 'Якість TMDB', '', { w300: 'w300', w500: 'w500', w780: 'w780', original: 'Оригінал' }, 'original');
+        sel(LOGO, 'logo_w', 'Обмеження по ширині (vw)', 'Відносно ширини екрану', WIDTHS, 'auto');
+        sel(LOGO, 'logo_h', 'Обмеження по висоті (vh)', 'Відносно висоти екрану', HEIGHTS, '15vh');
+        sel(LOGO, 'logo_mt', 'Відступ зверху (Перенос)', '', MARG, '0px');
+        sel(LOGO, 'logo_ml', 'Відступ зліва (Завжди)', 'Діє і для перенесеного, і для звичайного лого', MLEFT, '0px');
+        sel(LOGO, 'logo_mb', 'Відступ знизу (Перенос)', 'auto (за замовчуванням)', MARG, 'auto');
+        sel(LOGO, 'logo_sat', 'Насиченість', '', SAT1, '1');
+        btn(LOGO, 'logo_clear', 'Очистити кеш картинок', 'Очистити кеш плагіну', clear('sui_img', 'Кеш картинок очищено'));
 
-        ttl(LOOK, 'look_badges', 'Мітки на картках');
-        trg(LOOK, 'marks', 'Показувати мітки', '«Нова серія» і «Сьогодні» — для серіалів, «Новинка» — для фільмів за останній місяць, «Скоро» — для того, що ще не вийшло', true);
-        trg(LOOK, 'badge_ua', 'Мітка UA (українська звукова доріжка)', 'Прапорець на постері, якщо в парсері торентів є роздача з українською доріжкою', true);
-        trg(LOOK, 'badge_pl', 'Мітка PL (польська звукова доріжка)', 'Прапорець на постері, якщо є роздача з польською доріжкою (Lektor / Dubbing)', true);
-        sel(LOOK, 'mark_color', 'Колір: нова серія і «Сьогодні»', '', colorNames(), 'orange');
+        ttl(XT, 'xt_head', 'Додаткова назва');
+        trg(XT, 'xtitle', 'Увімкнути плагін', 'Відображати додаткову інформацію', true);
+        sel(XT, 'xt_mode', 'Режим', '', { smart: 'Залежно від наявності картинок', always_ua: 'Завжди українська' }, 'smart');
+        sel(XT, 'xt_size', 'Розмір', '', { xs: 'Дуже мала', s: 'Мала', m: 'Нормальна (стандарт)', l: 'Велика', xl: 'Дуже велика', xxl: 'Максимальна', giant: 'Гігантська' }, 'xs');
+        sel(XT, 'xt_ml', 'Відступ зліва', '', MLEFT, '0px');
+        btn(XT, 'xt_clear', 'Очистити кеш назв', 'Очистити кеш плагіну', clear('sui_full', 'Кеш назв очищено'));
 
-        ttl(LOOK, 'look_full', 'Сторінка фільму');
-        trg(LOOK, 'hide_seasons', 'Сховати розділ «Сезони»', 'Ряд із сезонами та серіями на сторінці серіалу', false);
-        trg(LOOK, 'comments', 'Коментарі', 'Ряд коментарів на сторінці фільму. Вимкнено — коментарі сховані', S('hide_comments', false) !== true);
-        trg(LOOK, 'coll_chrono', 'Колекція: хронологія подій', 'Фільми франшизи за епізодами або частинами, а не за роком виходу', false);
-        trg(LOOK, 'logo', 'Логотип замість назви', 'Логотип фільму з TMDB (українською, якщо є)', false);
-        btn(LOOK, 'btn_editor', 'Редактор кнопок', 'Які кнопки показувати на сторінці фільму', openButtonEditor);
+        ttl(BTNS, 'btns_head', 'Кнопки карток');
+        sel(BTNS, 'btn_style', 'Стиль кнопок', 'Зовнішній вигляд кнопок плеєра, закладок тощо', { normal: 'Звичайний (Lampa)', apple: 'Apple Style (Розмиття)', apple_lite: 'Apple Lite (Без розмиття)' }, 'normal');
+        sel(BTNS, 'btn_size', 'Розмір кнопок', 'Працює для Apple стилів', { '0.8em': '0.8em (Міні)', '0.9em': '0.9em (Дрібні)', '1em': '1em (Стандарт)', '1.1em': '1.1em (Більші)', '1.2em': '1.2em (Великі)', '1.4em': '1.4em (Гігантські)' }, '1em');
+        sel(BTNS, 'btn_mt', 'Відступ зверху (до кнопок)', 'Відстань між деталями фільму та кнопками', MARG, '1em');
+
+        ttl(STUD, 'st_head', 'Лого студій');
+        trg(STUD, 'studios', 'Увімкнути плагін', 'Відображати логотипи студій', true);
+        sel(STUD, 'st_style', 'Стиль блоку', 'Зовнішній вигляд', STYLES, 'normal');
+        trg(STUD, 'st_bg', 'Підложка', 'Напівпрозорий фон (не діє для Apple Style)', true);
+        sel(STUD, 'st_size', 'Розмір лого', '', SIZES, '0.7em');
+        sel(STUD, 'st_gap', 'Відступ між лого', '', GAPS, '0.2em');
+        sel(STUD, 'st_ml', 'Відступ зліва', '', MLEFT, '0px');
+        sel(STUD, 'st_sat', 'Насиченість', '', SAT1, '1');
+
+        ttl(UAT, 'ua_head', 'Uator');
+        trg(UAT, 'uator', 'Увімкнути плагін', 'Відображати значки торрентів', true);
+        sel(UAT, 'ua_style', 'Стиль блоку', 'Тільки для повної сторінки фільму', STYLES, 'normal');
+        sel(UAT, 'ua_gap', 'Відстань між значками', '', GAPS, '0.45em');
+        sel(UAT, 'ua_ml', 'Відступ зліва', 'Тільки для повної сторінки', MLEFT, '0px');
+        sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
+        sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
     }
 
     function start() {
         addMenus();
-        patchRows();
-        addStatsMenu();
-        setTimeout(addStatsMenu, 1500);
         lookCss();
         rtCss();
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
             try { onFullRatings(e); } catch (er) { }
-            try { onFullLook(e); } catch (er) { }
+            try { onFullLook(e); } catch (er) { console.log('SUI look', er); }
         });
         Lampa.Storage.listener.follow('change', function (e) {
             var n = String(e.name || '');
-            if (n.indexOf(P + 'rt_') === 0) rtCss();
-            if (n === P + 'mark_color' || n === P + 'card_size' || n === P + 'card_design' || n === P + 'bot_size' || n === P + 'bot_style' || n === P + 'native_vote') lookCss();
-            if (/^sui_(bot_|native_vote)/.test(n)) refreshInfo();
-            if (n === P + 'marks') refreshMarks();
-            if (n === P + 'stats_menu') { if (S('stats_menu', true) === false) $('.sui-stats-menu').remove(); else addStatsMenu(); }
-            if (n === P + 'badges' || n === P + 'badge_ua' || n === P + 'badge_pl' || n === P + 'badge_style') { refreshBadges(); }
+            if (n.indexOf(P) !== 0) return;
+            if (n.indexOf(P + 'rt_') === 0) return rtCss();
+            lookCss();
+            if (/^sui_(bot_|native_vote|uator)/.test(n)) refreshCards();
         });
     }
 
