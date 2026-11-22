@@ -185,6 +185,15 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
   }
 
   function start() {
+    try {
+      var sm = window.location.search.match(/[?&]srv=([^&]+)/);
+      if (sm) {
+        var su = decodeURIComponent(sm[1]);
+        window.localStorage.setItem('mylampa_url2', su);
+        var sl = []; try { sl = JSON.parse(window.localStorage.getItem('mylampa_list') || '[]'); } catch (e) {}
+        if (sl.indexOf(su) < 0) { sl.push(su); window.localStorage.setItem('mylampa_list', JSON.stringify(sl)); }
+      }
+    } catch (e) {}
     var u = norm(getUrl());
     $('url').textContent = u.replace(/^https?:\/\//, '');
     show(null);
@@ -200,9 +209,10 @@ window.ALCO_START = window.location.href.split('#')[0].split('?')[0];
     } catch (e) {}
     var hm = (u.match(/^https?:\/\/([^\/?#]+)/i) || [])[1] || '';
     var mode = null;
-    // Завжди відкриваємо Lampa всередині застосунку: одна пам'ять налаштувань і розширень.
-    // (Раніше при повільному старті застосунок перемикався «напряму» — і там була інша пам'ять.)
-    mode = 'inside';
+    // Завжди відкриваємо Lampa напряму з сервера: там ваша пам'ять (розширення, Stylish, CUB),
+    // і саме туди Lampa повертається після «Очистити кеш». Меню ◀ підвантажує сервер (Lampac).
+    mode = 'direct';
+    try { window.name = JSON.stringify({ alco: 1, start: window.ALCO_START, def: window.ALCO_DEFAULT_URL, cur: u, list: (function () { try { return JSON.parse(localStorage.getItem('mylampa_list') || '[]'); } catch (e) { return []; } })() }); } catch (e) {}
     if (mode === 'direct') {                    // цей сервер працює лише напряму
       var t0 = Date.now();
       $('status').textContent = 'Натисніть ◀ — змінити сервер';

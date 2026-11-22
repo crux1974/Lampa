@@ -8,6 +8,18 @@
 
   var KEY = 'mylampa_url2';
   var LIST = 'mylampa_list';
+  // Режим «напряму»: сторінка з сервера, дані застосунку передані через window.name
+  var NAMED = null;
+  try { NAMED = JSON.parse(window.name || 'null'); } catch (e) {}
+  var DIRECT = !!(NAMED && NAMED.alco && /^https?:/i.test(window.location.protocol));
+  if (DIRECT) {
+    window.ALCO_START = window.ALCO_START || NAMED.start;
+    window.ALCO_DEFAULT_URL = window.ALCO_DEFAULT_URL || NAMED.def;
+    try {
+      if (NAMED.cur) window.localStorage.setItem(KEY, NAMED.cur);
+      if (NAMED.list && NAMED.list.length) window.localStorage.setItem(LIST, JSON.stringify(NAMED.list));
+    } catch (e) {}
+  }
   var DEFAULT_URL = window.ALCO_DEFAULT_URL || 'http://92-5-178-165.sslip.io';
   var LONG_MS = 1000;
   var BACK = { 461: 1, 8: 1, 27: 1 };
@@ -43,6 +55,14 @@
 
   function restart() {
     var start = window.ALCO_START || (window.location.href.split('#')[0]);
+    if (DIRECT) {
+      // повертаємось у застосунок, щоб він запам'ятав нову адресу; якщо телевізор не пустить — відкриваємо її напряму
+      var nu = current();
+      try { NAMED.cur = nu; NAMED.list = list(); window.name = JSON.stringify(NAMED); } catch (e) {}
+      setTimeout(function () { try { window.location.replace(nu); } catch (e) {} }, 1500);
+      try { window.location.replace(start + '?srv=' + encodeURIComponent(nu)); } catch (e) {}
+      return;
+    }
     try { window.location.replace(start); } catch (e) { window.location.reload(); }
   }
 
