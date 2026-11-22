@@ -3151,6 +3151,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3710,6 +3711,7 @@
         var prev = S('style_active', '');
         if (prev === id) return;
         setS('style_active', id);
+        setS('style_just', id || '');
         Lampa.Noty.show(id ? 'Стиль змінено — перезапуск Lampa…' : 'Стиль вимкнено — перезапуск Lampa…');
         setTimeout(function () { try { window.location.reload(); } catch (e) { } }, 1500);
     }
@@ -3915,6 +3917,9 @@
         Lampa.Template.add('settings_stylish_ui_style_urls', '<div></div>');
         var actSt = activeStyle(), mark = function (on) { return on ? '✓ ' : ''; };
         ttl(STYLES_C, 'styles_status', actSt ? 'Активний: ' + actSt.name : 'Активний: без стилю (стандартна Lampa)');
+        if (actSt && actSt.comp) btn(STYLES_C, 'style_settings', '⚙ Налаштування: ' + actSt.name, 'Власне меню активного стилю від автора', function () {
+            try { Lampa.Settings.create(actSt.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { Lampa.Noty.show('Меню стилю ще не завантажилось'); }
+        });
         btn(STYLES_C, 'style_go_none', mark(!actSt) + 'Без стилю', !actSt ? 'Активний' : 'Стандартний вигляд Lampa. Lampa перезапуститься', function () {
             if (!actSt) return Lampa.Noty.show('Уже без стилю');
             setStyle('');
@@ -3953,6 +3958,25 @@
         lookCss();
         styleCss();
         btnEdCss();
+        // після перемикання стилю — одразу показати його налаштування
+        (function () {
+            var just = S('style_just', ''), st = activeStyle();
+            if (!just) return;
+            setS('style_just', '');
+            if (!st || st.id !== just || !st.comp) return;
+            var tries = 0, t = setInterval(function () {
+                tries++;
+                var ready = false;
+                try { ready = !!document.querySelector('.settings-folder[data-component="' + st.comp + '"]') || (Lampa.SettingsApi.getComponent && Lampa.SettingsApi.getComponent(st.comp)); } catch (e) { }
+                if (!ready && tries < 20) return;
+                clearInterval(t);
+                try {
+                    Lampa.Controller.toggle('settings');
+                    setTimeout(function () { try { Lampa.Settings.create(st.comp, { onBack: function () { open(STYLES_C); } }); } catch (e) { } }, 400);
+                    Lampa.Noty.show('Увімкнено: ' + st.name + ' — налаштування стилю');
+                } catch (e) { }
+            }, 500);
+        })();
         watchCards();
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
