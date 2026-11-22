@@ -3153,6 +3153,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3190,10 +3191,12 @@
             if (typeof all === 'string') all = JSON.parse(all || '{}');
             all = all || {};
             all[key] = { t: Date.now(), v: val, ttl: ttl };
-            var keys = Object.keys(all);
-            if (keys.length > 700) {
+            var keys = Object.keys(all), now = Date.now();
+            keys.forEach(function (k) { var x = all[k]; if (!x || now - x.t > (x.ttl || ttl)) delete all[k]; });
+            keys = Object.keys(all);
+            if (keys.length > 250) {
                 keys.sort(function (a, b) { return all[a].t - all[b].t; });
-                for (var i = 0; i < keys.length - 500; i++) delete all[keys[i]];
+                for (var i = 0; i < keys.length - 200; i++) delete all[keys[i]];
             }
             Lampa.Storage.set(store, all);
         } catch (e) { }
@@ -3827,6 +3830,19 @@
         show(null);
     }
 
+
+    /* ---- пам'ять телевізора: кеші не повинні забивати localStorage ---- */
+    var SUI_CACHES = ['sui_img', 'sui_full', 'sui_uat', 'sui_lang', 'sui_rt_cache', 'sui_tv_cache', 'sui_svc_cache'];
+    var FOREIGN_CACHES = ['obsidian_quality_cache', 'obsidian_poster_cache', 'obsidian_episode_cache', 'title_cache_hybrid_v3', 'netflix_card_cache', 'applecation_ratings_cache'];
+    function lsSize() { var n = 0; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { } return n * 2; }
+    function kb(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.round(n / 1024) + ' КБ'; }
+    function clearCaches(all) {
+        SUI_CACHES.concat(all ? FOREIGN_CACHES : []).forEach(function (k) { try { localStorage.removeItem(k); } catch (e) { } });
+        try { for (var i = localStorage.length - 1; i >= 0; i--) { var k = localStorage.key(i); if (all && k && /^img_cache_v3_/.test(k)) localStorage.removeItem(k); } } catch (e) { }
+    }
+    // при старті: якщо пам'ять майже заповнена — чистимо свої кеші, щоб Lampa могла зберегти розширення й налаштування
+    try { if (lsSize() > 3.5 * 1048576) clearCaches(false); } catch (e) { }
+
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
@@ -3972,6 +3988,12 @@
         btn(BTNED, 'btned_open', 'Порядок і видимість кнопок', 'Переставити або сховати будь-яку кнопку (Дивитись, Торенти, Онлайн, Закладки, Трейлер…)', openBtnOrder);
         sel(BTNED, 'btned_labels', 'Підписи кнопок', '', { lampa: 'Як у Lampa', all: 'Завжди з підписом', none: 'Лише іконки' }, 'lampa');
         btn(BTNED, 'btned_reset', 'Скинути', 'Повернути стандартний порядок і показати всі кнопки', function () { setS('btned_order', []); setS('btned_hidden', []); Lampa.Noty.show('Кнопки скинуто'); });
+
+        // ---- пам'ять ----
+        btn(SUI, 'mem_clear', 'Очистити кеш (пам’ять: ' + kb(lsSize()) + ')', 'Кеші постерів, лого, Uator і стилів. Розширення й налаштування не зачіпаються. Допомагає, коли Lampa не зберігає додані плагіни', function () {
+            var before = lsSize(); clearCaches(true);
+            Lampa.Noty.show('Звільнено ' + kb(before - lsSize()) + ' — тепер додайте плагін ще раз');
+        });
     }
 
     function start() {
