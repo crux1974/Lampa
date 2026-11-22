@@ -3161,6 +3161,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3310,6 +3311,7 @@
             '.sui-uat--under{margin-top:.8em}' +
             '.sui-uat--inline{display:inline-flex;margin:.2em 0 .2em .6em;vertical-align:middle;background:none!important;border:0!important;padding:0!important}.sui-uat--inline .sui-uat__b{background:transparent;padding:0 .2em;text-shadow:0 1px 3px rgba(0,0,0,.9)}' +
             '.sui-uat__b svg{flex-shrink:0;width:1.1em!important;height:1.1em!important;max-width:none}.sui-uat__b{gap:.3em;white-space:nowrap;flex-shrink:0}.sui-uat .sui-dv svg{width:1.25em!important;height:.85em!important}.sui-uat__b>span{font-size:1em!important;line-height:1.2}' +
+            '.sui-uat--cfy{display:flex;flex-wrap:nowrap;margin:0 1.2em 0 0!important;background:none!important;border:0!important;padding:0!important}.cardify__right .full-start-new__rate-line{flex-shrink:0}' +
             '.sui-uy{display:inline-flex;align-items:center;gap:.35em;color:#fff;white-space:nowrap;flex-shrink:0;height:1.1em;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
             '.sui-uy__t{font-weight:bold;line-height:1.1em;height:1.1em;display:flex;align-items:center}' +
             '.sui-uy__i{height:1.1em!important;width:auto!important;max-width:none;display:block;object-fit:contain;margin:0}' +
@@ -3607,7 +3609,22 @@
         var st = S('ua_style', 'normal'), gap = S('ua_gap', '0.45em');
         var box = $('<div class="sui-uat' + (st !== 'normal' ? ' sui-glass' + (st === 'apple_lite' ? ' is-lite' : '') : '') + '"></div>').css({ 'font-size': S('ua_size', '1.1em'), 'margin-left': S('ua_ml', '0px') });
         if (neg(gap)) box.addClass('sui-neg').css('--sui-neg', gap); else box.css('gap', gap);
-        var pos = S('ua_pos', 'br'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        var pos = S('ua_pos', 'auto'), line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        if (pos === 'auto') pos = styleIs('cardify') ? 'cardify' : 'rate';
+        if (pos === 'cardify') {
+            // Cardify: справа внизу, в одному рядку перед «17+ / Випущено», без накладання
+            var right = root.find('.cardify__right').first();
+            if (right.length) {
+                box.removeClass('sui-glass is-lite').addClass('sui-uat--cfy').css('margin-left', 0);
+                var rl = right.find('.full-start-new__rate-line').first();
+                if (rl.length) rl.before(box); else right.append(box);
+                uatorData(m, function (r) { box.html(uatorHtml(r, false)); });
+                return;
+            }
+            pos = 'br';
+        }
+        var rts = root.find('.sui-rates').first();
+        if (rts.length) line = rts;
         if (pos === 'status') {
             // в один рядок зі статусом («Випущено»), без фону — як на фото
             var stEl = root.find('.full-start__status, .full-start-new__status').filter(function () { return $(this).css('display') !== 'none'; }).first();
@@ -4039,7 +4056,7 @@
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
         sel(UAT, 'ua_look', 'Вигляд значків', '', { ymod: 'Як у ymod', 'new': 'Іконки (кольорові)', classic: 'Класичний' }, 'ymod');
-        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', status: 'В рядку зі статусом', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
+        sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { auto: 'Авто (Cardify — справа знизу, інші — лівий блок)', br: 'Справа знизу', status: 'В рядку зі статусом', tr: 'Справа зверху', rate: 'Лівий блок (під рейтингами)', buttons: 'Під кнопками' }, 'auto');
 
 
         // ---- 3. Стилі: вибір одним натисканням ----
@@ -4091,6 +4108,7 @@
 
     function start() {
         if (S('ua_pos_v2', false) !== true) { setS('ua_pos', 'br'); setS('ua_pos_v2', true); }
+        if (S('ua_pos_v4', false) !== true) { setS('ua_pos', 'auto'); setS('ua_pos_v4', true); }
         if (S('ua_look_v3', false) !== true) { setS('ua_look', 'ymod'); setS('ua_look_v3', true); }
         addMenus();
         lookCss();
