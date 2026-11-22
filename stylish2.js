@@ -3160,6 +3160,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3309,6 +3310,12 @@
             '.sui-uat--under{margin-top:.8em}' +
             '.sui-uat--inline{display:inline-flex;margin:.2em 0 .2em .6em;vertical-align:middle;background:none!important;border:0!important;padding:0!important}.sui-uat--inline .sui-uat__b{background:transparent;padding:0 .2em;text-shadow:0 1px 3px rgba(0,0,0,.9)}' +
             '.sui-uat__b svg{flex-shrink:0;width:1.1em!important;height:1.1em!important;max-width:none}.sui-uat__b{gap:.3em;white-space:nowrap;flex-shrink:0}.sui-uat .sui-dv svg{width:1.25em!important;height:.85em!important}.sui-uat__b>span{font-size:1em!important;line-height:1.2}' +
+            '.sui-uy{display:inline-flex;align-items:center;gap:.35em;color:#fff;white-space:nowrap;flex-shrink:0;height:1.1em;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
+            '.sui-uy__t{font-weight:bold;line-height:1.1em;height:1.1em;display:flex;align-items:center}' +
+            '.sui-uy__i{height:1.1em!important;width:auto!important;max-width:none;display:block;object-fit:contain;margin:0}' +
+            '.sui-uy__ti{height:1.1em;line-height:1.1em;font-size:.85em;font-weight:900;display:inline-flex;align-items:center;background:#fff;color:#000;padding:0 .25em;border-radius:2px}' +
+            '.sui-uy--no{opacity:.6}' +
+            '.sui-uat-card .sui-uy{background:rgba(0,0,0,.6);padding:2px 4px;border-radius:4px;height:1em}.sui-uat-card .sui-uy__i{height:1em!important}' +
             '.sui-dv{display:inline-flex;align-items:center;gap:.15em}.sui-dv__t{display:inline-flex;flex-direction:column;line-height:.85}' +
             '.sui-dv__t b{font:800 .72em/1 Arial,sans-serif;letter-spacing:-.02em}.sui-dv__t i{font:700 .38em/1 Arial,sans-serif;letter-spacing:.12em;font-style:normal;text-align:center}' +
             '.sui-hdr{display:inline-block;border:.12em solid #fff;border-radius:.2em;padding:.05em .25em;font:800 .72em/1 Arial,sans-serif;color:#fff}' +
@@ -3554,8 +3561,30 @@
         dv: '<span class="sui-dv"><svg viewBox="0 0 30 20" width="1.25em" height=".85em"><path d="M0 0h6a10 10 0 0 1 0 20H0z" fill="#fff"/><path d="M30 0h-6a10 10 0 0 0 0 20h6z" fill="#fff"/></svg><span class="sui-dv__t"><b>Dolby</b><i>VISION</i></span></span>',
         hdr: '<span class="sui-hdr">HDR</span>'
     };
+    // вигляд як у ymod: іконки з сайту автора (yarikrazor-star.github.io), без плашок
+    var YI = 'https://yarikrazor-star.github.io/lmp/';
+    var UI3 = {
+        ua: YI + 'ua.svg', none: YI + 'dontknow.svg', top: YI + 'stream.svg', seed: YI + 'upload.svg', snd: YI + 'zvuk.svg', hdr: YI + 'hdr.svg',
+        dv: 'https://upload.wikimedia.org/wikipedia/commons/0/03/Dolby_Vision_2021_logo.svg'
+    };
+    function uatorHtmlY(r, card) {
+        var sat = S('ua_sat', '100%');
+        var b = function (src, txt, cls, flt) {
+            var ic = src === 'UA' ? '<span class="sui-uy__ti">UA</span>' : '<img class="sui-uy__i" src="' + src + '" style="filter:' + (flt || 'saturate(' + sat + ')') + '">';
+            return '<span class="sui-uy' + (cls ? ' ' + cls : '') + '">' + ic + (txt !== '' && txt != null ? '<span class="sui-uy__t">' + esc(txt) + '</span>' : '') + '</span>';
+        };
+        var ua = sat === '0%' ? 'UA' : UI3.ua;
+        if (card) return r.ukr ? b(ua, r.best) : '';
+        if (!r.ukr) return b(sat === '0%' ? 'UA' : UI3.none, 'немає', 'sui-uy--no');
+        var out = b(ua, r.best) + b(UI3.top, r.pop) + b(UI3.seed, r.seeds);
+        if (r.audio) out += b(UI3.snd, r.audio);
+        if (r.dv) out += b(UI3.dv, '', '', 'brightness(0) invert(1)');
+        if (r.hdr) out += b(UI3.hdr, '', '', 'grayscale(1)');
+        return out;
+    }
     function uatorHtml(r, card) {
-        var sat = S('ua_sat', '100%'), f = 'filter:saturate(' + sat + ')', nu = S('ua_look', 'new') === 'new';
+        if (S('ua_look', 'ymod') === 'ymod') return uatorHtmlY(r, card);
+        var sat = S('ua_sat', '100%'), f = 'filter:saturate(' + sat + ')', nu = S('ua_look', 'ymod') === 'new';
         var b = function (ico, txt, cls) { return '<span class="sui-uat__b' + (cls ? ' ' + cls : '') + '" style="' + f + '">' + (ico || '') + (txt !== '' && txt != null ? '<span>' + esc(txt) + '</span>' : '') + '</span>'; };
         var flag = sat === '0%' ? '<b>UA</b>' : (nu ? UI2.ua : '<i class="sui-uat__ua"></i>');
         if (card) return r.ukr ? b(flag, r.best) : '';
@@ -4009,7 +4038,7 @@
         sel(UAT, 'ua_ml', 'Відступ зліва', 'Тільки для повної сторінки', MLEFT, '0px');
         sel(UAT, 'ua_sat', 'Насиченість', '', SATP, '100%');
         sel(UAT, 'ua_size', 'Розмір значків', '', SIZES, '1.1em');
-        sel(UAT, 'ua_look', 'Вигляд значків', '', { 'new': 'Новий (іконки)', classic: 'Класичний' }, 'new');
+        sel(UAT, 'ua_look', 'Вигляд значків', '', { ymod: 'Як у ymod', 'new': 'Іконки (кольорові)', classic: 'Класичний' }, 'ymod');
         sel(UAT, 'ua_pos', 'Розміщення', 'Де показувати значки на сторінці фільму', { br: 'Справа знизу', status: 'В рядку зі статусом', tr: 'Справа зверху', rate: 'Під рейтингами', buttons: 'Під кнопками' }, 'br');
 
 
@@ -4062,6 +4091,7 @@
 
     function start() {
         if (S('ua_pos_v2', false) !== true) { setS('ua_pos', 'br'); setS('ua_pos_v2', true); }
+        if (S('ua_look_v3', false) !== true) { setS('ua_look', 'ymod'); setS('ua_look_v3', true); }
         addMenus();
         lookCss();
         styleCss();
