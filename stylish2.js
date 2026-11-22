@@ -3157,6 +3157,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3304,7 +3305,7 @@
             '.sui-uat--abs .sui-uat__b,.sui-uat--under .sui-uat__b{background:transparent;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:0 .25em}' +
             '.sui-uat--under{margin-top:.8em}' +
             '.sui-uat--inline{display:inline-flex;margin:.2em 0 .2em .6em;vertical-align:middle;background:none!important;border:0!important;padding:0!important}.sui-uat--inline .sui-uat__b{background:transparent;padding:0 .2em;text-shadow:0 1px 3px rgba(0,0,0,.9)}' +
-            '.sui-uat__b svg{flex-shrink:0}.sui-uat__b{gap:.3em}' +
+            '.sui-uat__b svg{flex-shrink:0;width:1.1em!important;height:1.1em!important;max-width:none}.sui-uat__b{gap:.3em;white-space:nowrap;flex-shrink:0}.sui-uat .sui-dv svg{width:1.25em!important;height:.85em!important}.sui-uat__b>span{font-size:1em!important;line-height:1.2}' +
             '.sui-dv{display:inline-flex;align-items:center;gap:.15em}.sui-dv__t{display:inline-flex;flex-direction:column;line-height:.85}' +
             '.sui-dv__t b{font:800 .72em/1 Arial,sans-serif;letter-spacing:-.02em}.sui-dv__t i{font:700 .38em/1 Arial,sans-serif;letter-spacing:.12em;font-style:normal;text-align:center}' +
             '.sui-hdr{display:inline-block;border:.12em solid #fff;border-radius:.2em;padding:.05em .25em;font:800 .72em/1 Arial,sans-serif;color:#fff}' +
@@ -3340,6 +3341,7 @@
         if (design === 'square') css += '.card .card__view,.card .card__img{border-radius:0!important}';
         if (design === 'shadow') css += '.card .card__view{box-shadow:0 .5em 1.2em rgba(0,0,0,.65)}';
         if (design === 'minimal') css += '.card .card__title,.card .card__age{display:none!important}';
+        css += rateCss();
         el.textContent = css;
     }
 
@@ -3681,6 +3683,39 @@
         setInterval(function () { if (!on('uator')) return; var l = document.querySelectorAll('.card'); for (var i = 0; i < l.length; i++) if (!l[i].__sui_ua && io) io.observe(l[i]); }, 4000);
     }
 
+
+    /* ---- рейтинги в повній картці з логотипами (TMDB / IMDb / КП / CUB) ---- */
+    var RT_LOGO = {
+        tmdb: '<span class="sui-rl sui-rl--tmdb"><b>THE</b><b>MOVIE</b><b>DB</b></span>',
+        imdb: '<span class="sui-rl sui-rl--imdb">IMDb</span>',
+        kp: '<svg class="sui-rl-svg" viewBox="0 0 32 24"><rect x="1" y="1" width="30" height="22" rx="3" fill="none" stroke="#f5a623" stroke-width="2"/><rect x="5" y="5" width="22" height="14" rx="1.5" fill="#f5a623" opacity=".35"/><g fill="#f5a623"><rect x="3" y="3" width="2" height="2"/><rect x="3" y="19" width="2" height="2"/><rect x="27" y="3" width="2" height="2"/><rect x="27" y="19" width="2" height="2"/></g></svg>',
+        cub: '<svg class="sui-rl-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="6" fill="none" stroke="#fff" stroke-width="2"/><circle cx="12" cy="12" r="2.2" fill="#fff"/></svg>'
+    };
+    function rtColor(v) { return v >= 7 ? '#4cd964' : v >= 5.5 ? '#f5c518' : v > 0 ? '#ff6b5a' : '#fff'; }
+    function applyRateLogos(root) {
+        var line = root.find('.full-start-new__rate-line, .full-start__rate-line').first();
+        line.toggleClass('sui-rt2', on('rate_logos'));
+        if (!on('rate_logos')) return;
+        line.find('.full-start__rate').each(function () {
+            var $r = $(this), cls = this.className, key = /tmdb/.test(cls) ? 'tmdb' : /imdb/.test(cls) ? 'imdb' : /kp/.test(cls) ? 'kp' : /cub/.test(cls) ? 'cub' : '';
+            if (!key) return;
+            var kids = $r.children(), val = kids.eq(0), src = kids.eq(1);
+            var v = parseFloat(String(val.text()).replace(',', '.'));
+            val.addClass('sui-rv').css('color', rtColor(v));
+            if (src.length && !src.hasClass('sui-rs')) src.addClass('sui-rs').html(RT_LOGO[key]);
+        });
+    }
+    function rateCss() {
+        return '.sui-rt2{display:flex;align-items:center;flex-wrap:wrap;gap:.2em 1.1em}' +
+            '.sui-rt2 .full-start__rate{display:inline-flex!important;flex-direction:row-reverse;align-items:center;gap:.35em;background:none!important;padding:0!important;margin:0!important;border:0!important;font-size:1.25em}' +
+            '.sui-rt2 .full-start__rate>div{margin:0!important;padding:0!important;background:none!important}' +
+            '.sui-rv{font-weight:700;text-shadow:0 1px 3px rgba(0,0,0,.8)}' +
+            '.sui-rs{display:inline-flex;align-items:center}' +
+            '.sui-rl--tmdb{display:inline-flex;flex-direction:column;font:900 .42em/.95 Arial,sans-serif;letter-spacing:.02em;background:linear-gradient(90deg,#90cea1,#01b4e4);-webkit-background-clip:text;background-clip:text;color:transparent}' +
+            '.sui-rl--imdb{background:#f5c518;color:#000;font:900 .6em/1 Arial,sans-serif;padding:.18em .3em;border-radius:.2em}' +
+            '.sui-rl-svg{width:1.4em!important;height:1.05em!important}';
+    }
+
     function onFullLook(e) {
         var m = e.data && e.data.movie;
         if (!m || !m.id) return;
@@ -3688,6 +3723,8 @@
         applyLogo(root, m);
         applyUatorFull(root, m);
         applyXTitle(root);
+        try { applyRateLogos(root); } catch (e) { }
+        setTimeout(function () { try { applyRateLogos(root); } catch (e) { } }, 2500);
         try { applyBtnEditor(root); } catch (e) { }
         setTimeout(function () { try { applyBtnEditor(root); } catch (e) { } }, 1500);
         if (on('studios')) tmdbFull(m, function (d) { applyStudios(root, m, d); });
@@ -3909,6 +3946,7 @@
         var clear = function (store, txt) { return function () { Lampa.Storage.set(store, {}); Lampa.Noty.show(txt); }; };
 
         ttl(LOOK, 'look_head', 'Зовнішній вигляд');
+        trg(LOOK, 'rate_logos', 'Рейтинги з логотипами', 'TMDB, IMDb, КП, CUB — логотипи й кольорові оцінки замість плашок', true);
         if (!styleIs('cardify')) trg(LOOK, 'full_poster', 'Постер у повній картці', 'Показувати постер зліва на сторінці фільму', true);
         if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
         if (!styleIs('appletv')) {
