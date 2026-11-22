@@ -418,4 +418,2518 @@
                         _this.paused = false;
                         clearInterval(_this.timer);
                         _this.timer = setInterval(function() {
-                            if (_this.videoNode && !_this.videoNode.paused && !_this.videoNode.ended && _this.videoNode.duration) 
+                            if (_this.videoNode && !_this.videoNode.paused && !_this.videoNode.ended && _this.videoNode.duration) {
+                                var left = _this.videoNode.duration - _this.videoNode.currentTime;
+                                if (left <= 2 && left > 0) {
+                                    clearInterval(_this.timer);
+                                    _this.listener.send("ended");
+                                }
+                            }
+                        }, 100);
+                        
+                        _this.listener.send("play");
+
+                        // If background trailer sound is enabled, unmute once playback begins
+                        if (_this.isBgMode && bgSound) {
+                            try {
+                                _this.videoNode.muted = false;
+                                _this.videoNode.removeAttribute('muted');
+                            } catch(e) {}
+                        }
+
+                        if (window.cardify_fist_unmute && !_this.isBgMode) _this.unmute();
+                    });
+
+                    this.videoNode.addEventListener('pause', function() {
+                        _this.paused = true;
+                        clearInterval(_this.timer);
+                        _this.listener.send("paused");
+                    });
+
+                    this.videoNode.addEventListener('ended', function() {
+                        _this.listener.send("ended");
+                    });
+
+                    this.videoNode.addEventListener('error', function() {
+                        _this.loaded = false;
+                        _this.listener.send("error");
+                    });
+
+                    var srcUrl = this.video.url;
+                    if (this.video.startTime) {
+                        srcUrl += (srcUrl.indexOf('#') !== -1 ? '&' : '#') + 't=' + this.video.startTime;
+                    }
+                    videoElem.src = srcUrl;
+                    container.append(videoElem);
+
+                    try {
+                        videoElem.load();
+                    } catch(e) {}
+
+                    if (this.isBgMode) {
+                        try {
+                            var p = videoElem.play();
+                            if (p && typeof p.catch === 'function') {
+                                p.catch(function(err) {
+                                    videoElem.muted = true;
+                                    videoElem.setAttribute('muted', '');
+                                    videoElem.play().catch(function() {});
+                                });
+                            }
+                        } catch(e) {}
+                    }
+                }
+            },
+			{
+				key: "play",
+				value: function play() {
+                    if (this.videoNode) {
+                        try {
+                            var p = this.videoNode.play();
+                            if (p && typeof p.catch === 'function') {
+                                var vn = this.videoNode;
+                                p.catch(function(err) {
+                                    vn.muted = true;
+                                    vn.setAttribute('muted', '');
+                                    vn.play().catch(function() {});
+                                });
+                            }
+                        } catch(e) {}
+                    } else {
+                        try { this.youtube.playVideo(); } catch (e) {}
+                    }
+				}
+			},
+			{
+				key: "pause",
+				value: function pause() {
+                    if (this.videoNode) {
+                        try { this.videoNode.pause(); } catch(e) {}
+                    } else {
+                        try { this.youtube.pauseVideo(); } catch (e) {}
+                    }
+				}
+			},
+			{
+				key: "unmute",
+				value: function unmute() {
+					try {
+                        if (this.isBgMode) return;
+                        if (this.videoNode) {
+                            this.videoNode.muted = false;
+                        } else {
+                            this.youtube.unMute();
+                        }
+						this.html.find(".cardify-trailer__remote").remove();
+						window.cardify_fist_unmute = true;
+					} catch (e) {}
+				}
+			},
+			{
+				key: "show",
+				value: function show() {
+					this.html.addClass("display");
+					this.display = true;
+				}
+			},
+			{
+				key: "hide",
+				value: function hide() {
+					this.html.removeClass("display");
+					this.display = false;
+				}
+			},
+			{
+				key: "render",
+				value: function render() {
+					return this.html;
+				}
+			},
+			{
+				key: "destroy",
+				value: function destroy() {
+					this.loaded = false;
+					this.display = false;
+
+                    if (this.videoNode) {
+                        try {
+                            this.videoNode.pause();
+                            this.videoNode.removeAttribute('src');
+                            this.videoNode.load();
+                        } catch(e) {}
+                    } else {
+                        try { this.youtube.destroy(); } catch (e) {}
+                    }
+
+					clearInterval(this.timer);
+					this.html.remove();
+				}
+			}
+		]);
+
+		return Player;
+	})();
+
+	var Trailer = (function () {
+		function Trailer(object, video, isBgMode) {
+			var _this = this;
+
+			_classCallCheck(this, Trailer);
+
+			object.activity.trailer_ready = true;
+			this.object = object;
+			this.video = video;
+            this.isBgMode = isBgMode;
+			this.player;
+			
+            var isHorizontal = window.innerWidth > window.innerHeight;
+            if (isHorizontal) {
+                this.background = this.object.activity.render().find(".full-start__background, .m-full-start__background");
+            } else {
+                this.background = this.object.activity.render().find(".full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img");
+            }
+            
+			this.startblock = this.object.activity.render().find(".cardify");
+			this.head = $(".head");
+			this.timelauch = isBgMode ? 100 : 5000;
+			this.state = new State({
+				state: "start",
+				transitions: {
+					start: function start(state) {
+						clearTimeout(_this.timer_load);
+						if (_this.player.display) state.dispath("play");
+						else if (_this.player.loaded) {
+							_this.timer_load = setTimeout(function () {
+								state.dispath("load");
+							}, _this.timelauch);
+						}
+					},
+					load: function load(state) {
+                        var playerOpen = $('body').hasClass('player--open') || $('.player').length > 0;
+                        if (_this.isBgMode) {
+                            if (
+                                _this.player.loaded &&
+                                _this.same() &&
+                                !playerOpen &&
+                                $('.modal').length === 0
+                            ) {
+                                state.dispath("play");
+                            }
+                            return;
+                        }
+
+						if (
+							_this.player.loaded &&
+							(Lampa.Controller.enabled().name == "full_start" || Lampa.Controller.enabled().name == "scroll") &&
+							_this.same() &&
+                            $('.modal').length === 0
+						)
+							state.dispath("play");
+					},
+					play: function play() {
+						_this.player.play();
+					},
+					toggle: function toggle(state) {
+                        if (_this.isBgMode) {
+                            if (!_this.same()) {
+                                if (_this.player.display) state.dispath("hide");
+                                return;
+                            }
+                            
+                            var cname = Lampa.Controller.enabled().name;
+                            var playerOpen = $('body').hasClass('player--open') || $('.player').length > 0;
+                            
+                            if (!playerOpen) {
+                                if (!_this.player.display && _this.player.loaded) {
+                                    state.start();
+                                }
+                            } else {
+                                if (_this.player.display) state.dispath("hide");
+                            }
+                            return;
+                        }
+
+						clearTimeout(_this.timer_load);
+						if (Lampa.Controller.enabled().name == "cardify_trailer");
+						else if (
+							Lampa.Controller.enabled().name == "full_start" &&
+							_this.same()
+						) {
+							state.start();
+						} else if (_this.player.display) {
+							state.dispath("hide");
+						}
+					},
+					hide: function hide() {
+                        if (!_this.player.display) return;
+						_this.player.pause();
+						_this.player.hide();
+                        var isHorizontalNow = window.innerWidth > window.innerHeight;
+                        
+                        if (!isHorizontalNow && _this.isBgMode) {
+                            _this.background.css('opacity', '1');
+                        } else {
+                            _this.background.removeClass("nodisplay").css('opacity', '1');
+                        }
+                        
+                        if (!_this.isBgMode) {
+						    _this.startblock.removeClass("nodisplay");
+						    _this.head.removeClass("nodisplay");
+                            _this.object.activity.render().find('.cardify-effects-overlay').removeClass("nodisplay");
+                        }
+					}
+				}
+			});
+			this.start();
+		}
+
+		_createClass(Trailer,[
+			{
+				key: "same",
+				value: function same() {
+					return Lampa.Activity.active().activity === this.object.activity;
+				}
+			},
+			{
+				key: "controll",
+				value: function controll() {
+                    if (this.isBgMode) return; 
+					var _this3 = this;
+
+					var out = function out() {
+						_this3.state.dispath("hide");
+						Lampa.Controller.toggle("full_start");
+					};
+
+					Lampa.Controller.add("cardify_trailer", {
+						toggle: function toggle() {
+							Lampa.Controller.clear();
+						},
+						enter: function enter() {
+							_this3.player.unmute();
+						},
+						left: out.bind(this),
+						up: out.bind(this),
+						down: out.bind(this),
+						right: out.bind(this),
+						back: function back() {
+							_this3.player.destroy();
+							out();
+						}
+					});
+					Lampa.Controller.toggle("cardify_trailer");
+				}
+			},
+			{
+				key: "start",
+				value: function start() {
+					var _this4 = this;
+					var _self = this;
+
+					var toggle = function toggle(e) {
+						_self.state.dispath("toggle");
+					};
+
+                    var activityListener = function (a) {
+                        if (a.object.activity === _self.object.activity) {
+                            if (a.type === "destroy") {
+                                remove();
+                            } else if (a.type === "background") {
+                                _self.state.dispath("hide");
+                            } else if (a.type === "foreground") {
+                                _self.state.dispath("toggle");
+                            }
+                        }
+                    };
+
+					var remove = function remove() {
+						Lampa.Listener.remove("activity", activityListener);
+						Lampa.Controller.listener.remove("toggle", toggle);
+                        
+                        if (window.cardifyBgPlayer === _this4.player) {
+                            window.cardifyBgPlayer = null;
+                        }
+                        if (window.cardifyBgTrailer === _self) {
+                            window.cardifyBgTrailer = null;
+                        }
+
+						_self.destroy();
+					};
+
+					Lampa.Listener.follow("activity", activityListener);
+					Lampa.Controller.listener.follow("toggle", toggle);
+
+					this.player = new Player(this.object, this.video, this.isBgMode);
+                    
+                    if (this.isBgMode) {
+                        window.cardifyBgPlayer = this.player;
+                        window.cardifyBgTrailer = this;
+                    }
+
+					this.player.listener.follow("loaded", function () {
+						_this4.state.start();
+					});
+					var showBgTrailer = function() {
+                        if (_this4.bgShown) return;
+                        _this4.bgShown = true;
+                        clearTimeout(_this4.timer_show);
+
+                        if (_this4.player.html && _this4.player.html.length) {
+                            _this4.player.html[0].style.setProperty('transition', 'opacity 1.5s ease-in-out', 'important');
+                        }
+                        if (_this4.background && _this4.background.length) {
+                            _this4.background.each(function() {
+                                this.style.setProperty('transition', 'opacity 1.5s ease-in-out', 'important');
+                            });
+                        }
+
+                        _this4.player.show();
+
+                        setTimeout(function() {
+                            if (_this4.background && _this4.background.length) {
+                                var isHorizontalNow = window.innerWidth > window.innerHeight;
+                                if (!isHorizontalNow && _this4.isBgMode) {
+                                    _this4.background.css('opacity', '0');
+                                } else {
+                                    _this4.background.css('opacity', '0');
+                                }
+                            }
+                        }, 500);
+                    };
+
+                    this.player.listener.follow("first_frame", function () {
+                        if (_this4.isBgMode) {
+                            showBgTrailer();
+                        }
+                    });
+
+					this.player.listener.follow("play", function () {
+						clearTimeout(_this4.timer_show);
+
+                        if (_this4.isBgMode) {
+                            _this4.timer_show = setTimeout(function () {
+                                if (_this4.player.videoNode && _this4.player.videoNode.currentTime > 0) {
+                                    showBgTrailer();
+                                }
+                            }, 3500);
+                        } else {
+                            _this4.timer_show = setTimeout(function () {
+                                _this4.player.show();
+							    _this4.startblock.addClass("nodisplay");
+							    _this4.head.addClass("nodisplay");
+                                _this4.object.activity.render().find('.cardify-effects-overlay').addClass("nodisplay");
+							    _this4.controll();
+                            }, 500);
+                        }
+					});
+					this.player.listener.follow("ended,error", function () {
+                        if (_this4.isBgMode) {
+                            try {
+                                var sTime = (_this4.video && _this4.video.startTime) || 0;
+                                if (_this4.player.videoNode) {
+                                    _this4.player.videoNode.currentTime = sTime;
+                                } else if (_this4.player.youtube && typeof _this4.player.youtube.seekTo === 'function') {
+                                    _this4.player.youtube.seekTo(sTime);
+                                }
+                            } catch(err) {}
+                            _this4.player.play(); 
+                            return;
+                        }
+
+						_this4.state.dispath("hide");
+
+						if (Lampa.Controller.enabled().name !== "full_start")
+							Lampa.Controller.toggle("full_start");
+
+						setTimeout(remove, 300);
+					});
+
+                    var $render = this.object.activity.render();
+                    var $overlay = $render.find('.cardify-effects-overlay');
+                    var isHorizontal = window.innerWidth > window.innerHeight;
+
+                    if (!isHorizontal && this.isBgMode) {
+                        var $bg = $render.find('.full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img').first();
+                        var $playerHtml = this.player.render();
+                        if ($bg.length) {
+                            $playerHtml.find('.cardify-trailer__youtube').css({
+                                position: 'absolute',
+                                height: '100%',
+                                width: '100%',
+                                background: 'transparent',
+                                'background-color': 'transparent'
+                            });
+                            
+                            var $bgParent = $bg.parent();
+                            if ($bgParent.css('position') === 'static') {
+                                $bgParent.css('position', 'relative');
+                            }
+                            
+                            $bgParent.css({
+                                '-webkit-mask-image': '-webkit-linear-gradient(top, white 50%, rgba(255,255,255,0) 100%)',
+                                'mask-image': 'linear-gradient(to bottom, white 50%, rgba(255,255,255,0) 100%)'
+                            });
+
+                            $bg.css({
+                                '-webkit-mask-image': 'none',
+                                'mask-image': 'none'
+                            });
+
+                            var isTransparentMobile = Main.cases()[Main.stor()].field("cardify_transparent_mobile") === true;
+                            $playerHtml.css({
+                                position: 'absolute',
+                                top: '0',
+                                left: '0',
+                                width: '100%',
+                                height: '100%',
+                                zIndex: $bg.css('z-index') !== 'auto' ? $bg.css('z-index') : 1,
+                                overflow: 'hidden',
+                                '-webkit-mask-image': 'none',
+                                'mask-image': 'none',
+                                'border-radius': isTransparentMobile ? '0' : ($bg.css('border-radius') || '0')
+                            });
+
+                            $bg.after($playerHtml);
+                        } else {
+                            $render.find(".activity__body").prepend($playerHtml);
+                        }
+                    } else {
+                        if (this.isBgMode && $overlay.length) {
+                            $overlay.before(this.player.render());
+                        } else {
+                            $render.find(".activity__body").prepend(this.player.render());
+                        }
+                    }
+
+                    if (this.video.type === 'imdb_video') {
+                        this.player.initHtml5();
+                    } else {
+                        var checkYT = setInterval(function() {
+                            if (window.YT && window.YT.Player) {
+                                clearInterval(checkYT);
+                                _this4.player.initYoutube();
+                            }
+                        }, 100);
+
+                        if (!window.YT && !window.cardify_yt_injecting) {
+                            window.cardify_yt_injecting = true;
+                            window.onYouTubeIframeAPIReady = function() {
+                                window.cardify_yt_ready = true;
+                            };
+                            Lampa.Utils.putScript([ 'https://www.youtube.com/iframe_api' ], function(){});
+                        }
+                    }
+				}
+			},
+			{
+				key: "destroy",
+				value: function destroy() {
+					clearTimeout(this.timer_load);
+					clearTimeout(this.timer_show);
+					this.player.destroy();
+				}
+			}
+		]);
+
+		return Trailer;
+	})();
+
+	function fetchNetflixTrailer(tmdb_id, media_type, callback) {
+        var server = Lampa.Storage.get('netflix_server', '') || 'https://lampa-netflix.adambh.dev';
+        server = String(server).replace(/\/+$/, '');
+        var country = Lampa.Storage.get("netflix_country", "auto");
+        var lang = String(Lampa.Storage.get("language", 'en') || 'en').slice(0, 2);
+        var qs = (country && country !== "auto" ? 'country=' + country + '&' : '') + "lang=" + lang;
+        
+        var title_url = server + '/api/title/' + (media_type === 'tv' ? 'tv' : 'movie') + '/' + tmdb_id + '?' + qs;
+        $.ajax({
+            url: title_url,
+            type: 'GET',
+            dataType: 'json',
+            success: function(title_data) {
+                if (title_data && title_data.trailer && title_data.trailer.url) {
+                    callback(title_data.trailer.url);
+                } else {
+                    callback(null);
+                }
+            },
+            error: function() { callback(null); }
+        });
+    }
+
+	function fetchImdbTrailer(imdb_id, source, quality, use_proxy, callback) {
+        var query = "query GetTitleTrailer($id: ID!) {\n" +
+                    "  title(id: $id) {\n" +
+                    "    id\n" +
+                    "    latestTrailer {\n" +
+                    "      id\n" +
+                    "      name { value }\n" +
+                    "      runtime { value }\n" +
+                    "      playbackURLs {\n" +
+                    "        displayName { value }\n" +
+                    "        mimeType\n" +
+                    "        videoMimeType\n" +
+                    "        url\n" +
+                    "      }\n" +
+                    "    }\n" +
+                    "    primaryVideos(first: 1) {\n" +
+                    "      edges {\n" +
+                    "        node {\n" +
+                    "          id\n" +
+                    "          playbackURLs {\n" +
+                    "            displayName { value }\n" +
+                    "            mimeType\n" +
+                    "            videoMimeType\n" +
+                    "            url\n" +
+                    "          }\n" +
+                    "        }\n" +
+                    "      }\n" +
+                    "    }\n" +
+                    "  }\n" +
+                    "}";
+        var api_url = "https://caching.graphql.imdb.com/";
+        
+        var proxy_prefix = "";
+        if (typeof use_proxy === "string" && use_proxy.trim() !== "") {
+            proxy_prefix = use_proxy.trim();
+            if (!proxy_prefix.endsWith("/") && proxy_prefix.indexOf("?") === -1) {
+                proxy_prefix += "/";
+            }
+            api_url = proxy_prefix + api_url;
+        }
+        
+        var lang = "en-US";
+        try {
+            if (window.Lampa && Lampa.Storage) {
+                var l = Lampa.Storage.field('language') || 'en';
+                lang = l === 'uk' ? 'uk-UA' : (l === 'ru' ? 'ru-RU' : 'en-US');
+            }
+        } catch(e) {}
+
+        $.ajax({
+            url: api_url,
+            type: 'POST',
+            contentType: 'application/json',
+            headers: {
+                'x-imdb-client-name': 'imdb-android',
+                'x-imdb-client-version': '26.5.0',
+                'x-imdb-user-language': lang,
+                'X-APOLLO-OPERATION-NAME': 'GetTitleTrailer'
+            },
+            data: JSON.stringify({
+                operationName: 'GetTitleTrailer',
+                query: query,
+                variables: { id: imdb_id }
+            }),
+            success: function(data) {
+                try {
+                    var trailer = null;
+                    if (data && data.data && data.data.title) {
+                        trailer = data.data.title.latestTrailer;
+                        if ((!trailer || !trailer.playbackURLs || !trailer.playbackURLs.length) &&
+                            data.data.title.primaryVideos &&
+                            data.data.title.primaryVideos.edges &&
+                            data.data.title.primaryVideos.edges.length &&
+                            data.data.title.primaryVideos.edges[0].node) {
+                            trailer = data.data.title.primaryVideos.edges[0].node;
+                        }
+                    }
+
+                    if (trailer && trailer.playbackURLs && trailer.playbackURLs.length > 0) {
+                        var urls = trailer.playbackURLs;
+                        var target = String(quality || 'auto').toLowerCase();
+                        var video_url = null;
+                        
+                        var p = {};
+                        urls.forEach(function(u) {
+                            if (!u || !u.url) return;
+                            var key = (u.displayName && u.displayName.value ? u.displayName.value : '').toLowerCase().replace('p', '').trim();
+                            if (key) p[key] = u.url;
+                            if (u.videoMimeType) p[u.videoMimeType.toLowerCase().trim()] = u.url;
+                        });
+                        
+                        var order = ['1080', '720', '480', 'sd', 'auto', 'mp4', 'm3u8'];
+                        if (target === '720') {
+                            order = ['720', '1080', '480', 'sd', 'auto', 'mp4', 'm3u8'];
+                        } else if (target === '480' || target === 'sd') {
+                            order = ['480', 'sd', '720', '1080', 'auto', 'mp4', 'm3u8'];
+                        } else if (target === '1080') {
+                            order = ['1080', '720', '480', 'sd', 'auto', 'mp4', 'm3u8'];
+                        } else {
+                            order = ['1080', '720', '480', 'sd', 'auto', 'mp4', 'm3u8'];
+                        }
+
+                        for (var i = 0; i < order.length; i++) {
+                            if (p[order[i]]) {
+                                video_url = p[order[i]];
+                                break;
+                            }
+                        }
+
+                        if (!video_url && urls.length > 0) {
+                            video_url = urls[0].url;
+                        }
+
+                        if (video_url) {
+                            callback(video_url);
+                        } else {
+                            callback(null);
+                        }
+                    } else {
+                        callback(null);
+                    }
+                } catch(e) {
+                    callback(null);
+                }
+            },
+            error: function() { callback(null); }
+        });
+	}
+
+	var wordBank =[
+		"I ",
+		"You ",
+		"We ",
+		"They ",
+		"He ",
+		"She ",
+		"It ",
+		" the ",
+		"The ",
+		" of ",
+		" is ",
+		"mpa",
+		"Is ",
+		" am ",
+		"Am ",
+		" are ",
+		"Are ",
+		" have ",
+		"Have ",
+		" has ",
+		"Has ",
+		" may ",
+		"May ",
+		" be ",
+		"Be ",
+		"La "
+	];
+	var wi = window;
+
+	function keyFinder(str) {
+		var inStr = str.toString();
+		var outStr = "";
+		var outStrElement = "";
+
+		for (var k = 0; k < 26; k++) {
+			outStr = caesarCipherEncodeAndDecodeEngine(inStr, k);
+
+			for (var s = 0; s < outStr.length; s++) {
+				for (var i = 0; i < wordBank.length; i++) {
+					for (var w = 0; w < wordBank[i].length; w++) {
+						outStrElement += outStr[s + w];
+					}
+
+					if (wordBank[i] === outStrElement) {
+						return k;
+					}
+
+					outStrElement = "";
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	function bynam() {
+		return (
+			wi[decodeNumbersToString$1([108, 111, 99, 97, 116, 105, 111, 110])][
+				decodeNumbersToString$1([104, 111, 115, 116])
+			].indexOf(
+				decodeNumbersToString$1([
+					98, 121, 108, 97, 109, 112, 97, 46, 111, 110, 108, 105, 110, 101
+				])
+			) == -1
+		);
+	}
+
+	function caesarCipherEncodeAndDecodeEngine(inStr, numShifted) {
+		var shiftNum = numShifted;
+		var charCode = 0;
+		var shiftedCharCode = 0;
+		var result = 0;
+		return inStr
+			.split("")
+			.map(function (_char) {
+				charCode = _char.charCodeAt();
+				shiftedCharCode = charCode + shiftNum;
+				result = charCode;
+
+				if (charCode >= 48 && charCode <= 57) {
+					if (shiftedCharCode < 48) {
+						var diff = Math.abs(48 - 1 - shiftedCharCode) % 10;
+						while (diff >= 10) diff = diff % 10;
+						shiftedCharCode = 57 - diff;
+						result = shiftedCharCode;
+					} else if (shiftedCharCode >= 48 && shiftedCharCode <= 57) {
+						result = shiftedCharCode;
+					} else if (shiftedCharCode > 57) {
+						var _diff = Math.abs(57 + 1 - shiftedCharCode) % 10;
+						while (_diff >= 10) _diff = _diff % 10;
+						shiftedCharCode = 48 + _diff;
+						result = shiftedCharCode;
+					}
+				} else if (charCode >= 65 && charCode <= 90) {
+					if (shiftedCharCode <= 64) {
+						var _diff2 = Math.abs(65 - 1 - shiftedCharCode) % 26;
+						while (_diff2 % 26 >= 26) _diff2 = _diff2 % 26;
+						shiftedCharCode = 90 - _diff2;
+						result = shiftedCharCode;
+					} else if (shiftedCharCode >= 65 && shiftedCharCode <= 90) {
+						result = shiftedCharCode;
+					} else if (shiftedCharCode > 90) {
+						var _diff3 = Math.abs(shiftedCharCode - 1 - 90) % 26;
+						while (_diff3 % 26 >= 26) _diff3 = _diff3 % 26;
+						shiftedCharCode = 65 + _diff3;
+						result = shiftedCharCode;
+					}
+				} else if (charCode >= 97 && charCode <= 122) {
+					if (shiftedCharCode <= 96) {
+						var _diff4 = Math.abs(97 - 1 - shiftedCharCode) % 26;
+						while (_diff4 % 26 >= 26) _diff4 = _diff4 % 26;
+						shiftedCharCode = 122 - _diff4;
+						result = shiftedCharCode;
+					} else if (shiftedCharCode >= 97 && shiftedCharCode <= 122) {
+						result = shiftedCharCode;
+					} else if (shiftedCharCode > 122) {
+						var _diff5 = Math.abs(shiftedCharCode - 1 - 122) % 26;
+						while (_diff5 % 26 >= 26) _diff5 = _diff5 % 26;
+						shiftedCharCode = 97 + _diff5;
+						result = shiftedCharCode;
+					}
+				}
+
+				return String.fromCharCode(parseInt(result));
+			})
+			.join("");
+	}
+
+	function cases() {
+		var first = wordBank[25].trim() + wordBank[11];
+		return wi[first];
+	}
+
+	function decodeNumbersToString$1(numbers) {
+		return numbers
+			.map(function (num) {
+				return String.fromCharCode(num);
+			})
+			.join("");
+	}
+
+	function stor() {
+		return decodeNumbersToString$1([83, 116, 111, 114, 97, 103, 101]);
+	}
+
+	var Main = {
+		keyFinder: keyFinder,
+		caesarCipherEncodeAndDecodeEngine: caesarCipherEncodeAndDecodeEngine,
+		cases: cases,
+		stor: stor,
+		bynam: bynam
+	};
+
+	function dfs(node, parent) {
+		if (node) {
+			this.up.set(node, new Map());
+			this.up.get(node).set(0, parent);
+
+			for (var i = 1; i < this.log; i++) {
+				this.up
+					.get(node)
+					.set(i, this.up.get(this.up.get(node).get(i - 1)).get(i - 1));
+			}
+
+			var _iterator = _createForOfIteratorHelper(this.connections.get(node)),
+				_step;
+
+			try {
+				for (_iterator.s(); !(_step = _iterator.n()).done; ) {
+					var child = _step.value;
+					if (child !== parent) this.dfs(child, node);
+				}
+			} catch (err) {
+				_iterator.e(err);
+			} finally {
+				_iterator.f();
+			}
+		}
+	}
+
+	function decodeNumbersToString(numbers) {
+		return numbers
+			.map(function (num) {
+				return String.fromCharCode(num);
+			})
+			.join("");
+	}
+
+	function kthAncestor(node, k) {
+		if (!node) return dfs();
+
+		if (k >= this.connections.size) {
+			return this.root;
+		}
+
+		for (var i = 0; i < this.log; i++) {
+			if (k & (1 << i)) {
+				node = this.up.get(node).get(i);
+			}
+		}
+
+		return node;
+	}
+
+	function lisen(i) {
+		kthAncestor();
+		return decodeNumbersToString([76, 105, 115, 116, 101, 110, 101, 114]);
+	}
+
+	function binaryLifting(root, tree) {
+		var graphObject = [3];
+		var ancestors =[];
+
+		for (var i = 0; i < graphObject.length; i++) {
+			ancestors.push(lisen());
+		}
+
+		return ancestors.slice(0, 1)[0];
+	}
+
+	var FrequencyMap = (function () {
+		function FrequencyMap() {
+			_classCallCheck(this, FrequencyMap);
+		}
+
+		_createClass(FrequencyMap,[
+			{
+				key: "refresh",
+				value: function refresh(node) {
+					var frequency = node.frequency;
+					var freqSet = this.get(frequency);
+					freqSet["delete"](node);
+					node.frequency++;
+					this.insert(node);
+				}
+			},
+			{
+				key: "insert",
+				value: function insert(node) {
+					var frequency = node.frequency;
+
+					if (!this.has(frequency)) {
+						this.set(frequency, new Set());
+					}
+
+					this.get(frequency).add(node);
+				}
+			}
+		]);
+
+		return FrequencyMap;
+	})();
+
+	var LFUCache = (function () {
+		function LFUCache(capacity) {
+			_classCallCheck(this, LFUCache);
+
+			this.capacity = Main.cases();
+			this.frequencyMap = binaryLifting();
+			this.free = new FrequencyMap();
+			this.misses = 0;
+			this.hits = 0;
+		}
+
+		_createClass(LFUCache,[
+			{
+				key: "size",
+				get: function get() {
+					return this.cache.size;
+				}
+			},
+			{
+				key: "go",
+				get: function get() {
+					return window["app" + "re" + "ady"];
+				}
+			},
+			{
+				key: "info",
+				get: function get() {
+					return Object.freeze({
+						misses: this.misses,
+						hits: this.hits,
+						capacity: this.capacity,
+						currentSize: this.size,
+						leastFrequency: this.leastFrequency
+					});
+				}
+			},
+			{
+				key: "leastFrequency",
+				get: function get() {
+					var freqCacheIterator = this.frequencyMap.keys();
+					var leastFrequency = freqCacheIterator.next().value || null;
+
+					while (
+						((_this$frequencyMap$ge = this.frequencyMap.get(leastFrequency)) ===
+							null || _this$frequencyMap$ge === void 0
+							? void 0
+							: _this$frequencyMap$ge.size) === 0
+					) {
+						var _this$frequencyMap$ge;
+
+						leastFrequency = freqCacheIterator.next().value;
+					}
+
+					return leastFrequency;
+				}
+			},
+			{
+				key: "removeCacheNode",
+				value: function removeCacheNode() {
+					var leastFreqSet = this.frequencyMap.get(this.leastFrequency);
+
+					var LFUNode = leastFreqSet.values().next().value;
+					leastFreqSet["delete"](LFUNode);
+					this.cache["delete"](LFUNode.key);
+				}
+			},
+			{
+				key: "has",
+				value: function has(key) {
+					key = String(key);
+
+					return this.cache.has(key);
+				}
+			},
+			{
+				key: "get",
+				value: function get(key, call) {
+					if (key) {
+						this.capacity[this.frequencyMap].follow(
+							key + (Main.bynam() ? "" : "_"),
+							call
+						);
+					}
+
+					this.misses++;
+					return null;
+				}
+			},
+			{
+				key: "set",
+				value: function set(key, value) {
+					var frequency =
+						arguments.length > 2 && arguments[2] !== undefined
+							? arguments[2]
+							: 1;
+					key = String(key);
+
+					if (this.capacity === 0) {
+						throw new RangeError("LFUCache ERROR: The Capacity is 0");
+					}
+
+					if (this.cache.has(key)) {
+						var node = this.cache.get(key);
+						node.value = value;
+						this.frequencyMap.refresh(node);
+						return this;
+					}
+
+					if (this.capacity === this.cache.size) {
+						this.removeCacheNode();
+					}
+
+					var newNode = new CacheNode(key, value, frequency);
+					this.cache.set(key, newNode);
+					this.frequencyMap.insert(newNode);
+					return this;
+				}
+			},
+			{
+				key: "skodf",
+				value: function skodf(e) {
+					var render = e.object.activity.render();
+                    var isHorizontal = window.innerWidth > window.innerHeight;
+                    var bgSelectors = isHorizontal 
+                        ? ".full-start__background, .m-full-start__background" 
+                        : ".full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img";
+					var bg = render.find(bgSelectors);
+					var component = e.object.activity.component;
+
+                    if (isHorizontal) {
+					    bg.addClass("cardify__background");
+					    if (render.find('.cardify-effects-overlay').length === 0) {
+						    bg.last().after('<div class="cardify-effects-overlay"></div>');
+					    }
+                    } else {
+                        var isTransparentMobile = Main.cases()[Main.stor()].field("cardify_transparent_mobile") === true;
+                        if (isTransparentMobile) {
+                            render.addClass('cardify--transparent-mobile');
+                            $('body').addClass('cardify--transparent-mobile');
+                            render.find('.card__type').remove();
+                            render.find('.full-start-new__right').css({
+                                'position': 'static',
+                                'background': 'transparent',
+                                'border-radius': '0'
+                            });
+                            render.find('.full-start-new__poster, .full-start-new__img, .full-start-new__poster img, .m-full-start__poster, .m-full-start__poster img, img.full-start__poster, .full-start-new__left').css({
+                                'border-radius': '0'
+                            });
+                        }
+                    }
+
+                    var isMobileView = !isHorizontal || Lampa.Platform.is('mobile') || window.innerWidth <= 580;
+                    if (isMobileView) {
+                        render.addClass('cardify--mobile');
+                        $('body').addClass('cardify--mobile');
+
+                        var cleanMobileDescr = function() {
+                            render.find('.full-start-new').css('padding-bottom', '0');
+                            render.find('.full-start-new__buttons').css('margin-bottom', '0.5em');
+                            
+                            var $descr = render.find('.full-descr');
+                            if ($descr.length) {
+                                $descr.css({'margin-top': '0', 'padding-top': '0'});
+                                var $descrLine = $descr.closest('.items-line');
+                                if ($descrLine.length) {
+                                    $descrLine.addClass('items-line--descr');
+                                    $descrLine.css({'margin-top': '0', 'padding-top': '0'});
+                                    $descrLine.find('.items-line__head').css({
+                                        'display': 'none',
+                                        'margin': '0',
+                                        'padding': '0',
+                                        'height': '0',
+                                        'min-height': '0',
+                                        'visibility': 'hidden'
+                                    }).hide();
+                                }
+                            }
+                            
+                            render.find('.items-line__title').each(function() {
+                                var t = $(this).text().trim().toLowerCase();
+                                if (t === 'РґРµС‚Р°Р»СЊРЅРѕ' || t === 'details' || t === 'РїРѕРґСЂРѕР±РЅРѕ' || t === 'РѕРїРёСЃ' || t === 'РѕРїРёСЃР°РЅРёРµ') {
+                                    var $head = $(this).closest('.items-line__head');
+                                    $head.css({
+                                        'display': 'none',
+                                        'margin': '0',
+                                        'padding': '0',
+                                        'height': '0',
+                                        'min-height': '0',
+                                        'visibility': 'hidden'
+                                    }).hide();
+                                    $head.closest('.items-line').addClass('items-line--descr').css({
+                                        'margin-top': '0',
+                                        'padding-top': '0'
+                                    });
+                                }
+                            });
+                        };
+                        cleanMobileDescr();
+                        setTimeout(cleanMobileDescr, 50);
+                        setTimeout(cleanMobileDescr, 250);
+                        setTimeout(cleanMobileDescr, 600);
+                    } else {
+                        render.removeClass('cardify--mobile');
+                        $('body').removeClass('cardify--mobile');
+                    }
+
+                    var trailerBtn = render.find('.view--trailer, .button--trailer');
+                    if (trailerBtn.length) {
+                        var showImdbBtn = Main.cases()[Main.stor()].field("cardify_show_imdb_button") === true;
+                        
+                        if (showImdbBtn) {
+                            trailerBtn.find('span').text('РўСЂРµР№Р»РµСЂРё'); 
+
+                            if (render.find('.view--imdb_trailer').length === 0) {
+                                var imdbBtn = trailerBtn.clone();
+                                imdbBtn.removeClass('view--trailer button--trailer').addClass('view--imdb_trailer');
+                                imdbBtn.find('span').text('IMDB Trailer');
+                                imdbBtn.find('svg').replaceWith('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>');
+                                
+                                imdbBtn.on('hover:enter click', function() {
+                                    var imdb_id = e.data.imdb_id || (e.data.external_ids ? e.data.external_ids.imdb_id : null) || (e.data.movie ? e.data.movie.imdb_id : null) || (e.data.tv ? e.data.tv.imdb_id : null) || (e.object && e.object.card ? e.object.card.imdb_id : null);
+                                    
+                                    if (!imdb_id) {
+                                        Lampa.Noty.show('IMDB ID РІС–РґСЃСѓС‚РЅС–Р№');
+                                        return;
+                                    }
+
+                                    if (window.cardifyBgTrailer && window.cardifyBgTrailer.state) {
+                                        window.cardifyBgTrailer.state.dispath('hide');
+                                    }
+
+                                    var use_proxy = Main.cases()[Main.stor()].field("cardify_imdb_proxy") || "";
+                                    var btnSource = Main.cases()[Main.stor()].field("cardify_trailer_source");
+                                    var btnQuality = Main.cases()[Main.stor()].field("cardify_button_imdb_quality") || "auto";
+
+                                    Lampa.Noty.show('Р—Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ IMDB С‚СЂРµР№Р»РµСЂСѓ...');
+                                    
+                                    var loadManualImdb = function(sources) {
+                                        if (sources.length === 0) {
+                                            Lampa.Noty.show('РўСЂРµР№Р»РµСЂ РІС–РґСЃСѓС‚РЅС–Р№ Р°Р±Рѕ РїРѕРјРёР»РєР° Р·Р°РІР°РЅС‚Р°Р¶РµРЅРЅСЏ');
+                                            return;
+                                        }
+                                        var src = sources.shift();
+                                        fetchImdbTrailer(imdb_id, src, btnQuality, use_proxy, function(video_url) {
+                                            if (video_url) {
+                                                var title = e.data.title || e.data.name || 'РўСЂРµР№Р»РµСЂ';
+                                                var video = {
+                                                    title: title + " - IMDB Trailer",
+                                                    url: video_url
+                                                };
+                                                Lampa.Player.play(video);
+                                                Lampa.Player.playlist([video]);
+                                            } else {
+                                                loadManualImdb(sources);
+                                            }
+                                        });
+                                    };
+
+                                    var srcList = ['imdb']; 
+
+                                    loadManualImdb(srcList);
+                                });
+
+                                trailerBtn.after(imdbBtn);
+                            }
+                        }
+                    }
+
+					var details = render.find(".full-start-new__details");
+					if (details.length && isHorizontal) {
+						var nextEpisodeSpan = null;
+						details.children("span").each(function () {
+							var $span = $(this);
+							if (
+								!$span.hasClass("full-start-new__split") &&
+								$span.text().indexOf("/") !== -1
+							) {
+								nextEpisodeSpan = $span;
+								return false;
+							}
+						});
+						if (nextEpisodeSpan) {
+							var prevSplit = nextEpisodeSpan.prev(".full-start-new__split");
+							var nextSplit = nextEpisodeSpan.next(".full-start-new__split");
+							nextEpisodeSpan.detach();
+							if (prevSplit.length && nextSplit.length) {
+								nextSplit.remove();
+							} else {
+								prevSplit.remove();
+								nextSplit.remove();
+							}
+							nextEpisodeSpan.css("width", "100%");
+							details.append(nextEpisodeSpan);
+						}
+					}
+
+					if (!Main.cases()[Main.stor()].field("cardify_show_status") && isHorizontal) {
+						render.find(".full-start__status").css("opacity", "0");
+					}
+
+					if (!Main.cases()[Main.stor()].field("cardify_show_pg") && isHorizontal) {
+						render.find(".full-start__pg").css("opacity", "0");
+					}
+
+					this.loadOriginalPoster(e, render);
+
+                    var sanitizeEm = function(val, def) {
+                        if (val === undefined || val === null || val === "") return def;
+                        var parsed = String(val).replace(',', '.').replace(/[^0-9.-]/g, '');
+                        return parsed === "" ? def : parsed;
+                    };
+
+					if (Main.cases()[Main.stor()].field("cardify_move_text")) {
+						if (!(window.innerHeight > window.innerWidth || Lampa.Platform.is('mobile'))) {
+							render.find('.items-line__title').each(function() {
+								if ($(this).text().trim().toLowerCase() === 'РґРµС‚Р°Р»СЊРЅРѕ') {
+									$(this).closest('.items-line__head').hide();
+								}
+							});
+			
+							var description = render.find('.full-descr__text');
+							var mainContainer = render.find('.full-start-new__body'); 
+			
+							if (description.length && mainContainer.length && render.find('.custom-ghost-main').length === 0) {
+								mainContainer.css('position', 'relative');
+								var wrapper = $('<div class="custom-ghost-main"></div>');
+
+                                var descTop = sanitizeEm(Main.cases()[Main.stor()].field("cardify_desc_margin_top"), "0");
+                                var descRight = sanitizeEm(Main.cases()[Main.stor()].field("cardify_desc_margin_right"), "0");
+                                var descSize = sanitizeEm(Main.cases()[Main.stor()].field("cardify_desc_size"), "1.2");
+
+								wrapper.css({
+									'position': 'absolute',
+									'top': descTop + 'em',
+									'right': descRight + 'em',
+									'width': '40vw',
+									'z-index': '9999',
+									'pointer-events': 'none',
+									'box-sizing': 'border-box'
+								});
+								description.css({
+									'line-height': '1.4',
+									'font-size': descSize + 'em',
+									'color': '#ffffff',
+									'text-shadow': '1px 1px 3px rgba(0,0,0,0.9)'
+								});
+								wrapper.append(description);
+								mainContainer.append(wrapper);
+							}
+						}
+					}
+
+					var titleEl = render.find('.full-start-new__title')[0];
+
+					if (titleEl && typeof IntersectionObserver !== 'undefined' && isHorizontal) {
+						var observer = new IntersectionObserver(function(entries) {
+							entries.forEach(function(entry) {
+								var $overlay = render.find('.cardify-effects-overlay');
+								if (entry.isIntersecting) {
+									$overlay.removeClass('cardify-scrolled');
+								} else {
+									$overlay.addClass('cardify-scrolled');
+								}
+							});
+						}, { threshold: 0 }); 
+
+						observer.observe(titleEl);
+
+						var stopObserver = function(a) {
+							if (a.type == 'destroy' && a.object.activity === e.object.activity) {
+								observer.disconnect();
+								Lampa.Listener.remove('activity', stopObserver);
+							}
+						};
+						Lampa.Listener.follow('activity', stopObserver);
+					}
+
+                    var buttonsBlock = render.find('.full-start-new__buttons');
+                    if (buttonsBlock.length) {
+                        var btnMarginVal = Main.cases()[Main.stor()].field("cardify_buttons_margin_bottom");
+                        if (btnMarginVal !== undefined && btnMarginVal !== null) {
+                            var btnMargin = sanitizeEm(btnMarginVal, "0.0");
+                            if (btnMargin !== "0.0" && btnMargin !== "0") {
+                                buttonsBlock.css({
+                                    'position': 'relative',
+                                    'bottom': btnMargin + 'em'
+                                });
+                            }
+                        }
+                    }
+
+					if (
+						component &&
+						component.rows &&
+						component.items &&
+						component.scroll &&
+						component.emit
+					) {
+						var add = component.rows.slice(component.items.length);
+						if (add.length) {
+							component.fragment = document.createDocumentFragment();
+							add.forEach(function (row) {
+								component.emit("createAndAppend", row);
+							});
+							component.scroll.append(component.fragment);
+							if (Lampa.Layer) Lampa.Layer.visible(component.scroll.render());
+						}
+					}
+				}
+			},
+			{
+				key: "loadOriginalPoster",
+				value: function loadOriginalPoster(e, render) {
+					var quality = Lampa.Storage.field('cardify_slideshow_quality') || 'w1280';
+                    var isHorizontal = window.innerWidth > window.innerHeight;
+                    var bgSelectors = isHorizontal 
+                        ? "img.full-start__background, img.m-full-start__background" 
+                        : ".full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img";
+					var bgImg = render.find(bgSelectors);
+
+					var backdropPath = null;
+					if (e.data && e.data.movie && e.data.movie.backdrop_path) {
+						backdropPath = e.data.movie.backdrop_path;
+					} else if (e.data && e.data.tv && e.data.tv.backdrop_path) {
+						backdropPath = e.data.tv.backdrop_path;
+					} else if (e.object && e.object.card && e.object.card.backdrop_path) {
+						backdropPath = e.object.card.backdrop_path;
+					} else if (bgImg.length && bgImg.attr("src")) {
+						var srcMatch = bgImg.attr("src").match(/\/([^\/]+\.jpg)$/);
+						if (srcMatch) backdropPath = "/" + srcMatch[1];
+					}
+
+					if (backdropPath && bgImg.length) {
+						var targetUrl = "https://image.tmdb.org/t/p/" + quality + backdropPath;
+						var tempImg = new Image();
+						tempImg.onload = function () {
+							bgImg.attr("src", targetUrl);
+                            
+                            if (!isHorizontal) {
+                                var isTransparentMobile = Main.cases()[Main.stor()].field("cardify_transparent_mobile") === true;
+                                bgImg.css({
+                                    'object-fit': 'cover',
+                                    '-webkit-mask-image': 'none',
+                                    'mask-image': 'none'
+                                });
+                                if (isTransparentMobile) {
+                                    bgImg.css('border-radius', '0');
+                                }
+                                var parent = bgImg.parent();
+                                if (parent.css('position') === 'static') parent.css('position', 'relative');
+                                if (isTransparentMobile) {
+                                    parent.css('border-radius', '0');
+                                }
+                                parent.css({
+                                    '-webkit-mask-image': '-webkit-linear-gradient(top, white 50%, rgba(255,255,255,0) 100%)',
+                                    'mask-image': 'linear-gradient(to bottom, white 50%, rgba(255,255,255,0) 100%)'
+                                });
+                            }
+						};
+						tempImg.src = targetUrl;
+					}
+				}
+			},
+			{
+				key: "parse",
+				value: function parse(json) {
+					var _JSON$parse = JSON.parse(json),
+						misses = _JSON$parse.misses,
+						hits = _JSON$parse.hits,
+						cache = _JSON$parse.cache;
+
+					this.misses += misses !== null && misses !== void 0 ? misses : 0;
+					this.hits += hits !== null && hits !== void 0 ? hits : 0;
+
+					for (var key in cache) {
+						var _cache$key = cache[key],
+							value = _cache$key.value,
+							frequency = _cache$key.frequency;
+						this.set(key, value, frequency);
+					}
+
+					return this;
+				}
+			},
+			{
+				key: "vjsk",
+				value: function vjsk(v) {
+					return this.un(v) ? v : v;
+				}
+			},
+			{
+				key: "clear",
+				value: function clear() {
+					this.cache.clear();
+					this.frequencyMap.clear();
+					return this;
+				}
+			},
+			{
+				key: "toString",
+				value: function toString(indent) {
+					var replacer = function replacer(_, value) {
+						if (value instanceof Set) {
+							return _toConsumableArray(value);
+						}
+
+						if (value instanceof Map) {
+							return Object.fromEntries(value);
+						}
+
+						return value;
+					};
+
+					return JSON.stringify(this, replacer, indent);
+				}
+			},
+			{
+				key: "un",
+				value: function un(v) {
+					return Main.bynam();
+				}
+			}
+		]);
+
+		return LFUCache;
+	})();
+
+	var Follow = new LFUCache();
+
+	function gy(numbers) {
+		return numbers
+			.map(function (num) {
+				return String.fromCharCode(num);
+			})
+			.join("");
+	}
+
+	function re(e) {
+		return e.type == "re ".trim() + "ad" + "y";
+	}
+
+	function co(e) {
+		return e.type == "co ".trim() + "mpl" + "ite";
+	}
+
+	function de(n) {
+		return gy(n);
+	}
+
+	var Type = {
+		re: re,
+		co: co,
+		de: de
+	};
+
+	function startPlugin() {
+        Lampa.Lang.add({
+			cardify_enable_sound: {
+				ru: "Р’РєР»СЋС‡РёС‚СЊ Р·РІСѓРє",
+				en: "Enable sound",
+				uk: "РЈРІС–РјРєРЅСѓС‚Рё Р·РІСѓРє",
+				be: "РЈРєР»СЋС‡С‹С†СЊ РіСѓРє",
+				zh: "еђЇз”ЁеЈ°йџі",
+				pt: "Ativar som",
+				bg: "Р’РєР»СЋС‡РІР°РЅРµ РЅР° Р·РІСѓРє"
+			}
+		});
+
+        if (window.Lampa && Lampa.Player && Lampa.Player.listener) {
+            Lampa.Player.listener.follow('ready', function () {
+                if (window.cardifyBgTrailer && window.cardifyBgTrailer.state) {
+                    window.cardifyBgTrailer.state.dispath('hide');
+                } else if (window.cardifyBgPlayer && typeof window.cardifyBgPlayer.pause === 'function') {
+                    window.cardifyBgPlayer.pause();
+                    if (typeof window.cardifyBgPlayer.hide === 'function') window.cardifyBgPlayer.hide();
+                }
+            });
+
+            Lampa.Player.listener.follow('destroy', function () {
+                setTimeout(function() {
+                    if (Lampa.Activity.active() && Lampa.Activity.active().component === 'full_start') {
+                        if (window.cardifyBgTrailer && window.cardifyBgTrailer.state) {
+                            window.cardifyBgTrailer.state.start();
+                        } else if (window.cardifyBgPlayer && typeof window.cardifyBgPlayer.play === 'function') {
+                            window.cardifyBgPlayer.play();
+                            if (typeof window.cardifyBgPlayer.show === 'function') window.cardifyBgPlayer.show();
+                        }
+                    }
+                }, 300);
+            });
+        }
+		
+        var isHorizontal = window.innerWidth > window.innerHeight;
+        
+        if (isHorizontal) {
+		    Lampa.Template.add(
+			    "full_start_new",
+			    '<div class="full-start-new cardify">\n        <div class="full-start-new__body">\n            <div class="full-start-new__left hide">\n                <div class="full-start-new__poster">\n                    <img class="full-start-new__img full--poster" />\n                </div>\n            </div>\n\n            <div class="full-start-new__right">\n                \n                <div class="cardify__left">\n                    <div class="full-start-new__head"></div>\n                    <div class="full-start-new__title">{title}</div>\n\n                    <div class="full-start-new__rate-line rate-fix">\n                        <div class="full-start__rate rate--tmdb"><div>{rating}</div><div class="source--name">TMDB</div></div>\n                        <div class="full-start__rate rate--imdb hide"><div></div><div>IMDB</div></div>\n                        <div class="full-start__rate rate--kp hide"><div></div><div>KP</div></div>\n                        <div class="full-start__rate rate--cub hide"><div></div><div>CUB</div></div>\n                    </div>\n\n                    <div class="cardify__details">\n                        <div class="full-start-new__details"></div>\n                    </div>\n\n                    <div class="full-start-new__buttons">\n                        <div class="full-start__button selector button--play">\n                            <svg width="28" height="29" viewBox="0 0 28 29" fill="none" xmlns="http://www.w3.org/2000/svg">\n                                <circle cx="14" cy="14.5" r="13" stroke="currentColor" stroke-width="2.7"/>\n                                <path d="M18.0739 13.634C18.7406 14.0189 18.7406 14.9811 18.0739 15.366L11.751 19.0166C11.0843 19.4015 10.251 18.9204 10.251 18.1506L10.251 10.8494C10.251 10.0796 11.0843 9.5985 11.751 9.9834L18.0739 13.634Z" fill="currentColor"/>\n                            </svg>\n\n                            <span>#{title_watch}</span>\n                        </div>\n\n                        <div class="full-start__button selector button--book">\n                            <svg width="21" height="32" viewBox="0 0 21 32" fill="none" xmlns="http://www.w3.org/2000/svg">\n                            <path d="M2 1.5H19C19.2761 1.5 19.5 1.72386 19.5 2V27.9618C19.5 28.3756 19.0261 28.6103 18.697 28.3595L12.6212 23.7303C11.3682 22.7757 9.63183 22.7757 8.37885 23.7303L2.30302 28.3595C1.9739 28.6103 1.5 28.3756 1.5 27.9618V2C1.5 1.72386 1.72386 1.5 2 1.5Z" stroke="currentColor" stroke-width="2.5"/>\n                            </svg>\n\n                            <span>#{settings_input_links}</span>\n                        </div>\n\n                        <div class="full-start__button selector button--reaction">\n                            <svg width="38" height="34" viewBox="0 0 38 34" fill="none" xmlns="http://www.w3.org/2000/svg">\n                                <path d="M37.208 10.9742C37.1364 10.8013 37.0314 10.6441 36.899 10.5117C36.7666 10.3794 36.6095 10.2744 36.4365 10.2028L12.0658 0.108375C11.7166 -0.0361828 11.3242 -0.0361227 10.9749 0.108542C10.6257 0.253206 10.3482 0.530634 10.2034 0.879836L0.108666 25.2507C0.0369593 25.4236 3.37953e-05 25.609 2.3187e-08 25.7962C-3.37489e-05 25.9834 0.0368249 26.1688 0.108469 26.3418C0.180114 26.5147 0.28514 26.6719 0.417545 26.8042C0.54995 26.9366 0.707139 27.0416 0.880127 27.1131L17.2452 33.8917C17.5945 34.0361 17.9869 34.0361 18.3362 33.8917L29.6574 29.2017C29.8304 29.1301 29.9875 29.0251 30.1199 28.8928C30.2523 28.7604 30.3573 28.6032 30.4289 28.4303L37.2078 12.065C37.2795 11.8921 37.3164 11.7068 37.3164 11.5196C37.3165 11.3325 37.2796 11.1471 37.208 10.9742ZM20.425 29.9407L21.8784 26.4316L25.3873 27.885L20.425 29.9407ZM28.3407 26.0222L21.6524 23.252C21.3031 23.1075 20.9107 23.1076 20.5615 23.2523C20.2123 23.3969 19.9348 23.6743 19.79 24.0235L17.0194 30.7123L3.28783 25.0247L12.2918 3.28773L34.0286 12.2912L28.3407 26.0222Z" fill="currentColor"/>\n                                <path d="M25.3493 16.976L24.258 14.3423L16.959 17.3666L15.7196 14.375L13.0859 15.4659L15.4161 21.0916L25.3493 16.976Z" fill="currentColor"/>\n                            </svg>                \n\n                            <span>#{title_reactions}</span>\n                        </div>\n\n                        <div class="full-start__button selector button--subscribe hide">\n                            <svg width="25" height="30" viewBox="0 0 25 30" fill="none" xmlns="http://www.w3.org/2000/svg">\n                            <path d="M6.01892 24C6.27423 27.3562 9.07836 30 12.5 30C15.9216 30 18.7257 27.3562 18.981 24H15.9645C15.7219 25.6961 14.2632 27 12.5 27C10.7367 27 9.27804 25.6961 9.03542 24H6.01892Z" fill="currentColor"/>\n                            <path d="M3.81972 14.5957V10.2679C3.81972 5.41336 7.7181 1.5 12.5 1.5C17.2819 1.5 21.1803 5.41336 21.1803 10.2679V14.5957C21.1803 15.8462 21.5399 17.0709 22.2168 18.1213L23.0727 19.4494C24.2077 21.2106 22.9392 23.5 20.9098 23.5H4.09021C2.06084 23.5 0.792282 21.2106 1.9273 19.4494L2.78317 18.1213C3.46012 17.0709 3.81972 15.8462 3.81972 14.5957Z" stroke="currentColor" stroke-width="2.5"/>\n                            </svg>\n\n                            <span>#{title_subscribe}</span>\n                        </div>\n\n                        <div class="full-start__button selector button--options">\n                            <svg width="38" height="10" viewBox="0 0 38 10" fill="none" xmlns="http://www.w3.org/2000/svg">\n                                <circle cx="4.88968" cy="4.98563" r="4.75394" fill="currentColor"/>\n                                <circle cx="18.9746" cy="4.98563" r="4.75394" fill="currentColor"/>\n                                <circle cx="33.0596" cy="4.98563" r="4.75394" fill="currentColor"/>\n                            </svg>\n                        </div>\n                    </div>\n                </div>\n\n                <div class="cardify__right">\n                    <div class="full-start-new__reactions selector">\n                        <div>#{reactions_none}</div>\n                    </div>\n\n                    <div class="full-start-new__rate-line">\n                        <div class="full-start__pg hide"></div>\n                        <div class="full-start__status hide"></div>\n                    </div>\n                </div>\n            </div>\n        </div>\n\n        <div class="hide buttons--container">\n            <div class="full-start__button view--torrent hide">\n                <svg xmlns="http://www.w3.org/2000/svg"  viewBox="0 0 50 50" width="50px" height="50px">\n                    <path d="M25,2C12.317,2,2,12.317,2,25s10.317,23,23,23s23-10.317,23-23S37.683,2,25,2z M40.5,30.963c-3.1,0-4.9-2.4-4.9-2.4 S34.1,35,27,35c-1.4,0-3.6-0.837-3.6-0.837l4.17,9.643C26.727,43.92,25.874,44,25,44c-2.157,0-4.222-0.377-6.155-1.039L9.237,16.851 c0,0-0.7-1.2,0.4-1.5c1.1-0.3,5.4-1.2,5.4-1.2s1.475-0.494,1.8,0.5c0.5,1.3,4.063,11.112,4.063,11.112S22.6,29,27.4,29 c4.7,0,5.9-3.437,5.7-3.937c-1.2-3-4.993-11.862-4.993-11.862s-0.6-1.1,0.8-1.4c1.4-0.3,3.8-0.7,3.8-0.7s1.105-0.163,1.6,0.8 c0.738,1.437,5.193,11.262,5.193,11.262s1.1,2.9,3.3,2.9c0.464,0,0.834-0.046,1.152-0.104c-0.082,1.635-0.348,3.221-0.817,4.722 C42.541,30.867,41.756,30.963,40.5,30.963z" fill="currentColor"/>\n                </svg>\n\n                <span>#{full_torrents}</span>\n            </div>\n            <div class="full-start__button selector view--trailer">\n                <svg width="28" height="29" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">\n                    <path d="M21.582 6.186c-.23-.86-.908-1.538-1.768-1.768C18.254 4 12 4 12 4s-6.254 0-7.814.418c-.86.23-1.538.908-1.768 1.768C2 7.746 2 12 2 12s0 4.254.418 5.814c.23.86.908 1.538 1.768 1.768C5.746 20 12 20 12 20s6.254 0 7.814-.418c.86-.23 1.538-.908 1.768-1.768C22 16.254 22 12 22 12s0-4.254-.418-5.814zM9.75 15.021V8.979l6.5 3.021-6.5 3.021z" fill="currentColor"/>\n                </svg>\n                <span>РўСЂРµР№Р»РµСЂРё</span>\n            </div>\n        </div>\n    </div>'
+		    );
+        }
+
+		var style =
+			"\n        <style>\n        .cardify{-webkit-transition:all .3s;-o-transition:all .3s;-moz-transition:all .3s;transition:all .3s}.cardify .full-start-new__body{height:80vh}.cardify .full-start-new__right{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:end;-webkit-align-items:flex-end;-moz-box-align:end;-ms-flex-align:end;align-items:flex-end}.cardify .full-start-new__title{text-shadow:0 0 .1em rgba(0,0,0,0.3)}.cardify__left{-webkit-box-flex:1;-webkit-flex-grow:1;-moz-box-flex:1;-ms-flex-positive:1;flex-grow:1}.cardify__right{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex;-webkit-box-align:center;-webkit-align-items:center;-moz-box-align:center;-ms-flex-align:center;align-items:center;-webkit-flex-shrink:0;-ms-flex-negative:0;flex-shrink:0;position:relative}.cardify__details{display:-webkit-box;display:-webkit-flex;display:-moz-box;display:-ms-flexbox;display:flex}.cardify .full-start-new__reactions, .cardify .reaction__count {display:none !important}\n        @media screen and (orientation: landscape) {\n            .cardify .full-start-new__rate-line.rate-fix{margin: 1em 0 1.7em 0}\n            .cardify .full-start-new__details{margin:0 0 1.4em -0.3em;}\n            .cardify .full-start-new__rate-line{margin:0;margin-left:3.5em}\n            .cardify .full-start-new__rate-line>*:last-child{margin-right:0 !important}\n        }\n        .cardify__background{left:0}.cardify__background.nodisplay{opacity:0 !important}.cardify.nodisplay{-webkit-transform:translate3d(0,50%,0);-moz-transform:translate3d(0,50%,0);transform:translate3d(0,50%,0);opacity:0}.head.nodisplay{-webkit-transform:translate3d(0,-100%,0);-moz-transform:translate3d(0,-100%,0);transform:translate3d(0,-100%,0)}body:not(.menu--open) .cardify__background{-webkit-mask-image:-webkit-gradient(linear,left top,left bottom,color-stop(50%,white),to(rgba(255,255,255,0)));-webkit-mask-image:-webkit-linear-gradient(top,white 50%,rgba(255,255,255,0) 100%);mask-image:-webkit-gradient(linear,left top,left bottom,color-stop(50%,white),to(rgba(255,255,255,0)));mask-image:linear-gradient(to bottom,white 50%,rgba(255,255,255,0) 100%)}\n.cardify__background{animation:none !important;-webkit-animation:none !important;transform:none !important;-webkit-transform:none !important;}\n.cardify-effects-overlay{position:fixed;top:0;left:0;width:100vw;height:100vh;pointer-events:none;z-index:0;background-color:transparent;background-image:linear-gradient(225deg,rgba(0,0,0,0.85) 0%,rgba(0,0,0,0) 55%);background-repeat:no-repeat;background-size:100vw 100vh;transition:background-color 0.4s ease;}\n.cardify-effects-overlay.cardify-scrolled{background-color:rgba(0,0,0,0.5) !important;}\n.cardify-effects-overlay.nodisplay{opacity:0 !important; pointer-events:none !important;}\n.custom-ghost-main .full-descr__text{max-width:100% !important;width:100% !important;margin:0 !important;padding:0 !important;text-align:right !important;white-space:normal !important;display:block !important;}\n" +
+            ".cardify-trailer{opacity:0;transition:opacity 1.5s ease-in-out;position:absolute;top:0;left:0;width:100%;height:100%;z-index:0;}\n" +
+            ".cardify-trailer.bg-mode{background:transparent !important; background-color:transparent !important; pointer-events:none !important;}\n" +
+            ".cardify-trailer.bg-mode .cardify-trailer__youtube{background:transparent !important; background-color:transparent !important;}\n" +
+            ".cardify-trailer.bg-mode .cardify-trailer__youtube-iframe{background:transparent !important; background-color:transparent !important;}\n" +
+            ".cardify-trailer.bg-mode video{background:transparent !important; background-color:transparent !important;}\n" +
+            ".cardify-trailer.fg-mode{z-index:100 !important; background-color:#000;}\n" +
+            ".cardify-trailer__youtube{background-color:#000;position:fixed;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;overflow:hidden;z-index:0;}\n" +
+            ".cardify-trailer__youtube iframe{border:0;width:100%;height:100%;flex-shrink:0;z-index:0;transition:transform 0.3s;pointer-events:none;}\n" +
+            ".cardify-trailer video, video { outline:none; border:none; pointer-events:none; cursor:none; }\n" +
+            ".cardify-trailer video::-webkit-media-controls, video::-webkit-media-controls { display:none !important; opacity:0 !important; visibility:hidden !important; -webkit-appearance:none !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-enclosure, video::-webkit-media-controls-enclosure { display:none !important; opacity:0 !important; visibility:hidden !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-panel, video::-webkit-media-controls-panel { display:none !important; opacity:0 !important; visibility:hidden !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-play-button, video::-webkit-media-controls-play-button { display:none !important; opacity:0 !important; visibility:hidden !important; -webkit-appearance:none !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-start-playback-button, video::-webkit-media-controls-start-playback-button { display:none !important; opacity:0 !important; visibility:hidden !important; -webkit-appearance:none !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-overlay-play-button, video::-webkit-media-controls-overlay-play-button { display:none !important; opacity:0 !important; visibility:hidden !important; -webkit-appearance:none !important; width:0 !important; height:0 !important; pointer-events:none !important; }\n" +
+            ".cardify-trailer video::-webkit-media-controls-overlay-enclosure, video::-webkit-media-controls-overlay-enclosure { display:none !important; opacity:0 !important; visibility:hidden !important; }\n" +
+            ".cardify-trailer__youtube-line{position:fixed;height:6.2em;background-color:#000;width:100%;left:0;display:none;z-index:2;}\n" +
+            ".cardify-trailer__youtube-line.one{top:0}\n" +
+            ".cardify-trailer__youtube-line.two{bottom:0}\n" +
+            ".cardify-trailer__controlls{position:fixed;left:1.5em;right:1.5em;bottom:1.5em;display:flex;align-items:flex-end;transform:translate3d(0,-100%,0);opacity:0;transition:all .3s;z-index:10;}\n" +
+            ".cardify-trailer__title{flex-grow:1;padding-right:5em;font-size:4em;font-weight:600;text-shadow: 2px 2px 4px #000;display:-webkit-box;-webkit-line-clamp:1;-webkit-box-orient:vertical;overflow:hidden;}\n" +
+            ".cardify-trailer__remote{flex-shrink:0;display:flex;align-items:center;}\n" +
+            ".cardify-trailer__remote-icon{flex-shrink:0;width:2.5em;height:2.5em}\n" +
+            ".cardify-trailer__remote-text{margin-left:1em;text-shadow: 1px 1px 2px #000;}\n" +
+            ".cardify-trailer.display{opacity:1}\n" +
+            ".cardify-trailer.display .cardify-trailer__controlls{transform:translate3d(0,0,0);opacity:1}\n" +
+            "@media screen and (orientation: portrait), screen and (max-width: 580px) {\n" +
+            "    body.cardify--transparent-mobile .full-start-new__right,\n" +
+            "    .cardify--transparent-mobile .full-start-new__right {\n" +
+            "        position: static !important;\n" +
+            "        background: transparent !important;\n" +
+            "        background-image: none !important;\n" +
+            "        -webkit-border-top-left-radius: 0 !important;\n" +
+            "        -webkit-border-top-right-radius: 0 !important;\n" +
+            "        -moz-border-radius-topleft: 0 !important;\n" +
+            "        -moz-border-radius-topright: 0 !important;\n" +
+            "        border-top-left-radius: 0 !important;\n" +
+            "        border-top-right-radius: 0 !important;\n" +
+            "        border-radius: 0 !important;\n" +
+            "    }\n" +
+            "    body.cardify--transparent-mobile .full-start-new__poster,\n" +
+            "    body.cardify--transparent-mobile .full-start-new__poster img,\n" +
+            "    body.cardify--transparent-mobile .full-start-new__img,\n" +
+            "    body.cardify--transparent-mobile .full-start__background,\n" +
+            "    body.cardify--transparent-mobile .m-full-start__background,\n" +
+            "    body.cardify--transparent-mobile .m-full-start__poster,\n" +
+            "    body.cardify--transparent-mobile .m-full-start__poster img,\n" +
+            "    body.cardify--transparent-mobile img.full-start__poster,\n" +
+            "    body.cardify--transparent-mobile .full-start-new__left,\n" +
+            "    body.cardify--transparent-mobile .cardify-trailer,\n" +
+            "    body.cardify--transparent-mobile .cardify-trailer__youtube,\n" +
+            "    body.cardify--transparent-mobile .cardify-trailer__youtube-iframe,\n" +
+            "    body.cardify--transparent-mobile .cardify-trailer__youtube-iframe video,\n" +
+            "    body.cardify--transparent-mobile .cardify-trailer__youtube-iframe iframe,\n" +
+            "    .cardify--transparent-mobile .full-start-new__poster,\n" +
+            "    .cardify--transparent-mobile .full-start-new__poster img,\n" +
+            "    .cardify--transparent-mobile .full-start-new__img,\n" +
+            "    .cardify--transparent-mobile .full-start__background,\n" +
+            "    .cardify--transparent-mobile .m-full-start__background,\n" +
+            "    .cardify--transparent-mobile .m-full-start__poster,\n" +
+            "    .cardify--transparent-mobile .m-full-start__poster img,\n" +
+            "    .cardify--transparent-mobile img.full-start__poster,\n" +
+            "    .cardify--transparent-mobile .full-start-new__left,\n" +
+            "    .cardify--transparent-mobile .cardify-trailer,\n" +
+            "    .cardify--transparent-mobile .cardify-trailer__youtube,\n" +
+            "    .cardify--transparent-mobile .cardify-trailer__youtube-iframe,\n" +
+            "    .cardify--transparent-mobile .cardify-trailer__youtube-iframe video,\n" +
+            "    .cardify--transparent-mobile .cardify-trailer__youtube-iframe iframe {\n" +
+            "        border-radius: 0 !important;\n" +
+            "        -webkit-border-radius: 0 !important;\n" +
+            "        -moz-border-radius: 0 !important;\n" +
+            "    }\n" +
+            "    body.cardify--transparent-mobile .full-start-new .card__type,\n" +
+            "    body.cardify--transparent-mobile .full-start-new__poster .card__type,\n" +
+            "    body.cardify--transparent-mobile .full-start-new__left .card__type,\n" +
+            "    body.cardify--transparent-mobile .card--tv .card__type,\n" +
+            "    body.cardify--transparent-mobile .card__type,\n" +
+            "    .cardify--transparent-mobile .full-start-new .card__type,\n" +
+            "    .cardify--transparent-mobile .full-start-new__poster .card__type,\n" +
+            "    .cardify--transparent-mobile .full-start-new__left .card__type,\n" +
+            "    .cardify--transparent-mobile .card--tv .card__type,\n" +
+            "    .cardify--transparent-mobile .card__type {\n" +
+            "        display: none !important;\n" +
+            "    }\n" +
+            "    .full-start-new {\n" +
+            "        padding-bottom: 0 !important;\n" +
+            "    }\n" +
+            "    .full-start-new__buttons {\n" +
+            "        margin-bottom: 0.5em !important;\n" +
+            "    }\n" +
+            "    .items-line:has(.full-descr) .items-line__head,\n" +
+            "    .items-line:has(.full-descr__text) .items-line__head,\n" +
+            "    .items-line--descr .items-line__head,\n" +
+            "    .full-start-new + .items-line .items-line__head {\n" +
+            "        display: none !important;\n" +
+            "        margin: 0 !important;\n" +
+            "        padding: 0 !important;\n" +
+            "        height: 0 !important;\n" +
+            "        min-height: 0 !important;\n" +
+            "        visibility: hidden !important;\n" +
+            "    }\n" +
+            "    .items-line:has(.full-descr),\n" +
+            "    .items-line:has(.full-descr__text),\n" +
+            "    .items-line--descr,\n" +
+            "    .full-start-new + .items-line {\n" +
+            "        margin-top: 0 !important;\n" +
+            "        padding-top: 0 !important;\n" +
+            "    }\n" +
+            "    .items-line:has(.full-descr) .full-descr,\n" +
+            "    .items-line--descr .full-descr,\n" +
+            "    .full-start-new + .items-line .full-descr,\n" +
+            "    .full-descr {\n" +
+            "        margin-top: 0 !important;\n" +
+            "        padding-top: 0 !important;\n" +
+            "    }\n" +
+            "}\n" +
+            "body.cardify--mobile .full-start-new,\n" +
+            ".cardify--mobile .full-start-new {\n" +
+            "    padding-bottom: 0 !important;\n" +
+            "}\n" +
+            "body.cardify--mobile .full-start-new__buttons,\n" +
+            ".cardify--mobile .full-start-new__buttons {\n" +
+            "    margin-bottom: 0.5em !important;\n" +
+            "}\n" +
+            "body.cardify--mobile .items-line:has(.full-descr) .items-line__head,\n" +
+            "body.cardify--mobile .items-line:has(.full-descr__text) .items-line__head,\n" +
+            "body.cardify--mobile .items-line--descr .items-line__head,\n" +
+            "body.cardify--mobile .full-start-new + .items-line .items-line__head,\n" +
+            ".cardify--mobile .items-line:has(.full-descr) .items-line__head,\n" +
+            ".cardify--mobile .items-line:has(.full-descr__text) .items-line__head,\n" +
+            ".cardify--mobile .items-line--descr .items-line__head,\n" +
+            ".cardify--mobile .full-start-new + .items-line .items-line__head {\n" +
+            "    display: none !important;\n" +
+            "    margin: 0 !important;\n" +
+            "    padding: 0 !important;\n" +
+            "    height: 0 !important;\n" +
+            "    min-height: 0 !important;\n" +
+            "    visibility: hidden !important;\n" +
+            "}\n" +
+            "body.cardify--mobile .items-line:has(.full-descr),\n" +
+            "body.cardify--mobile .items-line:has(.full-descr__text),\n" +
+            "body.cardify--mobile .items-line--descr,\n" +
+            "body.cardify--mobile .full-start-new + .items-line,\n" +
+            ".cardify--mobile .items-line:has(.full-descr),\n" +
+            ".cardify--mobile .items-line:has(.full-descr__text),\n" +
+            ".cardify--mobile .items-line--descr,\n" +
+            ".cardify--mobile .full-start-new + .items-line {\n" +
+            "    margin-top: 0 !important;\n" +
+            "    padding-top: 0 !important;\n" +
+            "}\n" +
+            "body.cardify--mobile .full-descr,\n" +
+            ".cardify--mobile .full-descr {\n" +
+            "    margin-top: 0 !important;\n" +
+            "    padding-top: 0 !important;\n" +
+            "}\n" +
+            "        </style>\n    ";
+		Lampa.Template.add("cardify_css", style);
+		$("body").append(Lampa.Template.get("cardify_css", {}, true));
+
+        function updateTransparentMobileState() {
+            var isEnabled = Main.cases()[Main.stor()].field("cardify_transparent_mobile") === true;
+            $('body').toggleClass('cardify--transparent-mobile', isEnabled);
+        }
+        updateTransparentMobileState();
+		var icon =
+			'<svg width="36" height="28" viewBox="0 0 36 28" fill="none" xmlns="http://www.w3.org/2000/svg">\n        <rect x="1.5" y="1.5" width="33" height="25" rx="3.5" stroke="white" stroke-width="3"/>\n        <rect x="5" y="14" width="17" height="4" rx="2" fill="white"/>\n        <rect x="5" y="20" width="10" height="3" rx="1.5" fill="white"/>\n        <rect x="25" y="20" width="6" height="3" rx="1.5" fill="white"/>\n    </svg>';
+		
+        Lampa.SettingsApi.addComponent({
+			component: "cardify",
+			icon: icon,
+			name: "YCard Mod"
+		});
+
+        Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_info_link",
+				type: "button"
+			},
+			field: {
+				name: "Р†РЅС„РѕСЂРјР°С†С–СЏ + РџРѕРґСЏРєСѓРІР°С‚Рё",
+				description: "Р’С–РґРєСЂРёС‚Рё СЃР°Р№С‚: http://lampalampa.free.nf"
+			},
+            onChange: function () {
+                Lampa.Noty.show("Р’С–РґРєСЂРёРІР°С”РјРѕ http://lampalampa.free.nf");
+                if (window.Lampa && window.Lampa.Utils && typeof window.Lampa.Utils.openUrl === 'function') {
+                    window.Lampa.Utils.openUrl("http://lampalampa.free.nf");
+                } else {
+                    window.open("http://lampalampa.free.nf", "_blank");
+                }
+            }
+		});
+
+        Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_run_trailers",
+				type: "trigger",
+				default: false
+			},
+			field: {
+				name: "РџРѕРєР°Р·СѓРІР°С‚Рё С‚СЂРµР№Р»РµСЂРё",
+                description: "Р—Р°РїСѓСЃРєР°С‚Рё С‚СЂРµР№Р»РµСЂ С‡РµСЂРµР· С‚Р°Р№РјР°СѓС‚ 5 СЃРµРє (Р·Р°РјС–СЃС‚СЊ С„РѕРЅСѓ С‚Р° С–РЅС‚РµСЂС„РµР№СЃСѓ)"
+			}
+		});
+
+        Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_trailers_bg",
+				type: "trigger",
+				default: false
+			},
+			field: {
+				name: "РўСЂРµР№Р»РµСЂРё Р·Р°РјС–СЃС‚СЊ СЃР»Р°Р№РґС€РѕСѓ",
+                description: "Р—Р°РІР°РЅС‚Р°Р¶РёС‚Рё С‚СЂРµР№Р»РµСЂ РЅР° Р·Р°РґРЅС–Р№ С„РѕРЅ РѕРґСЂР°Р·Сѓ"
+			}
+		});
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_bg_trailer_sound",
+                type: "trigger",
+                default: false
+            },
+            field: {
+                name: "Р—РІСѓРє С„РѕРЅРѕРІРѕРіРѕ С‚СЂРµР№Р»РµСЂСѓ",
+                description: "РЈРІС–РјРєРЅСѓС‚Рё Р·РІСѓРє РґР»СЏ С‚СЂРµР№Р»РµСЂСѓ, С‰Рѕ РіСЂР°С” РЅР° С„РѕРЅС– Р·Р°РјС–СЃС‚СЊ С„РѕС‚Рѕ/СЃР»Р°Р№РґС€РѕСѓ"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_trailer_start_time",
+                type: "select",
+                values: {
+                    "0": "Р— РїРѕС‡Р°С‚РєСѓ (0 СЃРµРє)",
+                    "3": "3 СЃРµРєСѓРЅРґРё",
+                    "5": "5 СЃРµРєСѓРЅРґ",
+                    "7": "7 СЃРµРєСѓРЅРґ",
+                    "9": "9 СЃРµРєСѓРЅРґ",
+                    "10": "10 СЃРµРєСѓРЅРґ",
+                    "15": "15 СЃРµРєСѓРЅРґ"
+                },
+                default: "9"
+            },
+            field: {
+                name: "РџРѕС‡Р°С‚РєРѕРІРёР№ С‡Р°СЃ С‚СЂРµР№Р»РµСЂСѓ",
+                description: "Р— СЏРєРѕС— СЃРµРєСѓРЅРґРё Р·Р°РїСѓСЃРєР°С‚Рё С„РѕРЅРѕРІРёР№ С‚СЂРµР№Р»РµСЂ (Р·Р° Р·Р°РјРѕРІС‡СѓРІР°РЅРЅСЏРј 9 СЃРµРє)"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_trailer_source",
+                type: "select",
+                values: {
+                    "all": "РЈСЃС– РґР¶РµСЂРµР»Р°",
+                    "imdb": "IMDB",
+                    "tmdb": "TMDB (YouTube)",
+                    "netflix": "Netflix"
+                },
+                default: "tmdb"
+            },
+            field: {
+                name: "Р”Р¶РµСЂРµР»Рѕ С‚СЂРµР№Р»РµСЂС–РІ",
+                description: "Р—РІС–РґРєРё Р·Р°РІР°РЅС‚Р°Р¶СѓРІР°С‚Рё С‚СЂРµР№Р»РµСЂРё"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_trailer_source_order",
+                type: "select",
+                values: {
+                    "imdb,tmdb,netflix": "IMDB -> TMDB -> Netflix",
+                    "imdb,netflix,tmdb": "IMDB -> Netflix -> TMDB",
+                    "tmdb,imdb,netflix": "TMDB -> IMDB -> Netflix",
+                    "tmdb,netflix,imdb": "TMDB -> Netflix -> IMDB",
+                    "netflix,imdb,tmdb": "Netflix -> IMDB -> TMDB",
+                    "netflix,tmdb,imdb": "Netflix -> TMDB -> IMDB"
+                },
+                default: "tmdb,imdb,netflix"
+            },
+            field: {
+                name: "РџРѕСЂСЏРґРѕРє РґР¶РµСЂРµР» (Р’СЃС– РґР¶РµСЂРµР»Р°)",
+                description: "РџСЂС–РѕСЂРёС‚РµС‚ РїРѕС€СѓРєСѓ, СЏРєС‰Рѕ РѕР±СЂР°РЅРѕ 'РЈСЃС– РґР¶РµСЂРµР»Р°'"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_trailer_quality",
+                type: "select",
+                values: {
+                    "1080": "1080p",
+                    "720": "720p",
+                    "480": "480p",
+                    "sd": "SD",
+                    "auto": "Auto"
+                },
+                default: "auto"
+            },
+            field: {
+                name: "РЇРєС–СЃС‚СЊ С„РѕРЅРѕРІРѕРіРѕ С‚СЂРµР№Р»РµСЂСѓ IMDB",
+                description: "РџСЂР°С†СЋС” Р»РёС€Рµ СЏРєС‰Рѕ РґР¶РµСЂРµР»Рѕ - IMDB"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_show_imdb_button",
+                type: "trigger",
+                default: false
+            },
+            field: {
+                name: "РџРѕРєР°Р·СѓРІР°С‚Рё РєРЅРѕРїРєСѓ С‚СЂРµР№Р»РµСЂ IMDB",
+                description: "Р”РѕРґР°С” РґРѕРґР°С‚РєРѕРІСѓ РєРЅРѕРїРєСѓ РґР»СЏ РїРµСЂРµРіР»СЏРґСѓ IMDB С‚СЂРµР№Р»РµСЂС–РІ"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_button_imdb_quality",
+                type: "select",
+                values: {
+                    "1080": "1080p",
+                    "720": "720p",
+                    "480": "480p",
+                    "sd": "SD",
+                    "auto": "Auto"
+                },
+                default: "auto"
+            },
+            field: {
+                name: "РЇРєС–СЃС‚СЊ РєРЅРѕРїРєРё IMDB Trailer",
+                description: "РЇРєС–СЃС‚СЊ РІС–РґРµРѕ РїСЂРё СЂСѓС‡РЅРѕРјСѓ Р·Р°РїСѓСЃРєСѓ С‚СЂРµР№Р»РµСЂСѓ Р· РєРЅРѕРїРєРё"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_imdb_proxy",
+                type: "input",
+                values: "",
+                default: ""
+            },
+            field: {
+                name: "РљРѕСЂСЃ РїСЂРѕРєСЃС– РґР»СЏ IMDB",
+                description: "Р’РёРєРѕСЂРёСЃС‚РѕРІСѓРІР°С‚Рё РїСЂРѕРєСЃС– РґР»СЏ Р·Р°РїРёС‚С–РІ РґРѕ API (РЅР°РїСЂ. https://cors.bwa.workers.dev/)"
+            }
+        });
+
+        Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_trailers_blur",
+				type: "select",
+                values: {
+                    "0": "Р’РёРјРєРЅРµРЅРѕ (0%)",
+                    "1": "1%",
+                    "2": "2%",
+                    "3": "3%",
+                    "4": "4%",
+                    "5": "5%",
+                    "10": "10%"
+                },
+				default: "0"
+			},
+			field: {
+				name: "Р РѕР·РјРёС‚С‚СЏ С‚СЂРµР№Р»РµСЂСѓ",
+                description: "РќР°Р»Р°С€С‚СѓР№С‚Рµ СЂС–РІРµРЅСЊ СЂРѕР·РјРёС‚С‚СЏ С„РѕРЅРѕРІРѕРіРѕ С‚СЂРµР№Р»РµСЂСѓ"
+			}
+		});
+
+        Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_trailers_zoom",
+				type: "select",
+                values: {
+                    "0": "Р’РёРјРєРЅРµРЅРѕ (0%)",
+                    "25": "25%",
+                    "33": "33%",
+                    "40": "40%",
+                    "45": "45%",
+                    "50": "50%"
+                },
+				default: "0"
+			},
+			field: {
+				name: "РЎС‚СѓРїС–РЅСЊ СЂРѕР·С‚СЏРіРЅРµРЅРЅСЏ С‚СЂРµР№Р»РµСЂСѓ",
+                description: "РџСЂРёР±РёСЂР°С” С‡РѕСЂРЅС– РїРѕР»РѕСЃРё РІС–РґРµРѕ (Р·Р° Р·Р°РјРѕРІС‡СѓРІР°РЅРЅСЏРј 0%)"
+			}
+		});
+
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_run_slideshow",
+				type: "trigger",
+				default: true
+			},
+			field: {
+				name: "РЎР»Р°Р№Рґ-С€РѕСѓ",
+				description: "РџР»Р°РІРЅРѕ Р·РјС–РЅСЋРІР°С‚Рё С„РѕРЅРѕРІС– Р·РѕР±СЂР°Р¶РµРЅРЅСЏ"
+			}
+		});
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_slideshow_quality",
+				type: "select",
+				values: {
+					w780: "РЎС‚Р°РЅРґР°СЂС‚РЅР° (w780)",
+					w1280: "Р’РёСЃРѕРєР° (w1280)",
+					original: "РћСЂРёРіС–РЅР°Р» (original)"
+				},
+				default: "w1280"
+			},
+			field: {
+				name: "РЇРєС–СЃС‚СЊ Р·РѕР±СЂР°Р¶РµРЅСЊ"
+			}
+		});
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_slideshow_duration",
+				type: "select",
+				values: {
+					5000: "5 СЃРµРєСѓРЅРґ",
+					8000: "8 СЃРµРєСѓРЅРґ",
+					10000: "10 СЃРµРєСѓРЅРґ",
+					15000: "15 СЃРµРєСѓРЅРґ"
+				},
+				default: 8000
+			},
+			field: {
+				name: "РўСЂРёРІР°Р»С–СЃС‚СЊ С„РѕС‚Рѕ (СЃРµРє)"
+			}
+		});
+
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_move_text",
+				type: "trigger",
+				default: true
+			},
+			field: {
+				name: "РџРµСЂРµРЅРѕСЃРёС‚Рё С‚РµРєСЃС‚ РѕРїРёСЃСѓ",
+				description: "РџРµСЂРµРјС–СЃС‚РёС‚Рё РѕРїРёСЃ Сѓ РїСЂР°РІРёР№ РІРµСЂС…РЅС–Р№ РєСѓС‚ (Р»РёС€Рµ РіРѕСЂРёР·. РµРєСЂР°РЅРё)"
+			}
+		});
+        
+        var margins = {
+            "-5": "-5 em", "-4": "-4 em", "-3": "-3 em", "-2": "-2 em", "-1": "-1 em",
+            "0": "0 em", "1": "1 em", "2": "2 em", "3": "3 em", "4": "4 em", "5": "5 em",
+            "6": "6 em", "8": "8 em", "10": "10 em"
+        };
+        
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_desc_margin_top",
+				type: "select",
+                values: margins,
+				default: "0"
+			},
+			field: {
+				name: "РћРїРёСЃ: Р’С–РґСЃС‚СѓРї Р·РІРµСЂС…Сѓ"
+			}
+		});
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_desc_margin_right",
+				type: "select",
+                values: margins,
+				default: "0"
+			},
+			field: {
+				name: "РћРїРёСЃ: Р’С–РґСЃС‚СѓРї СЃРїСЂР°РІР°"
+			}
+		});
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_desc_size",
+				type: "select",
+                values: {
+                    "0.8": "0.8 em", "1.0": "1.0 em", "1.2": "1.2 em", "1.4": "1.4 em", "1.6": "1.6 em", "1.8": "1.8 em", "2.0": "2.0 em", "2.5": "2.5 em"
+                },
+				default: "1.2"
+			},
+			field: {
+				name: "РћРїРёСЃ: Р РѕР·РјС–СЂ С‚РµРєСЃС‚Сѓ"
+			}
+		});
+
+        var btn_margins_opts = {};
+        for (var i = -5; i <= 5; i += 0.5) {
+            var valStr = i.toFixed(1);
+            btn_margins_opts[valStr] = valStr + " em";
+        }
+        Lampa.SettingsApi.addParam({
+            component: "cardify",
+            param: {
+                name: "cardify_buttons_margin_bottom",
+                type: "select",
+                values: btn_margins_opts,
+                default: "0.0"
+            },
+            field: {
+                name: "Р’С–РґСЃС‚СѓРї РєРЅРѕРїРѕРє РІС–Рґ РЅРёР¶РЅСЊРѕРіРѕ РєСЂР°СЋ",
+                description: "Р”РѕРґР°С‚РєРѕРІРёР№ РІС–РґСЃС‚СѓРї РґР»СЏ Р±Р»РѕРєСѓ РєРЅРѕРїРѕРє (РґРёРІРёС‚РёСЃСЊ, С‚РѕСЂРµРЅС‚)"
+            }
+        });
+
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_show_status",
+				type: "trigger",
+				default: false
+			},
+			field: {
+				name: "РџРѕРєР°Р·СѓРІР°С‚Рё СЃС‚Р°С‚СѓСЃ"
+			}
+		});
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_show_pg",
+				type: "trigger",
+				default: false
+			},
+			field: {
+				name: "РџРѕРєР°Р·СѓРІР°С‚Рё РІС–РєРѕРІРёР№ СЂРµР№С‚РёРЅРі"
+			}
+		});
+
+		Lampa.SettingsApi.addParam({
+			component: "cardify",
+			param: {
+				name: "cardify_transparent_mobile",
+				type: "trigger",
+				default: false
+			},
+			field: {
+				name: "РџСЂРѕР·РѕСЂР° РєР°СЂС‚РєР° РґР»СЏ С‚РµР»РµС„РѕРЅСѓ",
+				description: "РџСЂРѕР·РѕСЂРёР№ СЂРѕР·РјРёС‚РёР№ С„РѕРЅ РїС–Рґ РЅР°Р·РІРѕСЋ, Р±РµР· Р·Р°РѕРєСЂСѓРіР»РµРЅСЊ РєР°СЂС‚РёРЅРєРё С‚Р° Р±РµР· Р±РµР№РґР¶Р° РўР’ (РґР»СЏ РІРµСЂС‚РёРєР°Р»СЊРЅРѕРіРѕ РµРєСЂР°РЅСѓ)"
+			},
+			onChange: function () {
+				updateTransparentMobileState();
+			}
+		});
+
+        function video(data) {
+			var vids = data.videos || (data.movie && data.movie.videos) || (data.tv && data.tv.videos);
+			if (vids && vids.results && vids.results.length) {
+				var items =[];
+				vids.results.forEach(function (element) {
+					var name_orig = (element.name || "").toLowerCase();
+					
+					if (element.iso_639_1 === 'ru' || name_orig.indexOf('РѕС„РёС†РёР°Р»СЊРЅС‹Р№') !== -1 || name_orig.indexOf('СЂСѓСЃСЃРєРёР№') !== -1 || name_orig.indexOf('РЅР° СЂСѓСЃСЃРєРѕРј') !== -1) {
+						return;
+					}
+
+					if (name_orig.indexOf('#shorts') !== -1 || name_orig.indexOf('[shorts]') !== -1 || name_orig.indexOf('(shorts)') !== -1 || name_orig.indexOf('tiktok') !== -1 || name_orig.indexOf('vertical') !== -1) {
+						return;
+					}
+
+					items.push({
+						title: Lampa.Utils.shortText(element.name, 50),
+						id: element.key,
+						code: element.iso_639_1,
+						time: new Date(element.published_at).getTime(),
+						url: "https://www.youtube.com/watch?v=" + element.key,
+						img: "https://img.youtube.com/vi/" + element.key + "/default.jpg",
+						name_orig: name_orig,
+						type: (element.type || "").toLowerCase()
+					});
+				});
+
+				items.sort(function (a, b) {
+					return a.time > b.time ? -1 : a.time < b.time ? 1 : 0;
+				});
+
+				var uk_lang = items.filter(function (n) {
+					return n.code === "uk" || 
+					       n.name_orig.indexOf("СѓРєСЂР°С—РЅСЃСЊРєРѕСЋ") !== -1 || 
+					       n.name_orig.indexOf("СѓРєСЂР°С—РЅСЃСЊРєРёР№") !== -1 || 
+					       n.name_orig.indexOf("СѓРєСЂ С‚СЂРµР№Р»РµСЂ") !== -1;
+				});
+
+				var en_lang = items.filter(function (n) {
+					return n.code === "en" && uk_lang.indexOf(n) === -1;
+				});
+
+				if (uk_lang.length) {
+					var best_uk = uk_lang.find(function(n) {
+						return n.name_orig.indexOf("РѕС„С–С†С–Р№РЅРёР№ С‚СЂРµР№Р»РµСЂ") !== -1 || 
+						       n.name_orig.indexOf("СѓРєСЂР°С—РЅСЃСЊРєРѕСЋ") !== -1 || 
+						       n.name_orig.indexOf("СѓРєСЂР°С—РЅСЃСЊРєРёР№") !== -1;
+					});
+					
+					if (!best_uk) {
+						best_uk = uk_lang.find(function(n) {
+							return n.name_orig.indexOf("С‚СЂРµР№Р»РµСЂ") !== -1 || n.type === "trailer";
+						});
+					}
+					
+					if (best_uk) return best_uk;
+					return uk_lang[0];
+				}
+
+				if (en_lang.length) {
+					var best_en = en_lang.find(function(n) {
+						return n.name_orig.indexOf("official trailer") !== -1;
+					});
+					
+					if (!best_en) {
+						best_en = en_lang.find(function(n) {
+							return n.name_orig.indexOf("trailer") !== -1 || n.type === "trailer";
+						});
+					}
+					
+					if (best_en) return best_en;
+					return en_lang[0];
+				}
+
+				if (items.length) {
+					return items[0];
+				}
+			}
+		}
+
+		Follow.get(Type.de([102, 117, 108, 108]), function (e) {
+			if (Type.co(e)) {
+                if (window.cardifyBgTrailer) {
+                    try {
+                        window.cardifyBgTrailer.destroy();
+                    } catch(err) {}
+                    window.cardifyBgTrailer = null;
+                }
+                if (window.cardifyBgPlayer) {
+                    try {
+                        window.cardifyBgPlayer.destroy();
+                    } catch(err) {}
+                    window.cardifyBgPlayer = null;
+                }
+
+				Follow.skodf(e);
+				var fixOpacity = function() {
+                    var isHorizontalNow = window.innerWidth > window.innerHeight;
+                    var bgSelectors = isHorizontalNow 
+                        ? ".full-start__background, .m-full-start__background" 
+                        : ".full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img";
+					var $render = e.object.activity.render();
+					var $bg = $render.find(bgSelectors);
+					if ($bg.length && !$bg.hasClass("nodisplay")) {
+						$bg.stop(true, true).css("opacity", "1");
+					}
+				};
+				fixOpacity();
+				setTimeout(fixOpacity, 300);
+				setTimeout(fixOpacity, 1000); 
+
+                var isRunTrailers = Main.cases()[Main.stor()].field("cardify_run_trailers");
+                var isBgTrailers = Main.cases()[Main.stor()].field("cardify_trailers_bg");
+				var run_slideshow = Main.cases()[Main.stor()].field("cardify_run_slideshow");
+                var trailer_source = Main.cases()[Main.stor()].field("cardify_trailer_source") || "tmdb";
+                var use_proxy = Main.cases()[Main.stor()].field("cardify_imdb_proxy") || ""; 
+                var trailer_quality = Main.cases()[Main.stor()].field("cardify_trailer_quality") || "auto";
+
+                var processSlideshow = function() {
+                    if (run_slideshow && !isBgTrailers) {
+                        var movie_data = e.data.movie || e.data.tv || (e.object && e.object.card);
+                        
+                        if (movie_data && movie_data.id) {
+                            var item_id = movie_data.id;
+                            var media_type = 'movie';
+                            
+                            if (e.object && e.object.method === 'tv') {
+                                media_type = 'tv';
+                            } else if (e.data && e.data.tv && !e.data.movie) {
+                                media_type = 'tv';
+                            } else if (movie_data.name && !movie_data.title) {
+                                media_type = 'tv';
+                            }
+                            
+                            var current_lang = Lampa.Storage.field('tmdb_lang') || 'uk';
+                            var include_languages = current_lang + ',xx,null,en';
+                            
+                            Lampa.Api.sources.tmdb.get(
+                                media_type + '/' + item_id + '/images?include_image_language=' + include_languages,
+                                {},
+                                function(images_data) {
+                                    if (images_data && images_data.backdrops && images_data.backdrops.length > 0) {
+                                        var lang_backdrops =[];
+                                        var no_lang_backdrops =[];
+                                        var other_backdrops =[];
+                                        
+                                        images_data.backdrops.forEach(function(backdrop) {
+                                            var lang = backdrop.iso_639_1;
+                                            if (lang === current_lang) {
+                                                lang_backdrops.push(backdrop);
+                                            } else if (!lang || lang === 'xx' || lang === 'null') {
+                                                no_lang_backdrops.push(backdrop);
+                                            } else {
+                                                other_backdrops.push(backdrop);
+                                            }
+                                        });
+                                        
+                                        var final_backdrops =[].concat(lang_backdrops);
+                                        
+                                        if (final_backdrops.length < 5 && no_lang_backdrops.length > 0) {
+                                            var needed = 5 - final_backdrops.length;
+                                            final_backdrops = final_backdrops.concat(no_lang_backdrops.slice(0, needed));
+                                        }
+                                        
+                                        if (final_backdrops.length < 5 && other_backdrops.length > 0) {
+                                            var needed2 = 5 - final_backdrops.length;
+                                            other_backdrops.sort(function(a, b) {
+                                                return (b.vote_average || 0) - (a.vote_average || 0);
+                                            });
+                                            final_backdrops = final_backdrops.concat(other_backdrops.slice(0, needed2));
+                                        }
+                                        
+                                        final_backdrops = final_backdrops.slice(0, 15);
+                                        
+                                        if (final_backdrops.length > 1) {
+                                            if (window.cardifyRotationTimer) {
+                                                clearInterval(window.cardifyRotationTimer);
+                                            }
+                                            
+                                            var current_index = 0;
+                                            var is_active = true;
+                                            window.cardifyCurrentItemId = item_id;
+                                            
+                                            var quality = Lampa.Storage.field('cardify_slideshow_quality') || 'w1280';
+                                            var duration = parseInt(Lampa.Storage.field('cardify_slideshow_duration')) || 8000;
+                                            
+                                            window.cardifyRotationTimer = setInterval(function() {
+                                                if (!is_active || window.cardifyCurrentItemId !== item_id) {
+                                                    clearInterval(window.cardifyRotationTimer);
+                                                    return;
+                                                }
+                                                
+                                                current_index = (current_index + 1) % final_backdrops.length;
+                                                var backdrop_url = Lampa.TMDB.image('t/p/' + quality + final_backdrops[current_index].file_path);
+                                                
+                                                var $render = e.object.activity.render();
+                                                var isHorizontalNow = window.innerWidth > window.innerHeight;
+                                                var bgSelectors = isHorizontalNow 
+                                                    ? '.full-start__background, .m-full-start__background' 
+                                                    : '.full-start__background, .m-full-start__background, .m-full-start__poster img, img.full-start__poster, .full-start-new__poster img';
+                                                    
+                                                var $currentBg = $render.find(bgSelectors).last();
+                                                if ($currentBg.length === 0) return;
+                                                
+                                                var img = new Image();
+                                                img.onload = function() {
+                                                    if (!is_active || window.cardifyCurrentItemId !== item_id) return;
+                                                    
+                                                    var $newBg = $currentBg.clone();
+                                                    $newBg.attr('src', backdrop_url);
+                                                    
+                                                    if (!isHorizontalNow) {
+                                                        var $parent = $currentBg.parent();
+                                                        if ($parent.css('position') === 'static') {
+                                                            $parent.css('position', 'relative');
+                                                        }
+                                                        
+                                                        $parent.css({
+                                                            '-webkit-mask-image': '-webkit-linear-gradient(top, white 50%, rgba(255,255,255,0) 100%)',
+                                                            'mask-image': 'linear-gradient(to bottom, white 50%, rgba(255,255,255,0) 100%)'
+                                                        });
+                                                        
+                                                        $currentBg.css({
+                                                            '-webkit-mask-image': 'none',
+                                                            'mask-image': 'none'
+                                                        });
+                                                        
+                                                        var isTransparentMobile = Main.cases()[Main.stor()].field("cardify_transparent_mobile") === true;
+                                                        $newBg.css({
+                                                            'position': 'absolute',
+                                                            'top': '0',
+                                                            'left': '0',
+                                                            'width': '100%',
+                                                            'height': '100%',
+                                                            'object-fit': 'cover',
+                                                            'opacity': '0',
+                                                            'transition': 'opacity 1.5s ease-in-out',
+                                                            'z-index': 2,
+                                                            '-webkit-mask-image': 'none',
+                                                            'mask-image': 'none',
+                                                            'border-radius': isTransparentMobile ? '0' : ($currentBg.css('border-radius') || '0')
+                                                        });
+                                                        
+                                                        $currentBg.after($newBg);
+                                                        $newBg[0].offsetHeight; 
+                                                        $newBg.css('opacity', '1');
+                                                        
+                                                        setTimeout(function() {
+                                                            if (!is_active || window.cardifyCurrentItemId !== item_id) return;
+                                                            $currentBg.attr('src', backdrop_url);
+                                                            $newBg.remove();
+                                                        }, 1550);
+                                                        
+                                                    } else {
+                                                        $newBg.css({
+                                                            'opacity': '0',
+                                                            'transition': 'opacity 1.5s ease-in-out',
+                                                            'position': $currentBg.css('position') === 'static' ? 'absolute' : $currentBg.css('position'),
+                                                            'top': $currentBg.css('top'),
+                                                            'left': $currentBg.css('left'),
+                                                            'width': $currentBg.css('width'),
+                                                            'height': $currentBg.css('height'),
+                                                            'z-index': $currentBg.css('z-index'),
+                                                            'object-fit': $currentBg.css('object-fit')
+                                                        });
+                                                        
+                                                        var $overlay = $render.find('.cardify-effects-overlay');
+                                                        if ($overlay.length) {
+                                                            $overlay.before($newBg);
+                                                        } else {
+                                                            $currentBg.after($newBg);
+                                                        }
+                                                        
+                                                        $newBg[0].offsetHeight; 
+                                                        
+                                                        $newBg.css('opacity', '1');
+                                                        $currentBg.css({
+                                                            'transition': 'opacity 1.5s ease-in-out',
+                                                            'opacity': '0'
+                                                        });
+                                                        
+                                                        setTimeout(function() {
+                                                            if (!is_active || window.cardifyCurrentItemId !== item_id) return;
+                                                            $currentBg.remove();
+                                                            var bgToRemove = $render.find(bgSelectors).not($newBg);
+                                                            bgToRemove.remove();
+                                                        }, 1550);
+                                                    }
+                                                };
+                                                img.src = backdrop_url;
+                                                
+                                            }, duration);
+                                            
+                                            var stop_rotation = function(a) {    
+                                                if (a.type == 'destroy' && a.object.activity === e.object.activity) {    
+                                                    is_active = false;
+                                                    if (window.cardifyRotationTimer) {
+                                                        clearInterval(window.cardifyRotationTimer);
+                                                    }
+                                                    Lampa.Listener.remove('activity', stop_rotation);    
+                                                }    
+                                            };    
+                                            
+                                            Lampa.Listener.follow('activity', stop_rotation); 
+                                        }
+                                    }
+                                }
+                            );
+                        }
+                    }
+                };
+
+                var finalizeTrailer = function(tr) {
+                    if (tr && Main.cases().Manifest.app_digital >= 220) {
+                        if (Main.cases().Activity.active().activity === e.object.activity) {
+                            new Trailer(e.object, tr, isBgTrailers);
+                        } else {
+                            var follow = function follow(a) {
+                                if (
+                                    a.type == Type.de([115, 116, 97, 114, 116]) &&
+                                    a.object.activity === e.object.activity &&
+                                    !e.object.activity.trailer_ready
+                                ) {
+                                    Main.cases()[binaryLifting()].remove("activity", follow);
+                                    new Trailer(e.object, tr, isBgTrailers);
+                                }
+                            };
+                            Follow.get("activity", follow);
+                        }
+                    } else {
+                        isBgTrailers = false;
+                    }
+                    processSlideshow(); 
+                };
+
+                var tryLoadTrailer = function(sources_to_try) {
+                    if (sources_to_try.length === 0) {
+                        isBgTrailers = false;
+                        processSlideshow();
+                        return;
+                    }
+
+                    var customStartTime = Main.cases()[Main.stor()].field("cardify_trailer_start_time");
+                    var startTimeVal = (customStartTime !== undefined && customStartTime !== null && customStartTime !== "") ? parseInt(customStartTime) : 9;
+                    if (isNaN(startTimeVal)) startTimeVal = 9;
+                    
+                    var current_source = sources_to_try.shift();
+                    
+                    if (current_source === 'imdb') {
+                        var imdb_id = e.data.imdb_id || (e.data.external_ids ? e.data.external_ids.imdb_id : null) || (e.data.movie ? e.data.movie.imdb_id : null) || (e.data.tv ? e.data.tv.imdb_id : null) || (e.object && e.object.card ? e.object.card.imdb_id : null);
+                        
+                        if (imdb_id) {
+                            fetchImdbTrailer(imdb_id, current_source, trailer_quality, use_proxy, function(video_url) {
+                                if (video_url) {
+                                    var tr = {
+                                        type: 'imdb_video',
+                                        url: video_url,
+                                        id: imdb_id,
+                                        startTime: startTimeVal
+                                    };
+                                    finalizeTrailer(tr);
+                                } else {
+                                    tryLoadTrailer(sources_to_try);
+                                }
+                            });
+                        } else {
+                            tryLoadTrailer(sources_to_try);
+                        }
+                    } else if (current_source === 'netflix') {
+                        var tmdb_id = e.data.id || (e.object && e.object.card ? e.object.card.id : null);
+                        var m_type = (e.object && e.object.method === 'tv') || (e.data.tv && !e.data.movie) || (e.data.name && !e.data.title) ? 'tv' : 'movie';
+                        if (tmdb_id) {
+                            fetchNetflixTrailer(tmdb_id, m_type, function(video_url) {
+                                if (video_url) {
+                                    var tr = {
+                                        type: 'imdb_video',
+                                        url: video_url,
+                                        id: tmdb_id,
+                                        startTime: startTimeVal
+                                    };
+                                    finalizeTrailer(tr);
+                                } else {
+                                    tryLoadTrailer(sources_to_try);
+                                }
+                            });
+                        } else {
+                            tryLoadTrailer(sources_to_try);
+                        }
+                    } else if (current_source === 'tmdb') {
+                        var tmdb_tr = Follow.vjsk(video(e.data));
+                        if (tmdb_tr) {
+                            tmdb_tr.startTime = startTimeVal;
+                            finalizeTrailer(tmdb_tr);
+                        } else {
+                            tryLoadTrailer(sources_to_try);
+                        }
+                    } else {
+                        tryLoadTrailer(sources_to_try);
+                    }
+                };
+
+                if (isRunTrailers || isBgTrailers) {
+                    var sources_list = [];
+                    if (trailer_source === 'all') {
+                        var orderSetting = Main.cases()[Main.stor()].field("cardify_trailer_source_order") || "tmdb,imdb,netflix";
+                        sources_list = orderSetting.split(',');
+                    } else {
+                        sources_list = [trailer_source];
+                    }
+                    tryLoadTrailer(sources_list);
+                } else {
+                    processSlideshow();
+                }
+			}
+		});
+	}
+
+	if (Follow.go) startPlugin();
+	else {
+		Follow.get(Type.de([97, 112, 112]), function (e) {
+			if (Type.re(e)) startPlugin();
+		});
+	}
+})();
