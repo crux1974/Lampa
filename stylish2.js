@@ -3140,6 +3140,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд» і «Стилі».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3411,22 +3412,8 @@
             cb(v);
         }, function () { cb(null); });
     }
-    function applyXTitle(root, m, d) {
-        root.find('.sui-xtitle').remove();
-        if (!on('xtitle') || !d || styleIs('appletv')) return;
-        var sz = XT_SIZE[S('xt_size', 'xs')] || XT_SIZE.xs;
-        var name = S('xt_mode', 'smart') === 'smart' && d.ukImg && on('logo') ? d.en : d.uk;
-        var info = [d.year].concat(d.countries.length ? [d.countries.join(' / ')] : []).filter(Boolean);
-        var h = $('<div class="sui-xtitle" style="margin-left:' + S('xt_ml', '0px') + '"><span class="sui-xtitle__t" style="font-size:' + sz[0] + 'em">' + esc(name) + '</span>' +
-            (info.length ? '<span class="sui-xtitle__i" style="font-size:' + sz[1] + 'em">• ' + esc(info.join(' • ')) + '</span>' : '') + '</div>');
-        var t = titleEl(root);
-        if (t.length) t.after(h);
-        // рік і країни вже показані — ховаємо дублікати в рядку деталей
-        root.find('.full-start-new__details span, .full-start__details span').each(function () {
-            var s = trim($(this).text());
-            if (s && (s === d.year || d.countries.indexOf(s) >= 0)) { $(this).addClass('sui-hidden'); $(this).next('.full-start-new__split').addClass('sui-hidden'); }
-        });
-    }
+    // «Додаткову назву» прибрано: оригінальну назву під заголовком показує розділ 1 («Назва під заголовком»)
+    function applyXTitle(root) { root.find('.sui-xtitle').remove(); }
 
     /* ---- Лого студій ---- */
     function applyStudios(root, m, d) {
@@ -3652,7 +3639,8 @@
         var root = e.object && e.object.activity ? $(e.object.activity.render()) : $('.activity--active');
         applyLogo(root, m);
         applyUatorFull(root, m);
-        if (on('xtitle') || on('studios')) tmdbFull(m, function (d) { applyXTitle(root, m, d); applyStudios(root, m, d); });
+        applyXTitle(root);
+        if (on('studios')) tmdbFull(m, function (d) { applyStudios(root, m, d); });
     }
 
     /* ======================================================================
@@ -3759,8 +3747,7 @@
         if (!styleIs('cardify')) trg(LOOK, 'slogan', 'Приховування слогану', 'Прибрати короткі слогани під назвою', true);
         if (!styleIs('appletv')) {
             btn(LOOK, 'go_logo', 'Лого / Постер (Smart)', 'Заміна тексту назви на картинку', function () { open(LOGO); });
-            btn(LOOK, 'go_xtitle', 'Додаткова назва', 'Оригінальна назва, рік, країна', function () { open(XT); });
-        } else ttl(LOOK, 'look_hidden_atv', 'Лого, назву й студії малює «Стиль Apple TV» (розділ 3)');
+        } else ttl(LOOK, 'look_hidden_atv', 'Лого й студії малює «Стиль Apple TV» (розділ 3)');
         btn(LOOK, 'go_btns', 'Кнопки карток', 'Зовнішній вигляд кнопок дій', function () { open(BTNS); });
         if (!styleIs('appletv')) btn(LOOK, 'go_studios', 'Лого студій', 'Відображення виробничих компаній', function () { open(STUD); });
         btn(LOOK, 'go_uator', 'Uator', 'Налаштування маркерів UA контенту', function () { open(UAT); });
@@ -3782,12 +3769,6 @@
         sel(LOGO, 'logo_sat', 'Насиченість', '', SAT1, '1');
         btn(LOGO, 'logo_clear', 'Очистити кеш картинок', 'Очистити кеш плагіну', clear('sui_img', 'Кеш картинок очищено'));
 
-        ttl(XT, 'xt_head', 'Додаткова назва');
-        trg(XT, 'xtitle', 'Увімкнути плагін', 'Відображати додаткову інформацію', true);
-        sel(XT, 'xt_mode', 'Режим', '', { smart: 'Залежно від наявності картинок', always_ua: 'Завжди українська' }, 'smart');
-        sel(XT, 'xt_size', 'Розмір', '', { xs: 'Дуже мала', s: 'Мала', m: 'Нормальна (стандарт)', l: 'Велика', xl: 'Дуже велика', xxl: 'Максимальна', giant: 'Гігантська' }, 'xs');
-        sel(XT, 'xt_ml', 'Відступ зліва', '', MLEFT, '0px');
-        btn(XT, 'xt_clear', 'Очистити кеш назв', 'Очистити кеш плагіну', clear('sui_full', 'Кеш назв очищено'));
 
         ttl(BTNS, 'btns_head', 'Кнопки карток');
         sel(BTNS, 'btn_style', 'Стиль кнопок', 'Зовнішній вигляд кнопок плеєра, закладок тощо', { normal: 'Звичайний (Lampa)', apple: 'Apple Style (Розмиття)', apple_lite: 'Apple Lite (Без розмиття)' }, 'normal');
