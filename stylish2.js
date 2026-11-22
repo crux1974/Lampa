@@ -3154,6 +3154,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3296,7 +3297,7 @@
             '.sui-studio__dot{opacity:.4;font-size:.6em;margin:0 .4em}';
         // 5) Uator
         css += '.sui-uat{display:flex;align-items:center;flex-wrap:wrap}' +
-            '.sui-uat--abs{position:absolute;z-index:3;justify-content:flex-end;max-width:45%}' +
+            '.sui-uat--abs{position:absolute;z-index:3;justify-content:flex-end;max-width:45%;background:none!important;border:0!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;padding:0!important}' +
             '.sui-uat--br{right:1.5em;bottom:1.4em}.sui-uat--tr{right:1.5em;top:1em}' +
             '.sui-uat--abs .sui-uat__b,.sui-uat--under .sui-uat__b{background:transparent;text-shadow:0 1px 3px rgba(0,0,0,.9);padding:0 .25em}' +
             '.sui-uat--under{margin-top:.8em}' +
@@ -3574,7 +3575,7 @@
         if (pos === 'br' || pos === 'tr') {
             var body = root.find('.full-start-new__body, .full-start__body').first();
             if (!body.length) pos = 'rate';
-            else { body.css('position', 'relative'); box.addClass('sui-uat--abs sui-uat--' + pos).css('margin-left', 0); body.append(box); }
+            else { body.css('position', 'relative'); box.removeClass('sui-glass is-lite').addClass('sui-uat--abs sui-uat--' + pos).css('margin-left', 0); body.append(box); }
         }
         if (pos === 'buttons') {
             var bar = root.find('.full-start-new__buttons, .full-start__buttons').first();
