@@ -3188,6 +3188,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4178,13 +4179,27 @@
             $('.menu .menu__list').eq(0).append(el);
         }
         el.addClass('sui-ai-menu');
-        // одразу після стандартного «Пошуку», якщо він є в меню
-        var srch = $('.menu .menu__list').eq(0).find('[data-action="search"]').first();
-        if (srch.length) srch.after(el);
+        // на самий верх лівого меню
+        var list = $('.menu .menu__list').eq(0);
+        if (list.length) list.prepend(el);
+    }
+    // друга «лінза» у верхній панелі — поруч зі стандартним пошуком
+    function aiHeadIcon() {
+        if (S('ai_menu', true) === false || document.querySelector('.head .sui-ai-head')) return;
+        var el = $('<div class="head__action selector sui-ai-head">' + AI_ICON + '</div>');
+        el.on('hover:enter', aiStart);
+        var std = $('.head .open--search').first();
+        if (std.length) std.after(el);
+        else {
+            try { if (Lampa.Head && Lampa.Head.addElement) { Lampa.Head.addElement(el); return; } } catch (e) { }
+            $('.head .head__actions').prepend(el);
+        }
     }
     function aiInit() {
         try { Lampa.Component.add('sui_ai_results', aiComponent); } catch (e) { console.log('SUI ai', e); }
         aiMenuItem();
+        aiHeadIcon();
+        setTimeout(function () { aiMenuItem(); aiHeadIcon(); }, 1500);
     }
 
     /* ---- пам'ять телевізора: кеші не повинні забивати localStorage ---- */
@@ -4358,7 +4373,7 @@
         Lampa.Template.add('settings_' + AI, '<div></div>');
         btn(SUI, 'go_ai', '5. Розумний пошук', 'Пошук фільмів за описом звичайними словами (нейромережа Gemini)', function () { open(AI); });
         ttl(AI, 'ai_head', 'Розумний пошук');
-        trg(AI, 'ai_menu', 'Пункт у лівому меню', '«Розумний пошук» поруч зі звичайним пошуком', true);
+        trg(AI, 'ai_menu', 'Кнопки розумного пошуку', 'Пункт на самому верху лівого меню і друга лінза у верхній панелі', true);
         btn(AI, 'ai_go', '🔎 Шукати', 'Наприклад: «комедія про собаку для всієї сім’ї» або «щось як Інтерстеллар»', aiStart);
         inp(AI, 'ai_key', 'Ключ Gemini API', aiKey() ? 'Ключ вказано (…' + aiKey().slice(-4) + ')' : 'Безкоштовний ключ з aistudio.google.com → Get API key');
         btn(AI, 'ai_test', 'Перевірити ключ', 'Тестовий запит до нейромережі', function () {
@@ -4396,7 +4411,7 @@
             if (n.indexOf(P) !== 0) return;
             lookCss();
             if (/^sui_(bot_|native_vote|uator)/.test(n)) refreshCards();
-            if (n === 'sui_ai_menu') { if (S('ai_menu', true) === false) $('.menu .sui-ai-menu').remove(); else aiMenuItem(); }
+            if (n === 'sui_ai_menu') { if (S('ai_menu', true) === false) $('.menu .sui-ai-menu, .head .sui-ai-head').remove(); else { aiMenuItem(); aiHeadIcon(); } }
         });
     }
 
