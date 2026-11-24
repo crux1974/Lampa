@@ -3201,6 +3201,8 @@
 
 
 
+
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4316,7 +4318,7 @@
     var aiSeq = 0;
     function aiSource() {
         var src = {
-            title: '✨ Розумний',
+            title: '<span class="sui-tab-ic">' + AI_T + '</span>Розумний',
             search: function (params, oncomplite) {
                 var q = trim(decodeURIComponent(params.query || ''));
                 var my = ++aiSeq;
@@ -4339,18 +4341,23 @@
         return src;
     }
     // кольорова лінза стандартного пошуку у верхній панелі
-    var LENS = '<svg class="sui-lens" viewBox="0 0 32 32"><defs><linearGradient id="suiLensG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4facfe"/><stop offset=".5" stop-color="#a66cff"/><stop offset="1" stop-color="#ff5fa2"/></linearGradient><radialGradient id="suiLensGl" cx=".35" cy=".3" r=".7"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>' +
-        '<circle cx="13.5" cy="13.5" r="9" fill="url(#suiLensGl)" stroke="url(#suiLensG)" stroke-width="3.2"/>' +
-        '<path d="M20.5 20.5l7 7" stroke="url(#suiLensG)" stroke-width="4" stroke-linecap="round"/>' +
-        '<path d="M13.5 8.6l1.2 3 3 1.2-3 1.2-1.2 3-1.2-3-3-1.2 3-1.2z" fill="#ffd54a"/></svg>';
+    // іконки в стилі «скляна плитка з неоновим світінням»: лінза+мікрофон, мікрофон, лінза з AI
+    var LENS = '<svg class="sui-lens" viewBox="0 0 64 64"><defs><linearGradient id="suiCT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21466e"/><stop offset="1" stop-color="#0d1b2e"/></linearGradient><linearGradient id="suiCL" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9ecff"/><stop offset="1" stop-color="#3ab4ff"/></linearGradient></defs><rect x="1" y="1" width="62" height="62" rx="15" fill="url(#suiCT)" stroke="#6cc4ff" stroke-opacity=".45" stroke-width="1.5"/><rect x="14.5" y="16" width="11" height="22" rx="5.5" fill="#8fdcff" fill-opacity=".25" stroke="url(#suiCL)" stroke-width="2.6"/><path d="M10.65 29.64v1a9.35 9.35 0 0 0 18.7 0v-1" fill="none" stroke="url(#suiCL)" stroke-width="2.6" stroke-linecap="round"/><path d="M20 39.1v4.84m-6.050000000000001 0h12.100000000000001" stroke="url(#suiCL)" stroke-width="2.6" stroke-linecap="round"/><circle cx="38" cy="27" r="12" fill="#0b1626" fill-opacity=".55" stroke="url(#suiCL)" stroke-width="3"/><path d="M46.64 35.64l9.0 9.0" stroke="url(#suiCL)" stroke-width="3.9000000000000004" stroke-linecap="round"/><path d="M31.5 27q6.5 -5.46 13 0q-6.5 5.46 -13 0z" fill="none" stroke="url(#suiCL)" stroke-width="1.6"/><text x="38" y="29.16" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="6" fill="#c8f0ff">AI</text></svg>';
+    var MIC_T = '<svg class="sui-mic" viewBox="0 0 64 64"><defs><linearGradient id="suiMT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21466e"/><stop offset="1" stop-color="#0d1b2e"/></linearGradient><linearGradient id="suiML" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9ecff"/><stop offset="1" stop-color="#3ab4ff"/></linearGradient></defs><rect x="1" y="1" width="62" height="62" rx="15" fill="url(#suiMT)" stroke="#6cc4ff" stroke-opacity=".45" stroke-width="1.5"/><rect x="24.0" y="12" width="16" height="26" rx="8.0" fill="#8fdcff" fill-opacity=".25" stroke="url(#suiML)" stroke-width="3.2"/><path d="M18.4 28.12v1a13.6 13.6 0 0 0 27.2 0v-1" fill="none" stroke="url(#suiML)" stroke-width="3.2" stroke-linecap="round"/><path d="M32 41.88v5.72m-8.8 0h17.6" stroke="url(#suiML)" stroke-width="3.2" stroke-linecap="round"/></svg>';
+    var AI_T = '<svg class="sui-ai-ic" viewBox="0 0 64 64"><defs><linearGradient id="suiAT" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21466e"/><stop offset="1" stop-color="#0d1b2e"/></linearGradient><linearGradient id="suiAL" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9ecff"/><stop offset="1" stop-color="#3ab4ff"/></linearGradient></defs><rect x="1" y="1" width="62" height="62" rx="15" fill="url(#suiAT)" stroke="#6cc4ff" stroke-opacity=".45" stroke-width="1.5"/><circle cx="28" cy="28" r="15" fill="#0b1626" fill-opacity=".55" stroke="url(#suiAL)" stroke-width="3.4"/><path d="M38.8 38.8l11.25 11.25" stroke="url(#suiAL)" stroke-width="4.42" stroke-linecap="round"/><path d="M19.5 28q8.5 -7.14 17 0q-8.5 7.14 -17 0z" fill="none" stroke="url(#suiAL)" stroke-width="1.6"/><text x="28" y="30.7" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="7.5" fill="#c8f0ff">AI</text></svg>';
+    function aiMicSkin() {
+        if (S('ai_lens', true) === false) return;
+        $('.simple-keyboard-mic').each(function () { var m = $(this); if (!m.find('.sui-mic').length) m.html(MIC_T); });
+    }
     function aiLens() {
         var el = $('.head .open--search').first();
         if (!el.length) return;
         document.body.classList.toggle('sui-lens-on', S('ai_lens', true) !== false);
-        if (S('ai_lens', true) === false) { var o = el.data('sui-orig'); if (o != null) { el.html(o); el.removeData('sui-orig'); } return; }
+        if (S('ai_lens', true) === false) { var o = el.data('sui-orig'); if (o != null) { el.html(o).removeClass('sui-has-lens'); el.removeData('sui-orig'); } return; }
+        aiMicSkin();
         if (el.find('.sui-lens').length) return;
         if (el.data('sui-orig') == null) el.data('sui-orig', el.html());
-        el.html(LENS);
+        el.html(LENS).addClass('sui-has-lens');
     }
     function aiInit() {
         try { Lampa.Component.add('sui_ai_results', aiComponent); } catch (e) { console.log('SUI ai', e); }
@@ -4359,15 +4366,23 @@
         $('.menu .sui-ai-menu, .head .sui-ai-head').remove();
         aiLens();
         setTimeout(aiLens, 1500);
+        try { if (Lampa.Search && Lampa.Search.listener) Lampa.Search.listener.follow('sources', function () { setTimeout(aiMicSkin, 50); }); } catch (e) { }
+        new MutationObserver(function () { var m = document.querySelector('.simple-keyboard-mic'); if (m && !m.querySelector('.sui-mic')) aiMicSkin(); }).observe(document.body, { childList: true, subtree: true });
         var st = document.createElement('style');
-        st.textContent = '.head .open--search .sui-lens{width:1.9em;height:1.9em;filter:drop-shadow(0 0 .25em rgba(166,108,255,.55))}.head .open--search.focus .sui-lens{filter:none}' +
-            // мікрофон у пошуку — у тих самих кольорах, що й лінза
-            'body.sui-lens-on .simple-keyboard-mic{background:linear-gradient(135deg,#4facfe,#a66cff 55%,#ff5fa2)!important;color:#fff!important;box-shadow:0 0 .6em rgba(166,108,255,.6)}' +
-            'body.sui-lens-on .simple-keyboard-mic svg{color:#fff!important}' +
-            'body.sui-lens-on .simple-keyboard-mic.focus{box-shadow:0 0 0 .2em #fff,0 0 1em rgba(166,108,255,.8)}' +
-            'body.sui-lens-on .simple-keyboard-mic.record{background:linear-gradient(135deg,#ff416c,#ff4b2b)!important;animation:suiMicPulse 1s ease-in-out infinite}' +
-            '@keyframes suiMicPulse{50%{box-shadow:0 0 1.4em rgba(255,65,108,.9)}}' +
-            'body.sui-lens-on .simple-keyboard [data-skbtn="{mic}"]{background:linear-gradient(135deg,#4facfe,#a66cff 55%,#ff5fa2)!important;color:#fff!important}';
+        var glow = 'drop-shadow(0 0 .35em rgba(80,190,255,.65))';
+        st.textContent =
+            '.head .open--search .sui-lens{width:2.2em;height:2.2em;display:block;filter:' + glow + '}' +
+            '.head .open--search.sui-has-lens{background:none!important;padding:.15em!important}' +
+            '.head .open--search.focus .sui-lens,.head .open--search:hover .sui-lens{filter:drop-shadow(0 0 .6em rgba(120,210,255,.95)) brightness(1.25)}' +
+            // мікрофон у вікні пошуку — така сама плитка
+            'body.sui-lens-on .simple-keyboard-mic{background:none!important;box-shadow:none!important;padding:0!important;border-radius:22%!important;overflow:visible}' +
+            'body.sui-lens-on .simple-keyboard-mic .sui-mic{width:100%;height:100%;display:block;filter:' + glow + '}' +
+            'body.sui-lens-on .simple-keyboard-mic.focus .sui-mic{filter:drop-shadow(0 0 .7em rgba(120,210,255,1)) brightness(1.3)}' +
+            'body.sui-lens-on .simple-keyboard-mic.record .sui-mic{animation:suiMicPulse 1s ease-in-out infinite}' +
+            '@keyframes suiMicPulse{0%,100%{filter:drop-shadow(0 0 .3em rgba(255,70,110,.6))}50%{filter:drop-shadow(0 0 1em rgba(255,70,110,1)) brightness(1.3)}}' +
+            'body.sui-lens-on .simple-keyboard [data-skbtn="{mic}"]{background:linear-gradient(#21466e,#0d1b2e)!important;color:#9fe0ff!important;box-shadow:inset 0 0 0 1px rgba(108,196,255,.45),0 0 .5em rgba(80,190,255,.5)}' +
+            // вкладка «Розумний» з маленькою плиткою
+            '.sui-tab-ic{display:inline-block;width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.4em}.sui-tab-ic svg{width:100%;height:100%;display:block}';
         document.head.appendChild(st);
     }
 
