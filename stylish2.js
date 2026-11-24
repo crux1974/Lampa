@@ -3186,6 +3186,8 @@
 
 
 
+
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3274,6 +3276,7 @@
     PARENT['stylish_ui_styles'] = 'stylish_ui';
     PARENT['stylish_ui_style_urls'] = 'stylish_ui_styles';
     PARENT['stylish_ui_btned'] = 'stylish_ui';
+    PARENT['stylish_ui_ai'] = 'stylish_ui';
     PARENT['stylish_ui_rates'] = 'stylish_ui_look';
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
 
@@ -3986,8 +3989,206 @@
     }
 
 
+
+    /* ======================================================================
+     * 5. РОЗУМНИЙ ПОШУК — фільми за описом звичайними словами (Google Gemini + TMDB)
+     * ==================================================================== */
+    var AI = 'stylish_ui_ai';
+    var AI_BASE = 'https://generativelanguage.googleapis.com/v1beta/';
+    var AI_ICON = '<svg viewBox="0 0 24 24" fill="none"><circle cx="10" cy="10" r="6.5" stroke="currentColor" stroke-width="2.2"/><path d="M15 15l5.5 5.5" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><path d="M10 6.2l.9 2.2 2.2.9-2.2.9-.9 2.2-.9-2.2-2.2-.9 2.2-.9z" fill="currentColor"/></svg>';
+    function aiKey() { return trim(S('ai_key', '')); }
+    function postJSON(url, body, ok, fail) {
+        var x = new XMLHttpRequest(), done = false;
+        var tm = setTimeout(function () { if (!done) { done = true; try { x.abort(); } catch (e) { } fail(0, 'timeout'); } }, 40000);
+        try {
+            x.open('POST', url, true);
+            x.setRequestHeader('Content-Type', 'application/json');
+            x.onload = function () {
+                if (done) return; done = true; clearTimeout(tm);
+                var j = null; try { j = JSON.parse(x.responseText); } catch (e) { }
+                if (x.status >= 200 && x.status < 300 && j) ok(j); else fail(x.status, (j && j.error && j.error.message) || x.statusText || '');
+            };
+            x.onerror = function () { if (!done) { done = true; clearTimeout(tm); fail(0, 'net'); } };
+            x.send(JSON.stringify(body));
+        } catch (e) { if (!done) { done = true; clearTimeout(tm); fail(0, 'err'); } }
+    }
+    // модель: назви в Google часто змінюються, тож за потреби беремо найкращу «flash» зі списку доступних
+    function aiModels(cb) {
+        var own = trim(S('ai_model', '')), auto = trim(S('ai_model_auto', ''));
+        var list = [own, auto, 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+        cb(list);
+    }
+    function aiDiscover(cb) {
+        getJSON(AI_BASE + 'models?pageSize=200&key=' + encodeURIComponent(aiKey()), function (j) {
+            var ms = ((j && j.models) || []).filter(function (m) {
+                var n = String(m.name || '');
+                return /flash/i.test(n) && !/image|tts|audio|live|embed|vision|thinking/i.test(n) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
+            }).map(function (m) { return String(m.name).replace(/^models\//, ''); });
+            ms.sort(function (a, b) { var la = /lite/.test(a), lb = /lite/.test(b), pa = /preview|exp/.test(a), pb = /preview|exp/.test(b); return (la - lb) || (pa - pb) || (b > a ? 1 : -1); });
+            cb(ms[0] || '');
+        }, function () { cb(''); });
+    }
+    function aiPrompt(q) {
+        return 'You are a film and TV recommendation engine for a home media player. ' +
+            'The user writes in Ukrainian, Russian, Polish or English. Request: «' + q + '».\n' +
+            'Return ONLY JSON of the form {"items":[{"title":"original title","year":2014,"type":"movie"}]} — ' +
+            'up to 20 REAL, existing films or series that best match the request, best match first. ' +
+            'type is "movie" or "tv". If the user describes a specific film they cannot remember, put the most likely candidates first. ' +
+            'If the user asks for series, return only "tv". No comments, no markdown.';
+    }
+    function aiAsk(q, ok, fail) {
+        if (!aiKey()) return fail('Вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
+        aiModels(function (models) {
+            var i = 0, discovered = false;
+            var body = { contents: [{ role: 'user', parts: [{ text: aiPrompt(q) }] }], generationConfig: { temperature: 0.6, responseMimeType: 'application/json' } };
+            var next = function () {
+                if (i >= models.length) {
+                    if (discovered) return fail('Не знайдено доступної моделі Gemini');
+                    discovered = true;
+                    return aiDiscover(function (m) { if (!m) return fail('Не вдалося отримати список моделей Gemini — перевірте ключ'); models.push(m); next(); });
+                }
+                var model = models[i++];
+                postJSON(AI_BASE + 'models/' + model + ':generateContent?key=' + encodeURIComponent(aiKey()), body, function (j) {
+                    var txt = '';
+                    try { (j.candidates[0].content.parts || []).forEach(function (p) { if (p.text) txt += p.text; }); } catch (e) { }
+                    var arr = null;
+                    try { var m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/); var o = JSON.parse(m ? m[0] : txt); arr = Array.isArray(o) ? o : o.items; } catch (e) { }
+                    if (!arr || !arr.length) return fail('Нейромережа не дала відповіді, спробуйте сформулювати інакше');
+                    if (model !== S('ai_model_auto', '')) setS('ai_model_auto', model);
+                    ok(arr.slice(0, 24));
+                }, function (code, msg) {
+                    if (code === 400 && /api key|API_KEY/i.test(msg)) return fail('Ключ Gemini недійсний — перевірте його в налаштуваннях');
+                    if (code === 403) return fail('Ключ Gemini не має доступу (' + msg + ')');
+                    if (code === 429) return fail('Ліміт безкоштовних запитів Gemini вичерпано — спробуйте за хвилину');
+                    if (code === 404 || code === 400) return next();   // модель недоступна — пробуємо наступну
+                    fail('Помилка Gemini' + (code ? ' ' + code : '') + (msg ? ': ' + msg : ''));
+                });
+            };
+            next();
+        });
+    }
+    // кожну назву знаходимо в TMDB; вигадані нейромережею фільми просто не потрапляють у список
+    function tmdbFind(it, cb) {
+        var tv = it.type === 'tv', t = trim(it.title || it.name || ''), y = parseInt(it.year, 10) || 0;
+        if (!t) return cb(null);
+        var path = (tv ? 'search/tv' : 'search/movie') + '?language=uk-UA&query=' + encodeURIComponent(t);
+        var pick = function (j) {
+            var r = (j && j.results) || [];
+            if (y) { var exact = r.filter(function (x) { var d = parseInt(String(x.release_date || x.first_air_date || '').slice(0, 4), 10); return d && Math.abs(d - y) <= 1; }); if (exact.length) r = exact; }
+            return r[0] || null;
+        };
+        getJSON(tmdbUrl(path), function (j) {
+            var r = pick(j);
+            if (r) return cb(r);
+            getJSON(tmdbUrl('search/multi?language=uk-UA&query=' + encodeURIComponent(t)), function (j2) {
+                var r2 = pick({ results: ((j2 && j2.results) || []).filter(function (x) { return x.media_type === 'movie' || x.media_type === 'tv'; }) });
+                cb(r2);
+            }, function () { cb(null); });
+        }, function () { cb(null); });
+    }
+    // окремий маленький кеш: не більше 20 останніх запитів, щоб не забивати пам'ять телевізора
+    function aiCacheSet(ck, res) {
+        try {
+            var all = Lampa.Storage.get('sui_ai', '{}');
+            if (typeof all === 'string') all = JSON.parse(all || '{}');
+            all = all || {};
+            all[ck] = { t: Date.now(), v: res, ttl: 7 * 864e5 };
+            var keys = Object.keys(all).sort(function (a, b) { return all[b].t - all[a].t; });
+            keys.slice(20).forEach(function (k) { delete all[k]; });
+            Lampa.Storage.set('sui_ai', all);
+        } catch (e) { }
+    }
+    function aiSearch(q, ok, fail) {
+        var ck = q.toLowerCase();
+        var c = cacheGet('sui_ai', ck, 7 * 864e5);
+        if (c && c.length) return ok(c);
+        aiAsk(q, function (arr) {
+            var out = new Array(arr.length), left = arr.length, k = 0, run = 0;
+            var pump = function () {
+                while (run < 4 && k < arr.length) (function (idx) {
+                    run++;
+                    tmdbFind(arr[idx], function (r) {
+                        out[idx] = r; run--; left--;
+                        if (!left) {
+                            var seen = {}, res = [];
+                            out.forEach(function (x) {
+                                if (!x || !x.id) return;
+                                var key = (x.name || x.first_air_date ? 'tv' : 'movie') + x.id;
+                                if (seen[key]) return; seen[key] = true;
+                                var o = { source: 'tmdb' };
+                                ['id', 'title', 'name', 'original_title', 'original_name', 'poster_path', 'backdrop_path', 'release_date', 'first_air_date', 'vote_average', 'genre_ids', 'original_language', 'media_type'].forEach(function (f) { if (x[f] != null) o[f] = x[f]; });
+                                res.push(o);
+                            });
+                            if (res.length) aiCacheSet(ck, res);
+                            ok(res);
+                        } else pump();
+                    });
+                })(k++);
+            };
+            pump();
+        }, fail);
+    }
+    function aiHistory() { return jget('ai_hist', []); }
+    function aiRemember(q) { var h = aiHistory().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); }); h.unshift(q); setS('ai_hist', h.slice(0, 12)); }
+    function aiOpen(q) {
+        q = trim(q);
+        if (!q) return;
+        aiRemember(q);
+        Lampa.Activity.push({ url: '', title: '🔎 ' + q, component: 'sui_ai_results', source: 'tmdb', page: 1, sui_q: q });
+    }
+    function aiInput() {
+        var back = function () { try { Lampa.Controller.toggle('content'); } catch (e) { } };
+        Lampa.Input.edit({ title: 'Що хочете подивитися?', value: '', free: true, nosave: true }, function (v) {
+            if (trim(v)) aiOpen(v); else back();
+        });
+    }
+    function aiStart() {
+        if (!aiKey()) {
+            Lampa.Noty.show('Спершу вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
+            return open(AI);
+        }
+        var h = aiHistory();
+        if (!h.length) return aiInput();
+        Lampa.Select.show({
+            title: 'Розумний пошук',
+            items: [{ title: '✏️ Новий запит', fresh: true }].concat(h.map(function (x) { return { title: x, q: x }; })),
+            onSelect: function (a) { if (a.fresh) aiInput(); else aiOpen(a.q); },
+            onBack: function () { try { Lampa.Controller.toggle('menu'); } catch (e) { } }
+        });
+    }
+    function aiComponent(object) {
+        var comp = new Lampa.InteractionCategory(object);
+        comp.create = function () {
+            var self = this;
+            aiSearch(object.sui_q || '', function (res) {
+                if (!res.length) { Lampa.Noty.show('Нічого не знайдено — спробуйте описати інакше'); return self.empty(); }
+                self.build({ results: res, page: 1, total_pages: 1 });
+            }, function (err) { Lampa.Noty.show(err); self.empty(); });
+        };
+        comp.nextPageReuest = function (o, resolve, reject) { reject(); };
+        return comp;
+    }
+    function aiMenuItem() {
+        if (S('ai_menu', true) === false || document.querySelector('.menu .sui-ai-menu')) return;
+        var el;
+        try { if (Lampa.Menu && Lampa.Menu.addButton) el = Lampa.Menu.addButton(AI_ICON, 'Розумний пошук', aiStart); } catch (e) { el = null; }
+        if (!el) {
+            el = $('<li class="menu__item selector"><div class="menu__ico">' + AI_ICON + '</div><div class="menu__text">Розумний пошук</div></li>');
+            el.on('hover:enter', aiStart);
+            $('.menu .menu__list').eq(0).append(el);
+        }
+        el.addClass('sui-ai-menu');
+        // одразу після стандартного «Пошуку», якщо він є в меню
+        var srch = $('.menu .menu__list').eq(0).find('[data-action="search"]').first();
+        if (srch.length) srch.after(el);
+    }
+    function aiInit() {
+        try { Lampa.Component.add('sui_ai_results', aiComponent); } catch (e) { console.log('SUI ai', e); }
+        aiMenuItem();
+    }
+
     /* ---- пам'ять телевізора: кеші не повинні забивати localStorage ---- */
-    var SUI_CACHES = ['sui_img', 'sui_full', 'sui_uat', 'sui_lang', 'sui_rt_cache', 'sui_tv_cache', 'sui_svc_cache'];
+    var SUI_CACHES = ['sui_ai', 'sui_img', 'sui_full', 'sui_uat', 'sui_lang', 'sui_rt_cache', 'sui_tv_cache', 'sui_svc_cache'];
     var FOREIGN_CACHES = ['obsidian_quality_cache', 'obsidian_poster_cache', 'obsidian_episode_cache', 'title_cache_hybrid_v3', 'netflix_card_cache', 'applecation_ratings_cache'];
     function lsSize() { var n = 0; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); n += k.length + (localStorage.getItem(k) || '').length; } } catch (e) { } return n * 2; }
     function kb(n) { return n > 1048576 ? (n / 1048576).toFixed(1) + ' МБ' : Math.round(n / 1024) + ' КБ'; }
@@ -4001,7 +4202,7 @@
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [RTS, LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [RTS, LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_ai', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -4153,6 +4354,20 @@
         sel(BTNED, 'btned_labels', 'Підписи кнопок', '', { lampa: 'Як у Lampa', all: 'Завжди з підписом', none: 'Лише іконки' }, 'lampa');
         btn(BTNED, 'btned_reset', 'Скинути', 'Повернути стандартний порядок і показати всі кнопки', function () { setS('btned_order', []); setS('btned_hidden', []); Lampa.Noty.show('Кнопки скинуто'); });
 
+        // ---- 5. Розумний пошук ----
+        Lampa.Template.add('settings_' + AI, '<div></div>');
+        btn(SUI, 'go_ai', '5. Розумний пошук', 'Пошук фільмів за описом звичайними словами (нейромережа Gemini)', function () { open(AI); });
+        ttl(AI, 'ai_head', 'Розумний пошук');
+        trg(AI, 'ai_menu', 'Пункт у лівому меню', '«Розумний пошук» поруч зі звичайним пошуком', true);
+        btn(AI, 'ai_go', '🔎 Шукати', 'Наприклад: «комедія про собаку для всієї сім’ї» або «щось як Інтерстеллар»', aiStart);
+        inp(AI, 'ai_key', 'Ключ Gemini API', aiKey() ? 'Ключ вказано (…' + aiKey().slice(-4) + ')' : 'Безкоштовний ключ з aistudio.google.com → Get API key');
+        btn(AI, 'ai_test', 'Перевірити ключ', 'Тестовий запит до нейромережі', function () {
+            Lampa.Noty.show('Перевіряю…');
+            aiAsk('one famous sci-fi movie', function (a) { Lampa.Noty.show('Ключ працює ✓ модель: ' + S('ai_model_auto', '')); }, function (e) { Lampa.Noty.show(e); });
+        });
+        inp(AI, 'ai_model', 'Модель (необов’язково)', 'Порожньо — підбирається автоматично' + (S('ai_model_auto', '') ? ' (зараз: ' + S('ai_model_auto', '') + ')' : ''));
+        btn(AI, 'ai_clear', 'Очистити історію запитів', '', function () { setS('ai_hist', []); Lampa.Storage.set('sui_ai', {}); Lampa.Noty.show('Історію очищено'); });
+
         // ---- пам'ять ----
         btn(SUI, 'mem_clear', 'Очистити кеш (пам’ять: ' + kb(lsSize()) + ')', 'Кеші постерів, лого, Uator і стилів. Розширення й налаштування не зачіпаються. Допомагає, коли Lampa не зберігає додані плагіни', function () {
             var before = lsSize(); clearCaches(true);
@@ -4171,6 +4386,7 @@
         setS('style_just', '');
         watchCards();
         watchCrown();
+        try { aiInit(); } catch (e) { console.log('SUI ai', e); }
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
             try { onFullLook(e); } catch (er) { console.log('SUI look', er); }
@@ -4180,6 +4396,7 @@
             if (n.indexOf(P) !== 0) return;
             lookCss();
             if (/^sui_(bot_|native_vote|uator)/.test(n)) refreshCards();
+            if (n === 'sui_ai_menu') { if (S('ai_menu', true) === false) $('.menu .sui-ai-menu').remove(); else aiMenuItem(); }
         });
     }
 
