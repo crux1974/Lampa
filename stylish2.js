@@ -3205,6 +3205,9 @@
 
 
 
+
+
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4350,6 +4353,8 @@
     function aiMicSkin() {
         if (S('ai_lens', true) === false) return;
         $('.simple-keyboard-mic').each(function () { var m = $(this); if (!m.find('.sui-mic').length) m.html(MIC_T); });
+        // клавіша мікрофона на клавіатурі Lampa (зліва в першому ряду)
+        $('.simple-keyboard [data-skbtn="{mic}"]').each(function () { var m = $(this); if (!m.find('.sui-mic').length) { m.addClass('sui-mic-key'); var sp = m.children('span'); (sp.length ? sp : m).html(MIC_T); } });
     }
     function aiLens() {
         var el = $('.head .open--search').first();
@@ -4369,18 +4374,24 @@
         aiLens();
         setTimeout(aiLens, 1500);
         try { if (Lampa.Search && Lampa.Search.listener) Lampa.Search.listener.follow('sources', function () { setTimeout(aiMicSkin, 50); }); } catch (e) { }
-        new MutationObserver(function () { var m = document.querySelector('.simple-keyboard-mic'); if (m && !m.querySelector('.sui-mic')) aiMicSkin(); }).observe(document.body, { childList: true, subtree: true });
+        new MutationObserver(function () { var m = document.querySelector('.simple-keyboard-mic, .simple-keyboard [data-skbtn="{mic}"]'); if (m && !m.querySelector('.sui-mic')) aiMicSkin(); }).observe(document.body, { childList: true, subtree: true });
         var st = document.createElement('style');
         // без стилю — прозорі неонові іконки без рамки; зі стилем — плитка в кольорах стилю
-        st.textContent = '.sui-ic .sui-ic-tile{fill:var(--sui-ic-bg);stroke:var(--sui-ic-bd)}.sui-ic .sui-ic-g{stroke:var(--sui-ic-c);fill:none}.sui-ic .sui-ic-glass{fill:var(--sui-ic-glass)}.sui-ic .sui-ic-mf{fill:var(--sui-ic-mf)}.sui-ic .sui-ic-t{fill:var(--sui-ic-t)}.sui-ic{filter:var(--sui-ic-glow)}:root{--sui-ic-bg:transparent;--sui-ic-bd:transparent;--sui-ic-c:currentColor;--sui-ic-t:currentColor;--sui-ic-glass:transparent;--sui-ic-mf:transparent;--sui-ic-glow:none}html.sui-style-cardify{--sui-ic-bg:#16304f;--sui-ic-bd:rgba(108,196,255,.5);--sui-ic-c:#8fdcff;--sui-ic-t:#d2f3ff;--sui-ic-glass:rgba(11,22,38,.55);--sui-ic-mf:rgba(143,220,255,.25);--sui-ic-glow:drop-shadow(0 0 .35em rgba(80,190,255,.7))}html.sui-style-obsidian{--sui-ic-bg:#0c0c12;--sui-ic-bd:rgba(160,130,255,.45);--sui-ic-c:#b7a4ff;--sui-ic-t:#e2dbff;--sui-ic-glass:rgba(0,0,0,.4);--sui-ic-mf:rgba(183,164,255,.2);--sui-ic-glow:drop-shadow(0 0 .3em rgba(150,120,255,.6))}html.sui-style-appletv{--sui-ic-bg:rgba(235,235,245,.22);--sui-ic-bd:rgba(255,255,255,.28);--sui-ic-c:#f5f5f7;--sui-ic-t:#ffffff;--sui-ic-glass:rgba(255,255,255,.1);--sui-ic-mf:rgba(255,255,255,.25);--sui-ic-glow:none}html.sui-style-netflix{--sui-ic-bg:#141414;--sui-ic-bd:rgba(229,9,20,.6);--sui-ic-c:#e50914;--sui-ic-t:#ffffff;--sui-ic-glass:rgba(0,0,0,.4);--sui-ic-mf:rgba(229,9,20,.2);--sui-ic-glow:drop-shadow(0 0 .25em rgba(229,9,20,.55))}' +
-            '.head .open--search .sui-lens{width:1.9em;height:1.9em;display:block}html[class*="sui-style-"] .head .open--search .sui-lens{width:2.2em;height:2.2em}' +
-            'html[class*="sui-style-"] .head .open--search.sui-has-lens{background:none!important;padding:.15em!important}' +
+        st.textContent = '.sui-ic .sui-ic-tile{fill:var(--sui-ic-bg);stroke:var(--sui-ic-bd)}.sui-ic .sui-ic-g{stroke:var(--sui-ic-c);fill:none}.sui-ic .sui-ic-glass{fill:var(--sui-ic-glass)}.sui-ic .sui-ic-mf{fill:var(--sui-ic-mf)}.sui-ic .sui-ic-t{fill:var(--sui-ic-t)}.sui-ic{filter:var(--sui-ic-glow)}:root{--sui-ic-bg:rgba(255,255,255,.08);--sui-ic-bd:rgba(255,255,255,.7);--sui-ic-c:#ffffff;--sui-ic-t:#ffffff;--sui-ic-glass:transparent;--sui-ic-mf:rgba(255,255,255,.15);--sui-ic-glow:none}html:not([class*="sui-style-"]) .head .open--search.focus,html:not([class*="sui-style-"]) .head .open--search:hover,html:not([class*="sui-style-"]) .simple-keyboard-mic.focus{--sui-ic-bg:#ffffff;--sui-ic-bd:#ffffff;--sui-ic-c:#000000;--sui-ic-t:#000000;--sui-ic-mf:rgba(0,0,0,.1)}html.sui-style-cardify{--sui-ic-bg:#16304f;--sui-ic-bd:rgba(108,196,255,.5);--sui-ic-c:#8fdcff;--sui-ic-t:#d2f3ff;--sui-ic-glass:rgba(11,22,38,.55);--sui-ic-mf:rgba(143,220,255,.25);--sui-ic-glow:drop-shadow(0 0 .35em rgba(80,190,255,.7))}html.sui-style-obsidian{--sui-ic-bg:#0c0c12;--sui-ic-bd:rgba(160,130,255,.45);--sui-ic-c:#b7a4ff;--sui-ic-t:#e2dbff;--sui-ic-glass:rgba(0,0,0,.4);--sui-ic-mf:rgba(183,164,255,.2);--sui-ic-glow:drop-shadow(0 0 .3em rgba(150,120,255,.6))}html.sui-style-appletv{--sui-ic-bg:rgba(235,235,245,.22);--sui-ic-bd:rgba(255,255,255,.28);--sui-ic-c:#f5f5f7;--sui-ic-t:#ffffff;--sui-ic-glass:rgba(255,255,255,.1);--sui-ic-mf:rgba(255,255,255,.25);--sui-ic-glow:none}html.sui-style-netflix{--sui-ic-bg:#141414;--sui-ic-bd:rgba(229,9,20,.6);--sui-ic-c:#e50914;--sui-ic-t:#ffffff;--sui-ic-glass:rgba(0,0,0,.4);--sui-ic-mf:rgba(229,9,20,.2);--sui-ic-glow:drop-shadow(0 0 .25em rgba(229,9,20,.55))}' +
+            '.head .open--search .sui-lens{width:2.2em;height:2.2em;display:block}' +
+            '.head .open--search.sui-has-lens{background:none!important;padding:.15em!important}' +
             '.head .open--search.focus .sui-lens,.head .open--search:hover .sui-lens{transform:scale(1.12);filter:var(--sui-ic-glow) brightness(1.3)}' +
-            'html[class*="sui-style-"] body.sui-lens-on .simple-keyboard-mic{background:none!important;box-shadow:none!important;padding:0!important;border-radius:22%!important;overflow:visible}' +
-            'body.sui-lens-on .simple-keyboard-mic .sui-mic{width:100%;height:100%;display:block}html:not([class*="sui-style-"]) body.sui-lens-on .simple-keyboard-mic .sui-mic{width:70%;height:70%;margin:15%}' +
+            'body.sui-lens-on .simple-keyboard-mic{background:none!important;box-shadow:none!important;padding:0!important;border-radius:22%!important;overflow:visible}' +
+            'body.sui-lens-on .simple-keyboard-mic .sui-mic{width:100%;height:100%;display:block}' +
             'body.sui-lens-on .simple-keyboard-mic.focus .sui-mic{transform:scale(1.1);filter:var(--sui-ic-glow) brightness(1.3)}' +
+            'body.sui-lens-on .simple-keyboard .sui-mic-key[style*="red"] .sui-mic{--sui-ic-c:#ff4d6d;--sui-ic-bd:#ff4d6d;animation:suiMicPulse 1s ease-in-out infinite}' +
             'body.sui-lens-on .simple-keyboard-mic.record .sui-mic{--sui-ic-c:#ff4d6d;animation:suiMicPulse 1s ease-in-out infinite}' +
             '@keyframes suiMicPulse{0%,100%{filter:drop-shadow(0 0 .3em rgba(255,70,110,.6))}50%{filter:drop-shadow(0 0 1em rgba(255,70,110,1))}}' +
+            'body.sui-lens-on .simple-keyboard .sui-mic-key{background:none!important;box-shadow:none!important;padding:0!important}' +
+            'body.sui-lens-on .simple-keyboard .sui-mic-key span{display:block;width:100%;height:100%}' +
+            'body.sui-lens-on .simple-keyboard .sui-mic-key .sui-mic{width:100%;height:100%;display:block}' +
+            'body.sui-lens-on .simple-keyboard .sui-mic-key.focus .sui-mic,body.sui-lens-on .simple-keyboard .sui-mic-key:hover .sui-mic{transform:scale(1.08);filter:var(--sui-ic-glow) brightness(1.3)}' +
+            'html:not([class*="sui-style-"]) .simple-keyboard .sui-mic-key.focus{--sui-ic-bg:#ffffff;--sui-ic-bd:#ffffff;--sui-ic-c:#000000;--sui-ic-mf:rgba(0,0,0,.1)}' +
             '.sui-tab-ic{display:inline-block;width:1.35em;height:1.35em;vertical-align:-.3em;margin-right:.4em}.sui-tab-ic svg{width:100%;height:100%;display:block}';
         document.head.appendChild(st);
     }
