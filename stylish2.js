@@ -3192,6 +3192,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4120,7 +4121,9 @@
         var ck = q.toLowerCase();
         var c = cacheGet('sui_ai', ck, 7 * 864e5);
         if (c && c.length) return ok(c);
+        Lampa.Noty.show('🔎 Питаю нейромережу…');
         aiAsk(q, function (arr) {
+            Lampa.Noty.show('🔎 Нейромережа запропонувала ' + arr.length + ' — шукаю їх у базі…');
             var out = new Array(arr.length), left = arr.length, k = 0, run = 0;
             var pump = function () {
                 while (run < 4 && k < arr.length) (function (idx) {
@@ -4220,8 +4223,9 @@
         comp.create = function () {
             var self = this;
             aiSearch(object.sui_q || '', function (res) {
-                if (!res.length) { Lampa.Noty.show('Нічого не знайдено — спробуйте описати інакше'); return self.empty(); }
-                self.build({ results: res, page: 1, total_pages: 1 });
+                if (!res.length) { Lampa.Noty.show('Нічого не знайдено в базі TMDB — спробуйте описати інакше'); return self.empty(); }
+                try { self.build({ results: res, page: 1, total_pages: 1 }); }
+                catch (e) { console.log('SUI ai build', e); Lampa.Noty.show('Помилка показу результатів: ' + (e && e.message)); }
             }, function (err) { Lampa.Noty.show(err); self.empty(); });
         };
         comp.nextPageReuest = function (o, resolve, reject) { reject(); };
