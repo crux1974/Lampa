@@ -3195,6 +3195,9 @@
 
 
 
+
+
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4006,7 +4009,7 @@
     function aiKey() { return trim(S('ai_key', '')); }
     function postJSON(url, body, ok, fail) {
         var x = new XMLHttpRequest(), done = false;
-        var tm = setTimeout(function () { if (!done) { done = true; try { x.abort(); } catch (e) { } fail(0, 'timeout'); } }, 40000);
+        var tm = setTimeout(function () { if (!done) { done = true; try { x.abort(); } catch (e) { } fail(0, 'timeout'); } }, 25000);
         try {
             x.open('POST', url, true);
             x.setRequestHeader('Content-Type', 'application/json');
@@ -4022,7 +4025,7 @@
     // модель: назви в Google часто змінюються, тож за потреби беремо найкращу «flash» зі списку доступних
     function aiModels(cb) {
         var own = trim(S('ai_model', '')), auto = trim(S('ai_model_auto', ''));
-        var list = [own, auto, 'gemini-flash-latest', 'gemini-flash-lite-latest'].filter(function (x, i, a) { return x && a.indexOf(x) === i; });
+        var list = [own, auto, 'gemini-flash-lite-latest', 'gemini-flash-latest'].filter(function (x, i, a) { return x && a.indexOf(x) === i; });
         cb(list);
     }
     function aiDiscover(cb) {
@@ -4031,7 +4034,7 @@
                 var n = String(m.name || '');
                 return /flash|gemma/i.test(n) && !/image|tts|audio|live|embed|vision|thinking|robotics|computer/i.test(n) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
             }).map(function (m) { return String(m.name).replace(/^models\//, ''); });
-            ms.sort(function (a, b) { var ga = /gemma/.test(a), gb = /gemma/.test(b), la = /lite/.test(a), lb = /lite/.test(b), pa = /preview|exp/.test(a), pb = /preview|exp/.test(b); return (ga - gb) || (la - lb) || (pa - pb) || (b > a ? 1 : -1); });
+            ms.sort(function (a, b) { var ga = /gemma/.test(a), gb = /gemma/.test(b), la = /lite/.test(a), lb = /lite/.test(b), pa = /preview|exp/.test(a), pb = /preview|exp/.test(b); return (ga - gb) || (lb - la) || (pa - pb) || (b > a ? 1 : -1); });
             cb(ms);
         }, function () { cb([]); });
     }
@@ -4039,54 +4042,85 @@
         return 'You are a film and TV recommendation engine for a home media player. ' +
             'The user writes in Ukrainian, Russian, Polish or English. Request: «' + q + '».\n' +
             'Return ONLY JSON of the form {"items":[{"title":"original title","year":2014,"type":"movie"}]} — ' +
-            'ALWAYS return 15 to 20 REAL, existing films or series, best match first — never fewer than 15. ' +
+            'ALWAYS return 15 to 18 REAL, existing films or series, best match first — never fewer than 12. ' +
             'type is "movie" or "tv". If the user describes or names one specific film, put that film first and fill the rest with the most similar films. ' +
             'If the user asks for series, return only "tv". No comments, no markdown.';
+    }
+    // одна спроба однієї моделі; «думання» вимикаємо — для списку фільмів воно лише сповільнює
+    function aiCall(model, q, ok, fail) {
+        var url = AI_BASE + 'models/' + model + ':generateContent?key=' + encodeURIComponent(aiKey());
+        var gemma = /gemma/i.test(model);
+        var gc = { temperature: 0.6, maxOutputTokens: 2048 };
+        if (!gemma) gc.responseMimeType = 'application/json';
+        var think = !gemma ? (/2\.5/.test(model) ? { thinkingBudget: 0 } : { thinkingLevel: 'minimal' }) : null;
+        var send = function (withThink) {
+            var g = {}; for (var k in gc) g[k] = gc[k];
+            if (withThink && think) g.thinkingConfig = think;
+            postJSON(url, { contents: [{ role: 'user', parts: [{ text: aiPrompt(q) }] }], generationConfig: g }, function (j) {
+                var txt = '';
+                try { (j.candidates[0].content.parts || []).forEach(function (p) { if (p.text && !p.thought) txt += p.text; }); } catch (e) { }
+                var arr = null;
+                try { var m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/); var o = JSON.parse(m ? m[0] : txt); arr = Array.isArray(o) ? o : o.items; } catch (e) { }
+                if (!arr || !arr.length) return fail(0, 'empty');
+                ok(arr);
+            }, function (code, msg) {
+                // модель не знає налаштування «думання» — повторюємо без нього
+                if (withThink && think && code === 400 && /think/i.test(msg)) return send(false);
+                fail(code, msg);
+            });
+        };
+        send(true);
     }
     function aiAsk(q, ok, fail) {
         if (!aiKey()) return fail('Вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
         aiModels(function (models) {
-            var i = 0, discovered = false, retried = false, lastErr = '';
-            var body = { contents: [{ role: 'user', parts: [{ text: aiPrompt(q) }] }], generationConfig: { temperature: 0.6, responseMimeType: 'application/json' } };
-            var next = function () {
-                if (i >= models.length) {
-                    if (!discovered) {
-                        discovered = true;
-                        return aiDiscover(function (list) {
-                            list.forEach(function (m) { if (models.indexOf(m) < 0) models.push(m); });
-                            if (i >= models.length) return fail(lastErr || 'Не вдалося отримати список моделей Gemini — перевірте ключ');
-                            next();
-                        });
-                    }
-                    // усі моделі зайняті — одна повторна спроба першої через 3 секунди
-                    if (!retried && /503|500|429|зайнят|перевантаж/.test(lastErr)) {
-                        retried = true; i = 0;
-                        Lampa.Noty.show('Сервери Gemini завантажені — пробую ще раз…');
-                        try { aiStatus(q, 'Сервери Gemini завантажені — пробую ще раз…'); } catch (e) { }
-                        return setTimeout(next, 3000);
-                    }
-                    return fail(lastErr || 'Не знайдено доступної моделі Gemini');
+            var i = 0, discovered = false, retried = false, lastErr = '', finished = false, running = 0, t0 = Date.now();
+            var tick = setInterval(function () { if (finished) return clearInterval(tick); if (!document.getElementById('sui-ai-status')) return; try { aiStatus(q, 'Питаю нейромережу Gemini… ' + Math.round((Date.now() - t0) / 1000) + ' с'); } catch (e) { } }, 1000);
+            var finish = function (f, v) { if (finished) return; finished = true; clearInterval(tick); f(v); };
+            var hardFail = function (m) { finish(fail, m); };
+            var launch = function () {
+                if (finished) return;
+                // дві моделі одночасно — хто перший відповість, той і переміг
+                while (running < 2 && i < models.length) one(models[i++]);
+                if (running) return;
+                if (!discovered) {
+                    discovered = true;
+                    return aiDiscover(function (list) {
+                        list.forEach(function (m) { if (models.indexOf(m) < 0) models.push(m); });
+                        if (i >= models.length) return hardFail(lastErr || 'Не вдалося отримати список моделей Gemini — перевірте ключ');
+                        launch();
+                    });
                 }
-                var model = models[i++];
-                postJSON(AI_BASE + 'models/' + model + ':generateContent?key=' + encodeURIComponent(aiKey()), /gemma/i.test(model) ? { contents: body.contents, generationConfig: { temperature: 0.6 } } : body, function (j) {
-                    var txt = '';
-                    try { (j.candidates[0].content.parts || []).forEach(function (p) { if (p.text) txt += p.text; }); } catch (e) { }
-                    var arr = null;
-                    try { var m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/); var o = JSON.parse(m ? m[0] : txt); arr = Array.isArray(o) ? o : o.items; } catch (e) { }
-                    if (!arr || !arr.length) { lastErr = 'Нейромережа не дала відповіді, спробуйте сформулювати інакше'; return next(); }
+                if (!retried && /503|500|429|перевантаж|timeout|не встиг/.test(lastErr)) {
+                    retried = true; i = 0;
+                    try { if (document.getElementById('sui-ai-status')) aiStatus(q, 'Сервери Gemini завантажені — пробую ще раз…'); } catch (e) { }
+                    return setTimeout(launch, 3000);
+                }
+                hardFail(lastErr || 'Не знайдено доступної моделі Gemini');
+            };
+            var one = function (model) {
+                running++;
+                aiCall(model, q, function (arr) {
+                    running--;
+                    if (finished) return;
                     if (model !== S('ai_model_auto', '')) setS('ai_model_auto', model);
-                    ok(arr.slice(0, 24));
+                    finish(ok, arr.slice(0, 24));
                 }, function (code, msg) {
-                    if (code === 400 && /api key|API_KEY/i.test(msg)) return fail('Ключ Gemini недійсний — перевірте його в налаштуваннях');
-                    if (code === 403) return fail('Ключ Gemini не має доступу (' + msg + ')');
+                    running--;
+                    if (finished) return;
+                    if (code === 400 && /api key|API_KEY/i.test(msg)) return hardFail('Ключ Gemini недійсний — перевірте його в налаштуваннях');
+                    if (code === 403) return hardFail('Ключ Gemini не має доступу (' + msg + ')');
                     if (code === 503 || code === 500 || code === 502 || code === 504) lastErr = 'Сервери Gemini зараз перевантажені (' + code + ') — спробуйте за хвилину';
                     else if (code === 429) lastErr = 'Ліміт безкоштовних запитів Gemini вичерпано (429) — спробуйте пізніше';
-                    else if (code === 404 || code === 400) lastErr = lastErr || ('Модель ' + model + ' недоступна');
-                    else lastErr = 'Помилка Gemini' + (code ? ' ' + code : '') + (msg ? ': ' + msg : '');
-                    next();   // пробуємо наступну модель
+                    else if (code === 0 && msg === 'timeout') lastErr = 'Gemini не встиг відповісти за 25 с';
+                    else if (code === 0 && msg === 'empty') lastErr = 'Нейромережа не дала відповіді, спробуйте сформулювати інакше';
+                    else if (code === 0) lastErr = 'Немає зв’язку з Gemini (' + msg + ')';
+                    else if (code === 404 || code === 400) lastErr = lastErr || ('Модель ' + model + ' недоступна: ' + msg);
+                    else lastErr = 'Помилка Gemini ' + code + (msg ? ': ' + msg : '');
+                    launch();
                 });
             };
-            next();
+            launch();
         });
     }
     // кожну назву знаходимо в TMDB; вигадані нейромережею фільми просто не потрапляють у список
@@ -4487,7 +4521,7 @@
         inp(AI, 'ai_key', 'Ключ Gemini API', aiKey() ? 'Ключ вказано (…' + aiKey().slice(-4) + ')' : 'Безкоштовний ключ з aistudio.google.com → Get API key');
         btn(AI, 'ai_test', 'Перевірити ключ', 'Тестовий запит до нейромережі', function () {
             Lampa.Noty.show('Перевіряю…');
-            aiAsk('one famous sci-fi movie', function (a) { Lampa.Noty.show('Ключ працює ✓ модель: ' + S('ai_model_auto', '')); }, function (e) { Lampa.Noty.show(e); });
+            aiAsk('one famous sci-fi movie', function (a) { aiStatus('', null); Lampa.Noty.show('Ключ працює ✓ модель: ' + S('ai_model_auto', '')); }, function (e) { aiStatus('', null); Lampa.Noty.show(e); });
         });
         sel(AI, 'ai_kbd', 'Клавіатура', 'Системна клавіатура телевізора має мікрофон для голосового вводу', { auto: 'Авто (на LG — системна)', integrate: 'Системна (з мікрофоном)', lampa: 'Вбудована Lampa' }, 'auto');
         inp(AI, 'ai_model', 'Модель (необов’язково)', 'Порожньо — підбирається автоматично' + (S('ai_model_auto', '') ? ' (зараз: ' + S('ai_model_auto', '') + ')' : ''));
