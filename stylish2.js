@@ -3191,6 +3191,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4025,11 +4026,11 @@
         getJSON(AI_BASE + 'models?pageSize=200&key=' + encodeURIComponent(aiKey()), function (j) {
             var ms = ((j && j.models) || []).filter(function (m) {
                 var n = String(m.name || '');
-                return /flash/i.test(n) && !/image|tts|audio|live|embed|vision|thinking/i.test(n) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
+                return /flash|gemma/i.test(n) && !/image|tts|audio|live|embed|vision|thinking|robotics|computer/i.test(n) && (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0;
             }).map(function (m) { return String(m.name).replace(/^models\//, ''); });
-            ms.sort(function (a, b) { var la = /lite/.test(a), lb = /lite/.test(b), pa = /preview|exp/.test(a), pb = /preview|exp/.test(b); return (la - lb) || (pa - pb) || (b > a ? 1 : -1); });
-            cb(ms[0] || '');
-        }, function () { cb(''); });
+            ms.sort(function (a, b) { var ga = /gemma/.test(a), gb = /gemma/.test(b), la = /lite/.test(a), lb = /lite/.test(b), pa = /preview|exp/.test(a), pb = /preview|exp/.test(b); return (ga - gb) || (la - lb) || (pa - pb) || (b > a ? 1 : -1); });
+            cb(ms);
+        }, function () { cb([]); });
     }
     function aiPrompt(q) {
         return 'You are a film and TV recommendation engine for a home media player. ' +
@@ -4042,29 +4043,43 @@
     function aiAsk(q, ok, fail) {
         if (!aiKey()) return fail('Вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
         aiModels(function (models) {
-            var i = 0, discovered = false;
+            var i = 0, discovered = false, retried = false, lastErr = '';
             var body = { contents: [{ role: 'user', parts: [{ text: aiPrompt(q) }] }], generationConfig: { temperature: 0.6, responseMimeType: 'application/json' } };
             var next = function () {
                 if (i >= models.length) {
-                    if (discovered) return fail('Не знайдено доступної моделі Gemini');
-                    discovered = true;
-                    return aiDiscover(function (m) { if (!m) return fail('Не вдалося отримати список моделей Gemini — перевірте ключ'); models.push(m); next(); });
+                    if (!discovered) {
+                        discovered = true;
+                        return aiDiscover(function (list) {
+                            list.forEach(function (m) { if (models.indexOf(m) < 0) models.push(m); });
+                            if (i >= models.length) return fail(lastErr || 'Не вдалося отримати список моделей Gemini — перевірте ключ');
+                            next();
+                        });
+                    }
+                    // усі моделі зайняті — одна повторна спроба першої через 3 секунди
+                    if (!retried && /503|500|429|зайнят|перевантаж/.test(lastErr)) {
+                        retried = true; i = 0;
+                        Lampa.Noty.show('Сервери Gemini завантажені — пробую ще раз…');
+                        return setTimeout(next, 3000);
+                    }
+                    return fail(lastErr || 'Не знайдено доступної моделі Gemini');
                 }
                 var model = models[i++];
-                postJSON(AI_BASE + 'models/' + model + ':generateContent?key=' + encodeURIComponent(aiKey()), body, function (j) {
+                postJSON(AI_BASE + 'models/' + model + ':generateContent?key=' + encodeURIComponent(aiKey()), /gemma/i.test(model) ? { contents: body.contents, generationConfig: { temperature: 0.6 } } : body, function (j) {
                     var txt = '';
                     try { (j.candidates[0].content.parts || []).forEach(function (p) { if (p.text) txt += p.text; }); } catch (e) { }
                     var arr = null;
                     try { var m = txt.match(/\{[\s\S]*\}|\[[\s\S]*\]/); var o = JSON.parse(m ? m[0] : txt); arr = Array.isArray(o) ? o : o.items; } catch (e) { }
-                    if (!arr || !arr.length) return fail('Нейромережа не дала відповіді, спробуйте сформулювати інакше');
+                    if (!arr || !arr.length) { lastErr = 'Нейромережа не дала відповіді, спробуйте сформулювати інакше'; return next(); }
                     if (model !== S('ai_model_auto', '')) setS('ai_model_auto', model);
                     ok(arr.slice(0, 24));
                 }, function (code, msg) {
                     if (code === 400 && /api key|API_KEY/i.test(msg)) return fail('Ключ Gemini недійсний — перевірте його в налаштуваннях');
                     if (code === 403) return fail('Ключ Gemini не має доступу (' + msg + ')');
-                    if (code === 429) return fail('Ліміт безкоштовних запитів Gemini вичерпано — спробуйте за хвилину');
-                    if (code === 404 || code === 400) return next();   // модель недоступна — пробуємо наступну
-                    fail('Помилка Gemini' + (code ? ' ' + code : '') + (msg ? ': ' + msg : ''));
+                    if (code === 503 || code === 500 || code === 502 || code === 504) lastErr = 'Сервери Gemini зараз перевантажені (' + code + ') — спробуйте за хвилину';
+                    else if (code === 429) lastErr = 'Ліміт безкоштовних запитів Gemini вичерпано (429) — спробуйте пізніше';
+                    else if (code === 404 || code === 400) lastErr = lastErr || ('Модель ' + model + ' недоступна');
+                    else lastErr = 'Помилка Gemini' + (code ? ' ' + code : '') + (msg ? ': ' + msg : '');
+                    next();   // пробуємо наступну модель
                 });
             };
             next();
