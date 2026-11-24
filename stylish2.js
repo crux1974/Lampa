@@ -3189,6 +3189,8 @@
 
 
 
+
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4137,11 +4139,51 @@
         aiRemember(q);
         Lampa.Activity.push({ url: '', title: '🔎 ' + q, component: 'sui_ai_results', source: 'tmdb', page: 1, sui_q: q });
     }
-    function aiInput() {
+    function aiKbd() {
+        var k = S('ai_kbd', 'auto');
+        if (k === 'auto') k = (window.webOS || /web0s|webos/i.test(navigator.userAgent)) ? 'integrate' : '';
+        return k;
+    }
+    function aiInput(kbd) {
         var back = function () { try { Lampa.Controller.toggle('content'); } catch (e) { } };
-        Lampa.Input.edit({ title: 'Що хочете подивитися?', value: '', free: true, nosave: true }, function (v) {
+        var p = { title: 'Що хочете подивитися?', value: '', free: true, nosave: true };
+        var k = kbd || aiKbd();
+        if (k) p.keyboard = k;
+        Lampa.Input.edit(p, function (v) {
             if (trim(v)) aiOpen(v); else back();
         });
+    }
+    // голосовий запит: браузерне розпізнавання → застосунок Android → системна клавіатура телевізора з мікрофоном
+    var aiRec = null;
+    function aiVoice() {
+        var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (window.Android && Android.voiceStart) {
+            try { window.voiceResult = function (t) { if (trim(t)) aiOpen(t); }; Android.voiceStart(); return; } catch (e) { }
+        }
+        if (SR) {
+            try {
+                if (aiRec) try { aiRec.abort(); } catch (e) { }
+                aiRec = new SR();
+                aiRec.lang = ({ uk: 'uk-UA', ru: 'ru-RU', en: 'en-US', pl: 'pl-PL' })[Lampa.Storage.get('language', 'uk')] || 'uk-UA';
+                aiRec.continuous = false;
+                aiRec.interimResults = false;
+                var got = false;
+                aiRec.onresult = function (ev) { var t = ''; try { t = ev.results[ev.resultIndex][0].transcript; } catch (e) { } got = true; if (trim(t)) { Lampa.Noty.show('🎤 ' + t); aiOpen(t); } };
+                aiRec.onerror = function (ev) {
+                    got = true;
+                    if (ev && ev.error === 'not-allowed') Lampa.Noty.show('Немає доступу до мікрофона');
+                    else if (ev && ev.error === 'no-speech') Lampa.Noty.show('Нічого не почуто — спробуйте ще');
+                    else { Lampa.Noty.show('Голос недоступний — відкриваю клавіатуру з мікрофоном'); aiInput('integrate'); }
+                };
+                aiRec.onend = function () { if (!got) Lampa.Noty.show('Нічого не почуто — спробуйте ще'); };
+                aiRec.start();
+                Lampa.Noty.show('🎤 Говоріть…');
+                return;
+            } catch (e) { }
+        }
+        // телевізор LG / інші: системна клавіатура, на ній є мікрофон (або кнопка мікрофона на пульті Magic Remote)
+        Lampa.Noty.show('Натисніть 🎤 на клавіатурі телевізора або кнопку мікрофона на пульті й скажіть запит');
+        aiInput('integrate');
     }
     function aiStart() {
         if (!aiKey()) {
@@ -4149,11 +4191,12 @@
             return open(AI);
         }
         var h = aiHistory();
-        if (!h.length) return aiInput();
         Lampa.Select.show({
             title: 'Розумний пошук',
-            items: [{ title: '✏️ Новий запит', fresh: true }].concat(h.map(function (x) { return { title: x, q: x }; })),
-            onSelect: function (a) { if (a.fresh) aiInput(); else aiOpen(a.q); },
+            items: [{ title: '🎤 Сказати голосом', voice: true }, { title: '✏️ Написати запит', fresh: true }]
+                .concat(h.length ? [{ title: 'Останні запити', separator: true }] : [])
+                .concat(h.map(function (x) { return { title: x, q: x }; })),
+            onSelect: function (a) { if (a.voice) aiVoice(); else if (a.fresh) aiInput(); else if (a.q) aiOpen(a.q); },
             onBack: function () { try { Lampa.Controller.toggle('menu'); } catch (e) { } }
         });
     }
@@ -4188,6 +4231,9 @@
         if (S('ai_menu', true) === false || document.querySelector('.head .sui-ai-head')) return;
         var el = $('<div class="head__action selector sui-ai-head">' + AI_ICON + '</div>');
         el.on('hover:enter', aiStart);
+        var mic = $('<div class="head__action selector sui-ai-head sui-ai-mic"><svg viewBox="0 0 24 31" fill="none"><rect x="5" width="14" height="23" rx="7" fill="currentColor"/><path d="M2 19c2 5 6 7 10 7s8-2 10-7" stroke="currentColor" stroke-width="3" stroke-linecap="round"/><rect x="10" y="25" width="4" height="6" rx="2" fill="currentColor"/></svg></div>');
+        mic.on('hover:enter', function () { if (!aiKey()) return aiStart(); aiVoice(); });
+        el = el.add(mic);
         var std = $('.head .open--search').first();
         if (std.length) std.after(el);
         else {
@@ -4380,6 +4426,7 @@
             Lampa.Noty.show('Перевіряю…');
             aiAsk('one famous sci-fi movie', function (a) { Lampa.Noty.show('Ключ працює ✓ модель: ' + S('ai_model_auto', '')); }, function (e) { Lampa.Noty.show(e); });
         });
+        sel(AI, 'ai_kbd', 'Клавіатура', 'Системна клавіатура телевізора має мікрофон для голосового вводу', { auto: 'Авто (на LG — системна)', integrate: 'Системна (з мікрофоном)', lampa: 'Вбудована Lampa' }, 'auto');
         inp(AI, 'ai_model', 'Модель (необов’язково)', 'Порожньо — підбирається автоматично' + (S('ai_model_auto', '') ? ' (зараз: ' + S('ai_model_auto', '') + ')' : ''));
         btn(AI, 'ai_clear', 'Очистити історію запитів', '', function () { setS('ai_hist', []); Lampa.Storage.set('sui_ai', {}); Lampa.Noty.show('Історію очищено'); });
 
