@@ -3193,6 +3193,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4037,8 +4038,8 @@
         return 'You are a film and TV recommendation engine for a home media player. ' +
             'The user writes in Ukrainian, Russian, Polish or English. Request: «' + q + '».\n' +
             'Return ONLY JSON of the form {"items":[{"title":"original title","year":2014,"type":"movie"}]} — ' +
-            'up to 20 REAL, existing films or series that best match the request, best match first. ' +
-            'type is "movie" or "tv". If the user describes a specific film they cannot remember, put the most likely candidates first. ' +
+            'ALWAYS return 15 to 20 REAL, existing films or series, best match first — never fewer than 15. ' +
+            'type is "movie" or "tv". If the user describes or names one specific film, put that film first and fill the rest with the most similar films. ' +
             'If the user asks for series, return only "tv". No comments, no markdown.';
     }
     function aiAsk(q, ok, fail) {
@@ -4224,7 +4225,11 @@
             var self = this;
             aiSearch(object.sui_q || '', function (res) {
                 if (!res.length) { Lampa.Noty.show('Нічого не знайдено в базі TMDB — спробуйте описати інакше'); return self.empty(); }
-                try { self.build({ results: res, page: 1, total_pages: 1 }); }
+                try {
+                    self.build({ results: res, page: 1, total_pages: 1 });
+                    // сітка постерів (як у колекціях Lampa), а не широкий вигляд з описом
+                    try { self.render().find('.category-full').addClass('mapping--grid cols--6'); } catch (e) { }
+                }
                 catch (e) { console.log('SUI ai build', e); Lampa.Noty.show('Помилка показу результатів: ' + (e && e.message)); }
             }, function (err) { Lampa.Noty.show(err); self.empty(); });
         };
