@@ -3194,6 +3194,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -4061,6 +4062,7 @@
                     if (!retried && /503|500|429|зайнят|перевантаж/.test(lastErr)) {
                         retried = true; i = 0;
                         Lampa.Noty.show('Сервери Gemini завантажені — пробую ще раз…');
+                        try { aiStatus(q, 'Сервери Gemini завантажені — пробую ще раз…'); } catch (e) { }
                         return setTimeout(next, 3000);
                     }
                     return fail(lastErr || 'Не знайдено доступної моделі Gemini');
@@ -4118,13 +4120,36 @@
             Lampa.Storage.set('sui_ai', all);
         } catch (e) { }
     }
+    // видима панель «йде пошук»: ваш запит + поточний крок; зникає, коли є результати
+    function aiStatus(q, step, err) {
+        var el = document.getElementById('sui-ai-status');
+        if (step === null) { if (el) el.parentNode.removeChild(el); return; }
+        if (!el) { el = document.createElement('div'); el.id = 'sui-ai-status'; document.body.appendChild(el); }
+        el.className = err ? 'is-err' : '';
+        el.innerHTML = (err ? '' : '<div class="sui-ai-status__spin"></div>') +
+            '<div class="sui-ai-status__q">🔎 «' + esc(q) + '»</div><div class="sui-ai-status__s">' + esc(step) + '</div>' +
+            (err ? '<div class="sui-ai-status__h">Натисніть «Назад», щоб повернутися</div>' : '');
+    }
+    function aiCss() {
+        if (document.getElementById('sui-ai-css')) return;
+        var st = document.createElement('style'); st.id = 'sui-ai-css';
+        st.textContent = '#sui-ai-status{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;max-width:80vw;min-width:22em;padding:1.6em 2em;border-radius:1em;background:rgba(20,22,30,.92);box-shadow:0 1em 3em rgba(0,0,0,.6);text-align:center;color:#fff;pointer-events:none}' +
+            '#sui-ai-status.is-err{border:2px solid #ff6b5a}' +
+            '.sui-ai-status__spin{width:2.6em;height:2.6em;margin:0 auto 1em;border-radius:50%;border:.3em solid rgba(255,255,255,.2);border-top-color:#fff;animation:suiAiSpin 1s linear infinite}' +
+            '@keyframes suiAiSpin{to{transform:rotate(360deg)}}' +
+            '.sui-ai-status__q{font-size:1.5em;font-weight:700;margin-bottom:.5em;word-break:break-word}' +
+            '.sui-ai-status__s{font-size:1.1em;opacity:.85}' +
+            '.sui-ai-status__h{font-size:.9em;opacity:.55;margin-top:.8em}' +
+            '.sui-ai-page .category-full{display:flex;flex-wrap:wrap}';
+        document.head.appendChild(st);
+    }
     function aiSearch(q, ok, fail) {
         var ck = q.toLowerCase();
         var c = cacheGet('sui_ai', ck, 7 * 864e5);
         if (c && c.length) return ok(c);
-        Lampa.Noty.show('🔎 Питаю нейромережу…');
+        aiStatus(q, 'Питаю нейромережу Gemini…');
         aiAsk(q, function (arr) {
-            Lampa.Noty.show('🔎 Нейромережа запропонувала ' + arr.length + ' — шукаю їх у базі…');
+            aiStatus(q, 'Нейромережа запропонувала ' + arr.length + ' — шукаю постери в базі TMDB…');
             var out = new Array(arr.length), left = arr.length, k = 0, run = 0;
             var pump = function () {
                 while (run < 4 && k < arr.length) (function (idx) {
@@ -4221,18 +4246,32 @@
     }
     function aiComponent(object) {
         var comp = new Lampa.InteractionCategory(object);
+        var q = object.sui_q || '';
         comp.create = function () {
-            var self = this;
-            aiSearch(object.sui_q || '', function (res) {
-                if (!res.length) { Lampa.Noty.show('Нічого не знайдено в базі TMDB — спробуйте описати інакше'); return self.empty(); }
+            var self = this, alive = true;
+            aiCss();
+            aiStatus(q, 'Починаю пошук…');
+            var done = function () { alive = false; };
+            var showErr = function (msg) {
+                if (!alive) return; done();
+                aiStatus(q, msg, true);
+                setTimeout(function () { var el = document.getElementById('sui-ai-status'); if (el && el.className === 'is-err') aiStatus(q, null); }, 9000);
+                try { self.empty(); } catch (e) { }
+            };
+            aiSearch(q, function (res) {
+                if (!alive) return;
+                if (!res.length) return showErr('Нічого не знайдено в базі TMDB — спробуйте описати інакше');
+                done();
+                aiStatus(q, null);
                 try {
                     self.build({ results: res, page: 1, total_pages: 1 });
-                    // сітка постерів (як у колекціях Lampa), а не широкий вигляд з описом
-                    try { self.render().find('.category-full').addClass('mapping--grid cols--6'); } catch (e) { }
-                }
-                catch (e) { console.log('SUI ai build', e); Lampa.Noty.show('Помилка показу результатів: ' + (e && e.message)); }
-            }, function (err) { Lampa.Noty.show(err); self.empty(); });
+                    try { self.render().addClass('sui-ai-page').find('.category-full').addClass('mapping--grid cols--6'); } catch (e) { }
+                    Lampa.Noty.show('Знайдено: ' + res.length);
+                } catch (e) { console.log('SUI ai build', e); showErr('Помилка показу результатів: ' + (e && e.message)); }
+            }, function (err) { showErr(err); });
         };
+        var _destroy = comp.destroy;
+        comp.destroy = function () { aiStatus(q, null); if (_destroy) return _destroy.apply(this, arguments); };
         comp.nextPageReuest = function (o, resolve, reject) { reject(); };
         return comp;
     }
