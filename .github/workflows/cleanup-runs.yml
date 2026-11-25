@@ -1,0 +1,44 @@
+name: Очищення старих запусків
+
+# Автоматично видаляє старі завершені запуски workflows, щоб вони не накопичувались.
+# Щонеділі о 03:41 UTC.
+on:
+  schedule:
+    - cron: '41 3 * * 0'
+  workflow_dispatch:        # ручний запуск кнопкою «Run workflow»
+  push:                     # перший запуск одразу після злиття
+    paths:
+      - '.github/workflows/cleanup-runs.yml'
+
+permissions:
+  actions: write
+
+concurrency:
+  group: cleanup-runs
+  cancel-in-progress: true
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Видалити запуски, старші за 3 дні (останні 10 лишаються завжди)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          CURRENT: ${{ github.run_id }}
+          KEEP_DAYS: '3'
+          KEEP_MIN: '10'
+        run: |
+          cutoff=$(date -u -d "$KEEP_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+          # нові запуски йдуть першими; пропускаємо KEEP_MIN найсвіжіших, далі — лише завершені й старші за cutoff
+          gh api --paginate "repos/$REPO/actions/runs?per_page=100" \
+            --jq '.workflow_runs[] | [.id, .status, .created_at] | @tsv' \
+          | tail -n +$((KEEP_MIN + 1)) \
+          | awk -v c="$cutoff" -v cur="$CURRENT" '$2 == "completed" && $3 < c && $1 != cur { print $1 }' > old.txt
+          echo "До видалення: $(wc -l < old.txt)"
+          n=0
+          while read -r id; do
+            gh api -X DELETE "repos/$REPO/actions/runs/$id" --silent && n=$((n + 1)) || echo "не вдалося: $id"
+          done < old.txt
+          echo "Видалено запусків: $n"
