@@ -979,12 +979,6 @@
             onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_styles'); }
         });
 
-        add({
-            component: SUI,
-            param: { name: 'stylish_ui_open_btned', type: 'button' },
-            field: { name: '4. Редактор кнопок', description: 'Порядок, приховування й підписи кнопок на сторінці фільму' },
-            onChange: function () { if (window.SUI_open) window.SUI_open('stylish_ui_btned'); }
-        });
 
         // ---- 1. Інформаційна панель (підменю) ----
         Lampa.Template.add('settings_' + SUI_INFO, '<div></div>');
@@ -3208,6 +3202,7 @@
 
 
 
+
 /* ==========================================================================
  * Стильний інтерфейс 2.0 — розділи «Зовнішній вигляд», «Стилі», «Редактор кнопок».
  * Власний код плагіна (ідеї функцій — Yarik's Mod і LMX Pack, код не запозичено).
@@ -3295,7 +3290,6 @@
     var PARENT = {};
     PARENT['stylish_ui_styles'] = 'stylish_ui';
     PARENT['stylish_ui_style_urls'] = 'stylish_ui_styles';
-    PARENT['stylish_ui_btned'] = 'stylish_ui';
     PARENT['stylish_ui_ai'] = 'stylish_ui';
     PARENT['stylish_ui_rates'] = 'stylish_ui_look';
     PARENT[LOGO] = LOOK; PARENT[XT] = LOOK; PARENT[BTNS] = LOOK; PARENT[STUD] = LOOK; PARENT[UAT] = LOOK;
@@ -3853,8 +3847,6 @@
         applyXTitle(root);
         try { applyRateLogos(root); } catch (e) { }
         [1500, 4000].forEach(function (t) { setTimeout(function () { try { applyRateLogos(root); } catch (e) { } }, t); });
-        try { applyBtnEditor(root); } catch (e) { }
-        setTimeout(function () { try { applyBtnEditor(root); } catch (e) { } }, 1500);
         if (on('studios')) tmdbFull(m, function (d) { applyStudios(root, m, d); });
     }
 
@@ -3930,83 +3922,8 @@
     /* ======================================================================
      * 4. РЕДАКТОР КНОПОК — порядок, видимість і підписи кнопок у повній картці
      * ==================================================================== */
-    var BTNED = 'stylish_ui_btned';
+    // «Редактор кнопок» прибрано: кнопками керує окремий плагін (buttons.js)
     function jget(k, d) { var v = S(k, null); if (v == null || v === '') return d; if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { return d; } } return v || d; }
-    function btnKey($b) {
-        var cls = String($b.attr('class') || '').split(/\s+/).filter(function (c) { return /^button--|^view--|^sui-/.test(c); })[0];
-        if (cls) return cls;
-        var t = trim($b.find('span').first().text() || $b.text());
-        return t ? 'txt:' + t.toLowerCase() : '';
-    }
-    function btnLabel($b) {
-        var t = trim($b.find('span').first().text() || $b.attr('data-title') || $b.text());
-        if (t) return t;
-        var k = btnKey($b);
-        return ({ 'button--play': 'Дивитись', 'button--book': 'Закладки', 'button--reaction': 'Реакції', 'button--subscribe': 'Підписатися', 'button--options': 'Ще (⋯)', 'button--trailer': 'Трейлер', 'view--torrent': 'Торенти', 'view--online': 'Онлайн' })[k] || k;
-    }
-    function applyBtnEditor(root) {
-        if (S('btned_on', true) === false) return;
-        var bar = root.find('.full-start-new__buttons, .full-start__buttons').first();
-        if (!bar.length) return;
-        var known = jget('btned_known', {}), changed = false;
-        bar.children('.full-start__button').each(function () {
-            var $b = $(this), k = btnKey($b);
-            if (!k) return;
-            $b.attr('data-sui-btn', k);
-            var l = btnLabel($b);
-            if (known[k] !== l && l) { known[k] = l; changed = true; }
-        });
-        if (changed) setS('btned_known', known);
-        var hidden = jget('btned_hidden', []), order = jget('btned_order', []);
-        bar.children('.full-start__button').each(function () { $(this).toggleClass('sui-btn-hidden', hidden.indexOf($(this).attr('data-sui-btn')) >= 0); });
-        if (order.length) {
-            var items = bar.children('.full-start__button').get();
-            items.sort(function (a, b) {
-                var ia = order.indexOf($(a).attr('data-sui-btn')), ib = order.indexOf($(b).attr('data-sui-btn'));
-                return (ia < 0 ? 999 : ia) - (ib < 0 ? 999 : ib);
-            });
-            items.forEach(function (el) { bar.append(el); });
-        }
-        var lab = S('btned_labels', 'lampa');
-        bar.toggleClass('sui-btn-lab-all', lab === 'all').toggleClass('sui-btn-lab-none', lab === 'none');
-        setTimeout(function () { try { var en = Lampa.Controller.enabled(); if (en && /full/.test(en.name || '')) en.collection = root.find('.selector:visible'); } catch (e) { } }, 300);
-    }
-    function btnEdCss() {
-        var id = 'sui-btned-css', el = document.getElementById(id);
-        if (!el) { el = document.createElement('style'); el.id = id; document.head.appendChild(el); }
-        el.textContent = '.full-start__button.sui-btn-hidden{display:none!important}' +
-            '.sui-btn-lab-all .full-start__button span{display:inline!important}' +
-            '.sui-btn-lab-none .full-start__button:not(.button--play) span{display:none!important}';
-    }
-    function openBtnOrder() {
-        var known = jget('btned_known', {});
-        var keys = Object.keys(known);
-        if (!keys.length) return Lampa.Noty.show('Спершу відкрийте будь-який фільм, щоб плагін побачив кнопки');
-        var order = jget('btned_order', []).filter(function (k) { return keys.indexOf(k) >= 0; });
-        keys.forEach(function (k) { if (order.indexOf(k) < 0) order.push(k); });
-        var show = function (picked) {
-            var hidden = jget('btned_hidden', []);
-            Lampa.Select.show({
-                title: 'Порядок і видимість кнопок',
-                items: order.map(function (k, i) { return { title: (i + 1) + '. ' + known[k] + (hidden.indexOf(k) >= 0 ? '  (сховано)' : ''), key: k, selected: k === picked }; }),
-                onSelect: function (it) {
-                    var hid = hidden.indexOf(it.key) >= 0;
-                    Lampa.Select.show({
-                        title: known[it.key],
-                        items: [{ title: 'Вгору', a: -1 }, { title: 'Вниз', a: 1 }, { title: 'На початок', a: 'top' }, { title: hid ? 'Показати' : 'Сховати', a: 'hide' }],
-                        onSelect: function (x) {
-                            if (x.a === 'hide') { var h = jget('btned_hidden', []); if (hid) h.splice(h.indexOf(it.key), 1); else h.push(it.key); setS('btned_hidden', h); }
-                            else { var i = order.indexOf(it.key), j = x.a === 'top' ? 0 : i + x.a; if (j >= 0 && j < order.length) { order.splice(i, 1); order.splice(j, 0, it.key); setS('btned_order', order); } }
-                            show(it.key);
-                        },
-                        onBack: function () { show(it.key); }
-                    });
-                },
-                onBack: function () { Lampa.Noty.show('Збережено — відкрийте фільм знову'); Lampa.Controller.toggle('settings_component'); }
-            });
-        };
-        show(null);
-    }
 
 
 
@@ -4082,7 +3999,7 @@
         send(true);
     }
     function aiAsk(q, ok, fail) {
-        if (!aiKey()) return fail('Вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
+        if (!aiKey()) return fail('Вкажіть ключ Gemini: Стильний інтерфейс → 4. Розумний пошук');
         aiModels(function (models) {
             var i = 0, discovered = false, retried = false, lastErr = '', finished = false, running = 0, t0 = Date.now();
             var tick = setInterval(function () { if (finished) return clearInterval(tick); if (!document.getElementById('sui-ai-status')) return; try { aiStatus(q, 'Питаю нейромережу Gemini… ' + Math.round((Date.now() - t0) / 1000) + ' с'); } catch (e) { } }, 1000);
@@ -4275,7 +4192,7 @@
     }
     function aiStart() {
         if (!aiKey()) {
-            Lampa.Noty.show('Спершу вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук');
+            Lampa.Noty.show('Спершу вкажіть ключ Gemini: Стильний інтерфейс → 4. Розумний пошук');
             return open(AI);
         }
         var h = aiHistory();
@@ -4328,7 +4245,7 @@
                 var q = trim(decodeURIComponent(params.query || ''));
                 var my = ++aiSeq;
                 src.params.nofound = 'Нічого не знайдено — опишіть інакше';
-                if (!aiKey()) { src.params.nofound = 'Вкажіть ключ Gemini: Стильний інтерфейс → 5. Розумний пошук'; return oncomplite([]); }
+                if (!aiKey()) { src.params.nofound = 'Вкажіть ключ Gemini: Стильний інтерфейс → 4. Розумний пошук'; return oncomplite([]); }
                 if (q.length < 4) return oncomplite([]);
                 aiSearch(q, function (res) {
                     if (my !== aiSeq) return;   // поки шукали, запит змінився
@@ -4411,7 +4328,7 @@
     /* ======================================================================
      * МЕНЮ
      * ==================================================================== */
-    function open(id) { [RTS, LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_btned', 'stylish_ui_ai', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
+    function open(id) { [RTS, LOGO, XT, BTNS, STUD, UAT, 'stylish_ui_ai', 'stylish_ui_styles', 'stylish_ui_style_urls'].forEach(function (c) { Lampa.Template.add('settings_' + c, '<div></div>'); }); Lampa.Settings.create(id, { onBack: function () { Lampa.Settings.create(PARENT[id] || SUI); } }); }
     window.SUI_open = open;
 
     function sel(comp, key, title, desc, values, def) {
@@ -4556,16 +4473,9 @@
         });
 
         // ---- 4. Редактор кнопок ----
-        Lampa.Template.add('settings_' + BTNED, '<div></div>');
-        ttl(BTNED, 'btned_head', 'Редактор кнопок');
-        trg(BTNED, 'btned_on', 'Увімкнути редактор', 'Застосовувати порядок, приховування й підписи кнопок на сторінці фільму', true);
-        btn(BTNED, 'btned_open', 'Порядок і видимість кнопок', 'Переставити або сховати будь-яку кнопку (Дивитись, Торенти, Онлайн, Закладки, Трейлер…)', openBtnOrder);
-        sel(BTNED, 'btned_labels', 'Підписи кнопок', '', { lampa: 'Як у Lampa', all: 'Завжди з підписом', none: 'Лише іконки' }, 'lampa');
-        btn(BTNED, 'btned_reset', 'Скинути', 'Повернути стандартний порядок і показати всі кнопки', function () { setS('btned_order', []); setS('btned_hidden', []); Lampa.Noty.show('Кнопки скинуто'); });
-
-        // ---- 5. Розумний пошук ----
+        // ---- 4. Розумний пошук ----
         Lampa.Template.add('settings_' + AI, '<div></div>');
-        btn(SUI, 'go_ai', '5. Розумний пошук', 'Пошук фільмів за описом звичайними словами (нейромережа Gemini)', function () { open(AI); });
+        btn(SUI, 'go_ai', '4. Розумний пошук', 'Пошук фільмів за описом звичайними словами (нейромережа Gemini)', function () { open(AI); });
         ttl(AI, 'ai_head', 'Розумний пошук');
         trg(AI, 'ai_lens', 'Іконки лінзи й мікрофона (під стиль)', 'Розумний пошук — вкладка «✨ Розумний» у звичайному пошуку (лінза вгорі, там же мікрофон)', true);
         btn(AI, 'ai_go', '🔎 Шукати', 'Відкриває пошук — вкладка «✨ Розумний». Наприклад: «комедія про собаку»', function () { try { Lampa.Search.open(); } catch (e) { aiStart(); } });
@@ -4592,7 +4502,6 @@
         addMenus();
         lookCss();
         styleCss();
-        btnEdCss();
         setS('style_just', '');
         watchCards();
         watchCrown();

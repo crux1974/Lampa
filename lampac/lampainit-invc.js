@@ -24,6 +24,39 @@ try {
   if (raw) { var arr = JSON.parse(raw), clean = sui_clean_list(arr); if (clean.length !== arr.length) localStorage.setItem('plugins', JSON.stringify(clean)); }
 } catch (e) {}
 
+/* 3) Міст http → https для сторонніх плагінів.
+ * Сторінка Lampa відкрита через https, а браузер не дає https-сторінці вантажити http-скрипти й запити
+ * («змішаний вміст»). Тому адреси з MAP непомітно переводимо на наш сервер, який проксіює їх (Caddy: /ext/...).
+ * Код плагінів не копіюється — вантажиться оригінал автора через проксі. */
+(function () {
+  if (location.protocol !== 'https:') return;
+  var MAP = { 'http://lampaua.mooo.com': '/ext/lampaua' };
+  function fix(u) {
+    if (typeof u !== 'string') return u;
+    for (var k in MAP) {
+      if (u.indexOf(k) === 0) {
+        var c = u.charAt(k.length);
+        if (!c || c === '/' || c === '?' || c === '#') return location.origin + MAP[k] + u.slice(k.length);
+      }
+    }
+    return u;
+  }
+  window.sui_bridge_fix = fix;
+  try {
+    var op = XMLHttpRequest.prototype.open;
+    XMLHttpRequest.prototype.open = function (m, u) { arguments[1] = fix(u); return op.apply(this, arguments); };
+  } catch (e) {}
+  try {
+    if (window.fetch) { var f = window.fetch; window.fetch = function (i, o) { if (typeof i === 'string') i = fix(i); return f.call(this, i, o); }; }
+  } catch (e) {}
+  try {
+    var d = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, 'src');
+    if (d && d.set) Object.defineProperty(HTMLScriptElement.prototype, 'src', { get: d.get, set: function (v) { d.set.call(this, fix(v)); }, configurable: true, enumerable: d.enumerable });
+    var sa = Element.prototype.setAttribute;
+    Element.prototype.setAttribute = function (n, v) { if (this.tagName === 'SCRIPT' && String(n).toLowerCase() === 'src') v = fix(v); return sa.call(this, n, v); };
+  } catch (e) {}
+})();
+
 lampainit_invc.appload = function () {};
 lampainit_invc.appready = function () {};
 lampainit_invc.first_initiale = function () {};
