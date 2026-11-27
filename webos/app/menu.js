@@ -73,6 +73,12 @@
     if (l.indexOf(u) < 0) l.push(u);
     saveList(l);
     ls(KEY, u);
+    // застосунок на телевізорі не завжди запам'ятовує нову адресу (з http-сторінки його пам'ять недоступна),
+    // тож запам'ятовуємо вибір і тут: наступного запуску ця адреса сама перекине на вибрану
+    if (DIRECT) {
+      try { if (u.replace(/\/+$/, '') !== location.origin) localStorage.setItem('alco_prefer', u); else localStorage.removeItem('alco_prefer'); } catch (e) {}
+      try { NAMED.chosen = u; } catch (e) {}
+    }
     restart();
   }
 
