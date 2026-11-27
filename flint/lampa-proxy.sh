@@ -4,6 +4,7 @@
 # Запуск на роутері (ssh root@192.168.8.1):
 #   curl -fsSL https://raw.githubusercontent.com/crux1974/Lampa/main/flint/lampa-proxy.sh | sh
 SERVER=92-5-178-165.sslip.io
+SERVER_IP=92.5.178.165   # напряму за IP: без DNS-запиту, який провайдер міг би побачити
 PORT=8095
 CONF=/etc/nginx/conf.d/lampa-proxy.conf
 
@@ -19,7 +20,7 @@ server {
     listen [::]:$PORT;
     client_max_body_size 50m;
     location / {
-        proxy_pass http://$SERVER;
+        proxy_pass http://$SERVER_IP;
         proxy_set_header Host $SERVER;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_http_version 1.1;

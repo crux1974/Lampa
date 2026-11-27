@@ -8,6 +8,7 @@ BIN=$DIR/TorrServer
 PORT=8090
 TUID=7777
 TABLE=77
+SRVIP=92.5.178.165   # сервер Lampac (Oracle)
 echo "torrserver-setup $(date)"
 
 # 1) окремий користувач, щоб маршрутизувати лише трафік TorrServer
@@ -37,6 +38,9 @@ while true; do
   ip rule show | grep -q "uidrange $TUID-$TUID lookup $TABLE" || ip rule add uidrange $TUID-$TUID lookup $TABLE priority 101
   ip rule show | grep -q "uidrange $TUID-$TUID prohibit" || ip rule add uidrange $TUID-$TUID prohibit priority 102
   ip -6 rule show | grep -q "uidrange $TUID-$TUID prohibit" || ip -6 rule add uidrange $TUID-$TUID prohibit priority 100
+  # власний трафік роутера до сервера Lampac (проксі 192.168.8.1:8095) — теж лише через VPN
+  ip rule show | grep -q "to $SRVIP lookup $TABLE" || ip rule add to $SRVIP lookup $TABLE priority 103
+  ip rule show | grep -q "to $SRVIP prohibit" || ip rule add to $SRVIP prohibit priority 104
   if [ -n "\$WG" ] && [ -d /sys/class/net/\$WG ] && [ "\$(cat /sys/class/net/\$WG/operstate 2>/dev/null)" != "down" ]; then
     ip route show table $TABLE | grep -q "dev \$WG" || { ip route flush table $TABLE; ip route add default dev \$WG table $TABLE; }
   else
@@ -74,6 +78,8 @@ grep -qs "$DIR" /etc/sysupgrade.conf || { echo "$DIR" >> /etc/sysupgrade.conf; e
 sleep 8
 echo "--- маршрут TorrServer (має бути dev wg…):"
 ip route get 1.1.1.1 uid $TUID 2>&1 | head -1
+echo "--- маршрут до сервера Lampac (має бути dev wg…):"
+ip route get $SRVIP 2>&1 | head -1
 echo "--- TorrServer відповідає:"
 curl -s -m 5 http://127.0.0.1:$PORT/echo || echo "НЕ відповідає"
 echo
