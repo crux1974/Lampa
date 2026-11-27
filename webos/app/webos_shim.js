@@ -53,10 +53,10 @@
     var pref = (localStorage.getItem('alco_prefer') || '').replace(/\/+$/, '');
     if (!pref || pref === here || !/^https?:\/\//i.test(pref)) return;
     // Перевіряти домашню адресу звідси не можна: телевізор не дає сторінці з інтернету звертатися до домашньої мережі.
-    // Тому переходимо одразу. Запобіжник: якщо застосунок перезапустили одразу (до 15 с) після перекидання, а ми знову тут — вибрана адреса
+    // Тому переходимо одразу. Запобіжник: якщо застосунок перезапустили одразу (до 5 с) після перекидання, а ми знову тут — вибрана адреса
     // не відкрилась, лишаємося на цій, щоб можна було вибрати іншу в меню ◀.
     var last = parseInt(localStorage.getItem('alco_prefer_ts') || '0', 10) || 0;
-    if (Date.now() - last < 15000) { localStorage.removeItem('alco_prefer_ts'); return; }
+    if (Date.now() - last < 5000) { localStorage.removeItem('alco_prefer_ts'); return; }
     localStorage.setItem('alco_prefer_ts', String(Date.now()));
     N.cur = pref;
     try { window.name = JSON.stringify(N); } catch (e) {}
