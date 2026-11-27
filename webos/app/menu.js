@@ -135,6 +135,12 @@
           { node: del, act: function () { remove(u); } }
         ]);
       });
+      if (DIRECT && list().length > 1) {
+        var xRow = el('div', 'am-row');
+        var xb = el('div', 'am-btn am-main', '⇄ Перенести налаштування сюди з іншої адреси');
+        xRow.appendChild(xb); box.appendChild(xRow);
+        grid.push([{ node: xb, act: function () { mode = 'xfer'; render(0, 0); } }]);
+      }
       var lRow = el('div', 'am-row');
       var lb = el('div', 'am-btn am-main', '📋 Журнал запуску');
       lRow.appendChild(lb); box.appendChild(lRow);
@@ -148,6 +154,21 @@
       addRow.appendChild(add);
       box.appendChild(addRow);
       grid.push([{ node: add, act: function () { edit(null); } }]);
+    } else if (mode === 'xfer') {
+      box.appendChild(el('div', 'am-hint', 'Звідки перенести розширення й налаштування на ' + short(current()) + '? Поточні налаштування тут буде замінено.'));
+      var here = current();
+      list().forEach(function (u) {
+        if (u === here) return;
+        var r = el('div', 'am-row'), b = el('div', 'am-btn am-main', '⇄ ' + short(u));
+        r.appendChild(b); box.appendChild(r);
+        grid.push([{ node: b, act: function () {
+          try { NAMED = NAMED || { alco: 1 }; NAMED.sui_export_to = here; NAMED.cur = here; window.name = JSON.stringify(NAMED); } catch (e) {}
+          try { window.location.replace(u); } catch (e) {}
+        } }]);
+      });
+      var xbk = el('div', 'am-btn am-main', 'Назад');
+      var xr = el('div', 'am-row'); xr.appendChild(xbk); box.appendChild(xr);
+      grid.push([{ node: xbk, act: function () { mode = 'list'; render(0, 0); } }]);
     } else if (mode === 'log') {
       box.appendChild(el('div', 'am-hint', 'Сфотографуйте й надішліть · OK — назад'));
       var get = function (k) { try { return JSON.parse(localStorage.getItem(k) || '[]'); } catch (e) { return []; } };

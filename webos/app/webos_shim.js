@@ -1,3 +1,41 @@
+/* Alcopac UA — перенесення налаштувань Lampa між адресами сервера.
+   У кожної адреси своя пам'ять браузера. Меню ◀ («Перенести налаштування») відкриває стару адресу
+   з позначкою sui_export_to; тут, до старту Lampa, пам'ять пакується у window.name і передається
+   на нову адресу, де так само до старту Lampa записується. Великі кеші не переносяться. */
+(function () {
+  var N = null;
+  try { N = JSON.parse(window.name || 'null'); } catch (e) {}
+  if (!N || !N.alco) return;
+  var SKIP = /^(sui_img|sui_full|sui_uat|sui_ai|sui_rt_cache|sui_tv_cache|sui_svc_cache|img_cache_v3_|obsidian_.*cache|title_cache|netflix_card_cache|applecation_ratings_cache)/;
+  try {
+    if (N.sui_export_to && /^https?:/i.test(location.protocol)) {
+      var data = {}, n = 0;
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!k || SKIP.test(k)) continue;
+        data[k] = localStorage.getItem(k); n++;
+      }
+      var to = N.sui_export_to;
+      delete N.sui_export_to;
+      N.sui_import = { from: location.origin, n: n, data: data };
+      N.cur = to;
+      window.name = JSON.stringify(N);
+      document.documentElement.innerHTML = '<body style="background:#111;color:#fff;font:32px sans-serif;display:flex;align-items:center;justify-content:center;height:100vh">Переношу налаштування (' + n + ')…</body>';
+      location.replace(to);
+      window.__alcoStop = true;
+      return;
+    }
+    if (N.sui_import && N.sui_import.from !== location.origin) {
+      var d = N.sui_import.data || {}, c = 0;
+      for (var key in d) { if (Object.prototype.hasOwnProperty.call(d, key) && !/^mylampa_/.test(key)) { try { localStorage.setItem(key, d[key]); c++; } catch (e) {} } }
+      try { localStorage.setItem('alco_imported', N.sui_import.from + ' · ' + c + ' · ' + new Date().toISOString()); } catch (e) {}
+      delete N.sui_import;
+      window.name = JSON.stringify(N);
+      window.__alcoImported = c;
+    }
+  } catch (e) { try { console.log('alco transfer', e); } catch (e2) {} }
+})();
+
 /* Alcopac UA — мінімальна заміна webOSTV.js (бібліотеки LG), щоб Lampa
    розпізнала телевізор LG так само, як в офіційному застосунку.
    Працює через вбудований у webOS PalmServiceBridge. */
