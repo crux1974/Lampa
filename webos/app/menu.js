@@ -17,7 +17,21 @@
     window.ALCO_DEFAULT_URL = window.ALCO_DEFAULT_URL || NAMED.def;
     try {
       if (NAMED.cur) window.localStorage.setItem(KEY, NAMED.cur);
-      if (NAMED.list && NAMED.list.length) window.localStorage.setItem(LIST, JSON.stringify(NAMED.list));
+      // список адрес: об'єднуємо те, що прийшло від застосунку, з тим, що вже збережено тут, — нічого не губимо
+      var mine = []; try { mine = JSON.parse(window.localStorage.getItem(LIST) || '[]') || []; } catch (e) { mine = []; }
+      var merged = [];
+      [].concat(NAMED.list || [], mine, NAMED.cur ? [NAMED.cur] : [], [location.origin]).forEach(function (u) {
+        u = String(u || '').replace(/\/+$/, '');
+        if (u && /^https?:\/\//i.test(u) && merged.indexOf(u) < 0) merged.push(u);
+      });
+      var gone = []; try { gone = JSON.parse(window.localStorage.getItem('alco_removed') || '[]') || []; } catch (e) { gone = []; }
+      (NAMED.removed || []).forEach(function (u) { if (gone.indexOf(u) < 0) gone.push(u); });
+      window.localStorage.setItem('alco_removed', JSON.stringify(gone));
+      NAMED.removed = gone;
+      merged = merged.filter(function (u) { return gone.indexOf(u) < 0 || u === location.origin || u === String(NAMED.cur || '').replace(/\/+$/, ''); });
+      window.localStorage.setItem(LIST, JSON.stringify(merged));
+      NAMED.list = merged;
+      window.name = JSON.stringify(NAMED);
     } catch (e) {}
   }
   var DEFAULT_URL = window.ALCO_DEFAULT_URL || 'http://92-5-178-165.sslip.io';
@@ -73,6 +87,7 @@
     if (l.indexOf(u) < 0) l.push(u);
     saveList(l);
     ls(KEY, u);
+    try { var g2 = JSON.parse(ls('alco_removed') || '[]') || []; g2 = g2.filter(function (x) { return x !== u; }); ls('alco_removed', JSON.stringify(g2)); if (DIRECT && NAMED) { NAMED.removed = g2; NAMED.list = l; } } catch (e) {}
     // застосунок на телевізорі не завжди запам'ятовує нову адресу (з http-сторінки його пам'ять недоступна),
     // тож запам'ятовуємо вибір і тут: наступного запуску ця адреса сама перекине на вибрану
     if (DIRECT) {
@@ -245,6 +260,11 @@
     if (!l.length) return;                 // останню адресу не видаляємо
     saveList(l);
     if (u === current()) ls(KEY, l[0]);
+    // запам'ятати видалення, щоб адреса не повернулась зі старого списку застосунку
+    try {
+      var g = JSON.parse(ls('alco_removed') || '[]') || []; if (g.indexOf(u) < 0) g.push(u); ls('alco_removed', JSON.stringify(g));
+      if (DIRECT && NAMED) { NAMED.removed = g; NAMED.list = l; window.name = JSON.stringify(NAMED); }
+    } catch (e) {}
     render(Math.min(fy, l.length - 1), 0);
   }
 
