@@ -7,6 +7,8 @@ SERVER=92-5-178-165.sslip.io
 PORT=8095
 CONF=/etc/nginx/conf.d/lampa-proxy.conf
 
+echo "lampa-proxy $(date)"
+ls /etc/nginx /etc/nginx/conf.d 2>&1
 if ! grep -rqs "conf.d" /etc/nginx/nginx.conf; then
   echo "ПОМИЛКА: nginx роутера не підключає /etc/nginx/conf.d — надішліть цей вивід:"; head -40 /etc/nginx/nginx.conf; exit 1
 fi
@@ -29,7 +31,7 @@ server {
 }
 NGX
 
-if nginx -t 2>/tmp/ngx.err; then
+if nginx -t >/tmp/ngx.err 2>&1; then
   /etc/init.d/nginx reload && echo "ок: nginx перезавантажено"
 else
   echo "ПОМИЛКА в конфігурації, прибираю:"; cat /tmp/ngx.err; rm -f "$CONF"; exit 1
@@ -41,3 +43,5 @@ grep -qs "$CONF" /etc/sysupgrade.conf || echo "$CONF" >> /etc/sysupgrade.conf
 sleep 1
 code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/")
 echo "Перевірка http://192.168.8.1:$PORT → $code (має бути 200)"
+
+netstat -lnt 2>/dev/null | grep ":$PORT " || echo "порт $PORT не слухається"
