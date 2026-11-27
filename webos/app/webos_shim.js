@@ -36,6 +36,34 @@
   } catch (e) { try { console.log('alco transfer', e); } catch (e2) {} }
 })();
 
+/* Alcopac UA — запам'ятована адреса: якщо в меню ◀ вибрали іншу адресу, а застосунок знову відкрив стару,
+   ця сторінка сама перекидає на вибрану (якщо вона відповідає). Явний вибір адреси в меню скасовує перекидання. */
+(function () {
+  var N = null;
+  try { N = JSON.parse(window.name || 'null'); } catch (e) {}
+  if (!N || !N.alco || !/^https?:/i.test(location.protocol) || window.__alcoStop) return;
+  try {
+    var here = location.origin;
+    if (N.chosen) {
+      var ch = String(N.chosen).replace(/\/+$/, '');
+      delete N.chosen;
+      window.name = JSON.stringify(N);
+      if (ch === here) { localStorage.removeItem('alco_prefer'); return; }
+    }
+    var pref = (localStorage.getItem('alco_prefer') || '').replace(/\/+$/, '');
+    if (!pref || pref === here || !/^https?:\/\//i.test(pref)) return;
+    var done = false;
+    var go = function () {
+      if (done) return; done = true;
+      N.cur = pref;
+      try { window.name = JSON.stringify(N); } catch (e) {}
+      location.replace(pref);
+    };
+    var t = setTimeout(function () { done = true; }, 2500);   // вибрана адреса не відповідає — лишаємось тут
+    fetch(pref + '/?ping=' + Date.now(), { mode: 'no-cors', cache: 'no-store' }).then(function () { clearTimeout(t); go(); }, function () { clearTimeout(t); done = true; });
+  } catch (e) {}
+})();
+
 /* Alcopac UA — мінімальна заміна webOSTV.js (бібліотеки LG), щоб Lampa
    розпізнала телевізор LG так само, як в офіційному застосунку.
    Працює через вбудований у webOS PalmServiceBridge. */
