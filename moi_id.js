@@ -75,6 +75,62 @@
         } catch (e) { Lampa.Noty.show(text); }
     }
 
+
+    /* ---------- «Свої пристрої»: керування списком прямо з Lampa ---------- */
+    function api(q, ok) {
+        var x = new XMLHttpRequest();
+        x.open('GET', '/jm/owners?box_mac=' + encodeURIComponent(uid()) + (q ? '&' + q : ''), true);
+        x.timeout = 10000;
+        x.onload = function () {
+            if (x.status === 403) return Lampa.Noty.show('Цей пристрій не в списку своїх — керувати може лише свій');
+            if (x.status !== 200) return Lampa.Noty.show('Сервер не відповів (' + x.status + ')');
+            try { ok(JSON.parse(x.responseText)); } catch (e) { Lampa.Noty.show('Помилка відповіді сервера'); }
+        };
+        x.onerror = x.ontimeout = function () { Lampa.Noty.show('Сервер не відповів'); };
+        x.send();
+    }
+
+    var MSG = { added: 'Додано. Діє приблизно за хвилину', removed: 'Прибрано', 'bad id': 'Неправильний ID', 'cannot remove yourself': 'Себе прибрати не можна' };
+
+    function owners() {
+        api('', function (d) { showOwners(d); });
+    }
+
+    function showOwners(d) {
+        if (d.msg && MSG[d.msg]) Lampa.Noty.show(MSG[d.msg]);
+        var items = [{ title: '+ Додати ID пристрою', add: true }];
+        (d.ids || []).forEach(function (id) {
+            items.push({ title: id, subtitle: id === d.me ? 'цей пристрій' : 'натисни — прибрати', id: id, me: id === d.me });
+        });
+        Lampa.Select.show({
+            title: 'Свої пристрої: ' + (d.ids || []).length,
+            items: items,
+            onSelect: function (a) {
+                if (a.add) {
+                    Lampa.Input.edit({ title: 'ID пристрою (з розділу «ID для сервера» на ньому)', value: '', free: true, nosave: true }, function (v) {
+                        v = (v || '').replace(/\s+/g, '').toLowerCase();
+                        if (!v) return Lampa.Controller.toggle('settings_component');
+                        api('add=' + encodeURIComponent(v), showOwners);
+                    });
+                } else if (a.me) {
+                    Lampa.Noty.show('Це цей пристрій — його прибрати не можна');
+                    Lampa.Controller.toggle('settings_component');
+                } else {
+                    Lampa.Select.show({
+                        title: 'Прибрати ' + a.id + '?',
+                        items: [{ title: 'Так, прибрати', yes: true }, { title: 'Скасувати' }],
+                        onSelect: function (b) {
+                            if (b.yes) api('del=' + encodeURIComponent(a.id), showOwners);
+                            else owners();
+                        },
+                        onBack: owners
+                    });
+                }
+            },
+            onBack: function () { Lampa.Controller.toggle('settings_component'); }
+        });
+    }
+
     function start() {
         Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'ID для сервера', icon: ICON });
 
@@ -97,13 +153,9 @@
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
-            param: { name: COMPONENT + '_email', type: 'button' },
-            field: { name: 'Акаунт CUB', description: email() || 'не виконано вхід' },
-            onRender: function (item) {
-                var d = item.find ? item.find('.settings-param__descr') : null;
-                if (d && d.length) d.text(email() || 'не виконано вхід — тоді використовуйте ID пристрою');
-            },
-            onChange: function () { if (email()) copy(email()); }
+            param: { name: COMPONENT + '_owners', type: 'button' },
+            field: { name: 'Свої пристрої', description: 'Додати або прибрати ID (працює лише на своєму пристрої)' },
+            onChange: owners
         });
 
         Lampa.SettingsApi.addParam({
