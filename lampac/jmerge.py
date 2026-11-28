@@ -22,46 +22,34 @@ LAMPAC = os.environ.get("LAMPAC", "http://127.0.0.1:9118").rstrip("/")
 JACKETT = os.environ.get("JACKETT", "http://127.0.0.1:9117/jackett").rstrip("/")
 CONF = os.environ.get("JACKETT_CONF", "/var/lib/jackett/ServerConfig.json")
 PORT = int(os.environ.get("PORT", "9120"))
-OWNERS = os.environ.get("OWNERS", "/etc/jmerge-owners")
-PIN_FILE = os.environ.get("PIN_FILE", "/var/lib/jackett/owner-pin")
-QUEUE = os.environ.get("QUEUE", "/var/lib/jackett/owner-requests")
-_bad = {}  # IP -> [час, кількість невдалих спроб]
+OWNERS = os.environ.get("OWNERS", "/var/lib/jmerge/owners")
+OWNERS_OLD = "/etc/jmerge-owners"
+ID_RE = re.compile(r"^[a-z0-9@._+-]{4,80}$")
 
 
-def own_request(params, ip):
-    """Додати пристрій до «своїх» прямо з Лампи (за PIN-кодом)."""
-    import time
-    now = time.time()
-    t, n = _bad.get(ip, [now, 0])
-    if now - t > 3600:
-        t, n = now, 0
-    if n >= 5:
-        return 429, {"ok": False, "msg": "Забагато спроб. Спробуй через годину"}
-    try:
-        pin = open(PIN_FILE, encoding="utf-8").read().strip()
-    except Exception:
-        return 403, {"ok": False, "msg": "На сервері не встановлено PIN"}
-    given = (params.get("pin") or [""])[0].strip()
-    if not pin or given != pin:
-        _bad[ip] = [t, n + 1]
-        return 403, {"ok": False, "msg": "Неправильний PIN"}
-    dev = (params.get("id") or [""])[0].strip().lower()
-    if not re.match(r"^[a-z0-9]{6,32}$", dev):
-        return 400, {"ok": False, "msg": "Неправильний ID пристрою"}
-    if dev in owners():
-        return 200, {"ok": True, "msg": "Цей пристрій уже свій"}
-    with open(QUEUE, "a", encoding="utf-8") as f:
-        f.write(dev + "\n")
-    return 200, {"ok": True, "msg": "Додано. Перезапусти Лампу за хвилину"}
+def owners_list():
+    for path in (OWNERS, OWNERS_OLD):
+        try:
+            with open(path, encoding="utf-8") as f:
+                out = []
+                for l in f:
+                    l = l.strip().lower()
+                    if l and not l.startswith("#") and l not in out:
+                        out.append(l)
+                return out
+        except Exception:
+            continue
+    return []
 
 
 def owners():
     """Хто бачить польські роздачі. Порожній список — бачать усі."""
-    try:
-        with open(OWNERS, encoding="utf-8") as f:
-            return {l.strip().lower() for l in f if l.strip() and not l.startswith("#")}
-    except Exception:
-        return set()
+    return set(owners_list())
+
+
+def save_owners(ids):
+    with open(OWNERS, "w", encoding="utf-8") as f:
+        f.write("\n".join(ids) + "\n")
 
 
 def is_owner(params):
@@ -232,10 +220,6 @@ class Handler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(qs, keep_blank_values=True)
         if self.path.startswith("/jm/owners"):
             return self.owners_api(params)
-        if self.path.startswith("/jm/own"):
-            ip = self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
-            code, data = own_request(params, ip)
-            return self.reply(code, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         is_all = "/indexers/all/results" in self.path.lower() and is_owner(params)
 
         fwd = {"Accept-Encoding": "identity"}
