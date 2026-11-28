@@ -22,6 +22,27 @@ LAMPAC = os.environ.get("LAMPAC", "http://127.0.0.1:9118").rstrip("/")
 JACKETT = os.environ.get("JACKETT", "http://127.0.0.1:9117/jackett").rstrip("/")
 CONF = os.environ.get("JACKETT_CONF", "/var/lib/jackett/ServerConfig.json")
 PORT = int(os.environ.get("PORT", "9120"))
+OWNERS = os.environ.get("OWNERS", "/etc/jmerge-owners")
+
+
+def owners():
+    """Хто бачить польські роздачі. Порожній список — бачать усі."""
+    try:
+        with open(OWNERS, encoding="utf-8") as f:
+            return {l.strip().lower() for l in f if l.strip() and not l.startswith("#")}
+    except Exception:
+        return set()
+
+
+def is_owner(params):
+    own = owners()
+    if not own:
+        return True
+    for k in ("account_email", "uid", "token"):
+        for v in params.get(k, []):
+            if v.strip().lower() in own:
+                return True
+    return False
 
 # польські трекери Jackett — з них беремо все
 PL_TRACKERS = {
@@ -153,7 +174,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         qs = self.path.split("?", 1)[1] if "?" in self.path else ""
         params = urllib.parse.parse_qs(qs, keep_blank_values=True)
-        is_all = "/indexers/all/results" in self.path.lower()
+        is_all = "/indexers/all/results" in self.path.lower() and is_owner(params)
 
         fwd = {"Accept-Encoding": "identity"}
         for h in ("Host", "User-Agent", "Cookie", "Authorization", "X-Forwarded-For", "X-Forwarded-Proto", "X-Real-IP"):
