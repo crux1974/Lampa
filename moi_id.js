@@ -221,7 +221,7 @@
     function addMenu() {
         try {
             if (document.querySelector('.menu__item[data-action="moi_fx"]')) return;
-            var list = document.querySelector('.menu .menu__list');
+            var list = document.querySelector('.menu .menu__list') || document.querySelector('.menu__list');
             if (!list) return;
             var li = document.createElement('li');
             li.className = 'menu__item selector';
@@ -235,7 +235,6 @@
 
     function start() {
         Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'ID для сервера', icon: ICON });
-        addMenu();
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
@@ -256,17 +255,6 @@
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
-            param: { name: COMPONENT + '_fx', type: 'button' },
-            field: { name: 'Мій Filmix', description: 'Увійти у свій акаунт Filmix на цьому пристрої' },
-            onRender: function (item) {
-                var d = item.find ? item.find('.settings-param__descr') : null;
-                if (d && d.length) fx('status', function (r) { d.text(fxStatusText(r)); });
-            },
-            onChange: function () { backTo = 'settings_component'; fxMenu(); }
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: COMPONENT,
             param: { name: COMPONENT + '_owners', type: 'button' },
             field: { name: 'Свої пристрої', description: 'Додати або прибрати ID (працює лише на своєму пристрої)' },
             onChange: function () { backTo = 'settings_component'; owners(); }
@@ -277,6 +265,40 @@
             param: { name: COMPONENT + '_tip', type: 'title' },
             field: { name: 'Цей ID свій на кожному пристрої і не переходить через CUB' }
         });
+
+        /* окремий розділ «Мій Filmix» */
+        Lampa.SettingsApi.addComponent({ component: 'moi_filmix', name: 'Мій Filmix', icon: FX_ICON });
+
+        Lampa.SettingsApi.addParam({
+            component: 'moi_filmix',
+            param: { name: 'moi_filmix_status', type: 'button' },
+            field: { name: 'Стан', description: 'Перевіряю…' },
+            onRender: function (item) {
+                var d = item.find ? item.find('.settings-param__descr') : null;
+                if (d && d.length) fx('status', function (r) { d.text(fxStatusText(r)); });
+            },
+            onChange: function () { backTo = 'settings_component'; fxMenu(); }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'moi_filmix',
+            param: { name: 'moi_filmix_login', type: 'button' },
+            field: { name: 'Увійти у свій акаунт Filmix', description: 'Код вводиться на filmix.my/consoles' },
+            onChange: function () { backTo = 'settings_component'; fxLogin(); }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'moi_filmix',
+            param: { name: 'moi_filmix_logout', type: 'button' },
+            field: { name: 'Вийти з Filmix на цьому пристрої' },
+            onChange: function () {
+                fx('logout', function () { Lampa.Noty.show('Вийшов з Filmix'); });
+            }
+        });
+
+        // пункт у лівому меню: Стильний інтерфейс може перемальовувати меню — повертаємо пункт, якщо зник
+        addMenu();
+        setInterval(addMenu, 3000);
     }
 
     if (window.appready) start();
