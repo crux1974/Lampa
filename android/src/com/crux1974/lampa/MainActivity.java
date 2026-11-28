@@ -26,6 +26,7 @@ import android.widget.Toast;
 /** Alcopac UA: Lampa з вашого сервера у WebView. Довге «Назад» або «Меню» — зміна адреси. */
 public class MainActivity extends Activity {
     static final String DEFAULT_URL = "http://92-5-178-165.sslip.io";
+    static final String PLUGIN = "https://crux1974.github.io/Lampa/moi_id.js";
     static final String HOME_URL = "http://192.168.8.1:8095";
     static final String[] PRESETS = { DEFAULT_URL, HOME_URL, "https://92-5-178-165.sslip.io", "http://lampa.mx" };
     static final String[] PRESET_NAMES = { "Сервер (будь-де)", "Вдома через роутер (з TorrServer)", "Сервер https", "lampa.mx" };
@@ -57,11 +58,18 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setAllowFileAccess(false);
         if (Build.VERSION.SDK_INT >= 21) s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " AlcopacUA/1.1");
+        s.setUserAgentString(s.getUserAgentString() + " AlcopacUA/1.2");
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= 21) CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
         web.setWebViewClient(new WebViewClient() {
+            /* Вбудований плагін «ID для сервера» (свій ID пристрою, «Мій Filmix», свої пристрої) */
+            @Override public void onPageFinished(WebView v, String u) {
+                v.evaluateJavascript(
+                    "(function(){if(window.moi_id_plugin||document.getElementById('moi_id_js'))return;" +
+                    "var s=document.createElement('script');s.id='moi_id_js';s.src='" + PLUGIN + "';" +
+                    "document.head.appendChild(s);})()", null);
+            }
             @Override public void onReceivedError(WebView v, WebResourceRequest r, WebResourceError e) {
                 if (r != null && r.isForMainFrame()) {
                     Toast.makeText(MainActivity.this, "Сервер не відповідає. Перевірте адресу", Toast.LENGTH_LONG).show();
