@@ -52,6 +52,103 @@ def save_owners(ids):
         f.write("\n".join(ids) + "\n")
 
 
+# ---------------- «Мій Filmix»: кожен пристрій входить у свій акаунт ----------------
+import hashlib
+import random
+import string
+import time
+
+KIT = os.environ.get("KIT", "/var/lib/jmerge/kit")
+FX_HOSTS = ["http://filmixapp.cyou", "http://filmixapp.vip", "http://fxapp.biz"]
+FX_DEV = "user_dev_apk=2.2.13&user_dev_name=Xiaomi&user_dev_os=12&user_dev_vendor=Xiaomi"
+_fx_pending = {}  # пристрій -> {code, user_code, dev_id, t}
+
+
+def fx_get(path):
+    for h in FX_HOSTS:
+        st, _, body = fetch(h + path, {"Accept-Encoding": "identity", "User-Agent": "okhttp/3.12.12"}, 12)
+        if st == 200 and body:
+            try:
+                return json.loads(body.decode("utf-8", "replace"))
+            except Exception:
+                continue
+    return None
+
+
+def kit_key(params):
+    """Під яким ім'ям Lampac шукає налаштування цього пристрою (kit.uidIdentity)."""
+    dev = ((params.get("token") or params.get("box_mac") or [""])[0]).strip().lower()
+    if not dev:
+        return "", ""
+    own = owners_list()
+    return dev, (own[0] if dev in own else dev)
+
+
+def kit_file(key):
+    m = hashlib.md5(key.encode("utf-8")).hexdigest()
+    return os.path.join(KIT, m[0], m)
+
+
+def kit_read(key):
+    try:
+        with open(kit_file(key), encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+
+def kit_write(key, data):
+    f = kit_file(key)
+    os.makedirs(os.path.dirname(f), exist_ok=True)
+    with open(f, "w", encoding="utf-8") as fh:
+        json.dump(data, fh, ensure_ascii=False)
+
+
+def fx_api(path, params):
+    dev, key = kit_key(params)
+    if not dev or not ID_RE.match(dev):
+        return 400, {"ok": False, "msg": "Немає ID пристрою — онови плагін «ID для сервера»"}
+    kit = kit_read(key)
+    fx = kit.get("Filmix") or {}
+
+    if path.endswith("/status"):
+        return 200, {"ok": True, "login": fx.get("login") or "", "pro": bool(fx.get("pro")), "on": bool(fx.get("token")),
+                     "server": bool(fx.get("enable")) and not fx.get("token")}
+
+    if path.endswith("/start"):
+        dev_id = "".join(random.choice(string.ascii_lowercase + string.digits) for _ in range(16))
+        r = fx_get("/api/v2/token_request?%s&user_dev_id=%s&user_dev_token=" % (FX_DEV, dev_id))
+        if not r or not r.get("code") or not r.get("user_code"):
+            return 502, {"ok": False, "msg": "Filmix не відповів, спробуй пізніше"}
+        _fx_pending[dev] = {"code": r["code"], "user_code": r["user_code"], "dev_id": dev_id, "t": time.time()}
+        return 200, {"ok": True, "user_code": r["user_code"], "url": "filmix.my/consoles"}
+
+    if path.endswith("/check"):
+        p = _fx_pending.get(dev)
+        if not p or time.time() - p["t"] > 900:
+            return 200, {"ok": False, "msg": "Код застарів — натисни «Увійти» ще раз"}
+        r = fx_get("/api/v2/user_profile?%s&user_dev_id=%s&user_dev_token=%s" % (FX_DEV, p["dev_id"], p["code"]))
+        u = (r or {}).get("user_data") or {}
+        if not u.get("login"):
+            return 200, {"ok": False, "wait": True, "msg": "Ще не підтверджено на сайті Filmix"}
+        pro = bool(u.get("is_pro") or u.get("is_pro_plus"))
+        kit["Filmix"] = {"enable": True, "token": p["code"], "pro": pro, "login": u.get("login")}
+        kit_write(key, kit)
+        _fx_pending.pop(dev, None)
+        return 200, {"ok": True, "login": u.get("login"), "pro": pro}
+
+    if path.endswith("/logout"):
+        if dev in owners_list():
+            # свій пристрій повертається до серверного Filmix
+            kit["Filmix"] = {"enable": True, "pro": bool(fx.get("server_pro", True))}
+        else:
+            kit.pop("Filmix", None)
+        kit_write(key, kit)
+        return 200, {"ok": True}
+
+    return 404, {"ok": False}
+
+
 def is_owner(params):
     own = owners()
     if not own:
@@ -220,6 +317,9 @@ class Handler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(qs, keep_blank_values=True)
         if self.path.startswith("/jm/owners"):
             return self.owners_api(params)
+        if self.path.startswith("/jm/filmix/"):
+            code, data = fx_api(self.path.split("?", 1)[0], params)
+            return self.reply(code, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         is_all = "/indexers/all/results" in self.path.lower() and is_owner(params)
 
         fwd = {"Accept-Encoding": "identity"}
