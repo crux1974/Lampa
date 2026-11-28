@@ -58,18 +58,29 @@ PY
 chown jackett:jackett "$DATA/ServerConfig.json"
 systemctl start jackett
 JK=http://127.0.0.1:9117/jackett
-for i in $(seq 1 60); do curl -s -o /dev/null "$JK/UI/Login" && break; sleep 1; done
+ready=""
+for i in $(seq 1 150); do
+  c=$(curl -s -o /dev/null -w '%{http_code}' "$JK/UI/Login" || true)
+  [ "$c" != "000" ] && [ -n "$c" ] && { ready=1; break; }
+  sleep 2
+done
+if [ -z "$ready" ]; then
+  echo "   Jackett не запустився. Ось що він пише:"
+  systemctl status jackett --no-pager -l 2>&1 | tail -8
+  journalctl -u jackett --no-pager -n 25 2>&1 | tail -25
+  exit 1
+fi
 echo "   ок"
 
 echo "2) Загальні трекери (з них беруться лише роздачі з польською озвучкою)"
 if [ ! -f /root/jackett-admin.txt ]; then
   for ix in thepiratebay limetorrents; do
-    cfg=$(curl -s "$JK/api/v2.0/indexers/$ix/config")
-    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$cfg" "$JK/api/v2.0/indexers/$ix/config")
+    cfg=$(curl -s "$JK/api/v2.0/indexers/$ix/config" || true)
+    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$cfg" "$JK/api/v2.0/indexers/$ix/config" || true)
     echo "   $ix → $code"
   done
   PASS=$(openssl rand -base64 15 | tr -d '/+=' | cut -c1-16)
-  curl -s -o /dev/null -H 'Content-Type: application/json' -d "\"$PASS\"" "$JK/api/v2.0/server/adminpassword"
+  curl -s -o /dev/null -H 'Content-Type: application/json' -d "\"$PASS\"" "$JK/api/v2.0/server/adminpassword" || true
   printf 'Jackett: https://%s/jackett\nПароль адміністратора: %s\n' "$HOST" "$PASS" > /root/jackett-admin.txt
   chmod 600 /root/jackett-admin.txt
   echo "   пароль до Jackett збережено в /root/jackett-admin.txt"
