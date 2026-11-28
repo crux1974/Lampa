@@ -23,6 +23,36 @@ JACKETT = os.environ.get("JACKETT", "http://127.0.0.1:9117/jackett").rstrip("/")
 CONF = os.environ.get("JACKETT_CONF", "/var/lib/jackett/ServerConfig.json")
 PORT = int(os.environ.get("PORT", "9120"))
 OWNERS = os.environ.get("OWNERS", "/etc/jmerge-owners")
+PIN_FILE = os.environ.get("PIN_FILE", "/var/lib/jackett/owner-pin")
+QUEUE = os.environ.get("QUEUE", "/var/lib/jackett/owner-requests")
+_bad = {}  # IP -> [час, кількість невдалих спроб]
+
+
+def own_request(params, ip):
+    """Додати пристрій до «своїх» прямо з Лампи (за PIN-кодом)."""
+    import time
+    now = time.time()
+    t, n = _bad.get(ip, [now, 0])
+    if now - t > 3600:
+        t, n = now, 0
+    if n >= 5:
+        return 429, {"ok": False, "msg": "Забагато спроб. Спробуй через годину"}
+    try:
+        pin = open(PIN_FILE, encoding="utf-8").read().strip()
+    except Exception:
+        return 403, {"ok": False, "msg": "На сервері не встановлено PIN"}
+    given = (params.get("pin") or [""])[0].strip()
+    if not pin or given != pin:
+        _bad[ip] = [t, n + 1]
+        return 403, {"ok": False, "msg": "Неправильний PIN"}
+    dev = (params.get("id") or [""])[0].strip().lower()
+    if not re.match(r"^[a-z0-9]{6,32}$", dev):
+        return 400, {"ok": False, "msg": "Неправильний ID пристрою"}
+    if dev in owners():
+        return 200, {"ok": True, "msg": "Цей пристрій уже свій"}
+    with open(QUEUE, "a", encoding="utf-8") as f:
+        f.write(dev + "\n")
+    return 200, {"ok": True, "msg": "Додано. Перезапусти Лампу за хвилину"}
 
 
 def owners():
@@ -171,9 +201,41 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def owners_api(self, params):
+        """Керування списком «своїх» прямо з Lampa. Доступ — лише зі «своїх» пристроїв."""
+        me = (params.get("box_mac") or [""])[0].strip().lower()
+        ids = owners_list()
+        if not me or me not in ids:
+            return self.reply(403, b'{"error":"not admin"}', "application/json; charset=utf-8")
+        add = (params.get("add") or [""])[0].strip().lower()
+        rem = (params.get("del") or [""])[0].strip().lower()
+        msg = ""
+        if add:
+            if not ID_RE.match(add):
+                msg = "bad id"
+            elif add not in ids:
+                ids.append(add)
+                save_owners(ids)
+                msg = "added"
+        if rem:
+            if rem == me:
+                msg = "cannot remove yourself"
+            elif rem in ids:
+                ids.remove(rem)
+                save_owners(ids)
+                msg = "removed"
+        out = json.dumps({"me": me, "ids": ids, "msg": msg}, ensure_ascii=False).encode("utf-8")
+        self.reply(200, out, "application/json; charset=utf-8")
+
     def do_GET(self):
         qs = self.path.split("?", 1)[1] if "?" in self.path else ""
         params = urllib.parse.parse_qs(qs, keep_blank_values=True)
+        if self.path.startswith("/jm/owners"):
+            return self.owners_api(params)
+        if self.path.startswith("/jm/own"):
+            ip = self.headers.get("X-Forwarded-For", self.client_address[0]).split(",")[0].strip()
+            code, data = own_request(params, ip)
+            return self.reply(code, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
         is_all = "/indexers/all/results" in self.path.lower() and is_owner(params)
 
         fwd = {"Accept-Encoding": "identity"}
