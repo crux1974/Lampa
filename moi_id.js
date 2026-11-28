@@ -16,23 +16,34 @@
 
     function email() { return (Lampa.Storage.get('account_email', '') || '') + ''; }
 
+    /* Власний ID пристрою: лежить прямо в localStorage, повз Lampa.Storage,
+       тому CUB його не синхронізує — на кожному пристрої свій. */
+    var KEY = 'srv_device_id';
     function uid() {
-        var u = Lampa.Storage.get('lampac_unic_id', '') + '';
+        var u = '';
+        try { u = localStorage.getItem(KEY) || ''; } catch (e) {}
         if (!u) {
-            // так само, як це робить Lampac, якщо ID ще не створено
-            u = Lampa.Utils.uid(8).toLowerCase();
-            Lampa.Storage.set('lampac_unic_id', u);
+            var a = 'abcdefghijkmnpqrstuvwxyz23456789';
+            for (var i = 0; i < 10; i++) u += a.charAt(Math.floor(Math.random() * a.length));
+            try { localStorage.setItem(KEY, u); } catch (e) {}
         }
         return u;
     }
 
     /* ---------- ID у запити пошуку торрентів ---------- */
+    /* box_mac=ID у запити до свого сервера: Lampac шукає «своїх» і за ним */
+    function ours(url) {
+        if (url.indexOf('/api/v2.0/indexers/') >= 0 || url.indexOf('/lite/') >= 0) return true;
+        if (url.indexOf('92-5-178-165.sslip.io') >= 0 || url.indexOf('92.5.178.165') >= 0) return true;
+        if (/^\//.test(url) && !/^\/\//.test(url)) return true;
+        try { return url.indexOf(location.origin + '/') === 0; } catch (e) { return false; }
+    }
+
     function addIds(url) {
         try {
-            if (typeof url !== 'string' || url.indexOf('/api/v2.0/indexers/') < 0) return url;
-            if (url.indexOf('uid=') < 0) url += (url.indexOf('?') < 0 ? '?' : '&') + 'uid=' + encodeURIComponent(uid());
-            var e = email();
-            if (e && url.indexOf('account_email=') < 0) url += '&account_email=' + encodeURIComponent(e);
+            if (typeof url !== 'string' || !ours(url)) return url;
+            if (/\.(js|css|png|jpe?g|svg|webp|gif|woff2?|ico|json)(\?|$)/i.test(url) && url.indexOf('/api/') < 0 && url.indexOf('/lite/') < 0) return url;
+            if (url.indexOf('box_mac=') < 0) url += (url.indexOf('?') < 0 ? '?' : '&') + 'box_mac=' + encodeURIComponent(uid());
         } catch (x) {}
         return url;
     }
@@ -98,7 +109,7 @@
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
             param: { name: COMPONENT + '_tip', type: 'title' },
-            field: { name: 'ID пристрою свій на кожному пристрої і не переходить через CUB' }
+            field: { name: 'Цей ID свій на кожному пристрої і не переходить через CUB' }
         });
     }
 
