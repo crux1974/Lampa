@@ -368,15 +368,24 @@ class Handler(BaseHTTPRequestHandler):
         target = re.sub(r"^(https?):/+", r"\1://", target)
         if not self.FXP_OK.match(target):
             return self.reply(403, b"forbidden", "text/plain")
-        req = urllib.request.Request(target, headers={"User-Agent": "okhttp/3.12.12", "Accept-Encoding": "identity"})
-        try:
-            with urllib.request.urlopen(req, timeout=20) as r:
-                body, ctype, code = r.read(), r.headers.get("Content-Type", "application/octet-stream"), r.status
-        except urllib.error.HTTPError as e:
-            body, ctype, code = e.read(), e.headers.get("Content-Type", "text/plain"), e.code
-        except Exception:
-            return self.reply(502, b"bad gateway", "text/plain")
-        self.reply(code, body, ctype)
+        # якщо дзеркало Filmix недоступне з сервера — пробуємо інші
+        tries = [target]
+        m = re.match(r"^(https?://)(filmixapp\.[a-z]+|fxapp\.[a-z]+)(/.*)?$", target, re.I)
+        if m:
+            for h in ("filmixapp.cyou", "filmixapp.vip", "fxapp.biz"):
+                u = m.group(1) + h + (m.group(3) or "")
+                if u not in tries:
+                    tries.append(u)
+        for t in tries:
+            req = urllib.request.Request(t, headers={"User-Agent": "okhttp/3.12.12", "Accept-Encoding": "identity"})
+            try:
+                with urllib.request.urlopen(req, timeout=12) as r:
+                    return self.reply(r.status, r.read(), r.headers.get("Content-Type", "application/octet-stream"))
+            except urllib.error.HTTPError as e:
+                return self.reply(e.code, e.read(), e.headers.get("Content-Type", "text/plain"))
+            except Exception:
+                continue
+        self.reply(502, b"filmix unreachable", "text/plain")
 
     def reply(self, code, body, ctype):
         self.send_response(code)
