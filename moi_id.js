@@ -2,7 +2,7 @@
  * «Мій ID» для Lampa — показує, за чим сервер упізнає цей пристрій,
  * і передає цей ID у пошук торрентів, щоб сервер міг дати «своїм» більше
  * (польські роздачі тощо).
- * Налаштування → «Мій ID».
+ * Налаштування → «ID для сервера».
  * Встановлення: Налаштування → Розширення → Додати плагін → https://crux1974.github.io/Lampa/moi_id.js
  */
 (function () {
@@ -65,7 +65,7 @@
     }
 
     function start() {
-        Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'Мій ID', icon: ICON });
+        Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'ID для сервера', icon: ICON });
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
