@@ -59,7 +59,9 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setAllowFileAccess(false);
         if (Build.VERSION.SDK_INT >= 21) s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " AlcopacUA/1.3");
+        // Lampa блокує торренти в «чужих» Android-оболонках (вікно «встановіть APK»).
+        // Прибираємо слово Android з User-Agent — тоді Lampa грає торренти вбудованим плеєром, як у браузері.
+        s.setUserAgentString(s.getUserAgentString().replaceAll("(?i)android", "Linux") + " AlcopacUA/1.3.1");
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= 21) CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
