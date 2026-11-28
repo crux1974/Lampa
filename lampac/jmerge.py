@@ -66,7 +66,7 @@ _fx_pending = {}  # пристрій -> {code, user_code, dev_id, t}
 
 def fx_get(path):
     for h in FX_HOSTS:
-        st, _, body = fetch(h + path, {"Accept-Encoding": "identity", "User-Agent": "okhttp/3.12.12"}, 12)
+        st, _, body = fetch(h + path, {"Accept-Encoding": "identity", "User-Agent": "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36"}, 12)
         if st == 200 and body:
             try:
                 return json.loads(body.decode("utf-8", "replace"))
@@ -377,7 +377,7 @@ class Handler(BaseHTTPRequestHandler):
                 if u not in tries:
                     tries.append(u)
         for t in tries:
-            req = urllib.request.Request(t, headers={"User-Agent": "okhttp/3.12.12", "Accept-Encoding": "identity"})
+            req = urllib.request.Request(t, headers={"User-Agent": "Mozilla/5.0 (Linux; Android 12) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36", "Accept-Encoding": "identity"})
             try:
                 with urllib.request.urlopen(req, timeout=12) as r:
                     return self.reply(r.status, r.read(), r.headers.get("Content-Type", "application/octet-stream"))
