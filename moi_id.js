@@ -33,6 +33,7 @@
     /* ---------- ID у запити пошуку торрентів ---------- */
     /* box_mac=ID у запити до свого сервера: Lampac шукає «своїх» і за ним */
     function ours(url) {
+        if (url.indexOf('/fxproxy/') >= 0) return false;
         if (url.indexOf('/api/v2.0/indexers/') >= 0 || url.indexOf('/lite/') >= 0) return true;
         if (url.indexOf('92-5-178-165.sslip.io') >= 0 || url.indexOf('92.5.178.165') >= 0) return true;
         if (/^\//.test(url) && !/^\/\//.test(url)) return true;
@@ -266,39 +267,6 @@
             field: { name: 'Цей ID свій на кожному пристрої і не переходить через CUB' }
         });
 
-        /* окремий розділ «Мій Filmix» */
-        Lampa.SettingsApi.addComponent({ component: 'moi_filmix', name: 'Мій Filmix', icon: FX_ICON });
-
-        Lampa.SettingsApi.addParam({
-            component: 'moi_filmix',
-            param: { name: 'moi_filmix_status', type: 'button' },
-            field: { name: 'Стан', description: 'Перевіряю…' },
-            onRender: function (item) {
-                var d = item.find ? item.find('.settings-param__descr') : null;
-                if (d && d.length) fx('status', function (r) { d.text(fxStatusText(r)); });
-            },
-            onChange: function () { backTo = 'settings_component'; fxMenu(); }
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: 'moi_filmix',
-            param: { name: 'moi_filmix_login', type: 'button' },
-            field: { name: 'Увійти у свій акаунт Filmix', description: 'Код вводиться на filmix.my/consoles' },
-            onChange: function () { backTo = 'settings_component'; fxLogin(); }
-        });
-
-        Lampa.SettingsApi.addParam({
-            component: 'moi_filmix',
-            param: { name: 'moi_filmix_logout', type: 'button' },
-            field: { name: 'Вийти з Filmix на цьому пристрої' },
-            onChange: function () {
-                fx('logout', function () { Lampa.Noty.show('Вийшов з Filmix'); });
-            }
-        });
-
-        // пункт у лівому меню: Стильний інтерфейс може перемальовувати меню — повертаємо пункт, якщо зник
-        addMenu();
-        setInterval(addMenu, 3000);
     }
 
     if (window.appready) start();

@@ -27,6 +27,7 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     static final String DEFAULT_URL = "http://92-5-178-165.sslip.io";
     static final String STYLISH = "https://crux1974.github.io/Lampa/stylish2.js";
+    static final String FILMIX = "https://crux1974.github.io/Lampa/fx_moi.js";
     static final String PLUGIN = "https://crux1974.github.io/Lampa/moi_id.js";
     static final String HOME_URL = "http://192.168.8.1:8095";
     static final String[] PRESETS = { DEFAULT_URL, HOME_URL, "https://92-5-178-165.sslip.io", "http://lampa.mx" };
@@ -61,7 +62,7 @@ public class MainActivity extends Activity {
         if (Build.VERSION.SDK_INT >= 21) s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         // Lampa блокує торренти в «чужих» Android-оболонках (вікно «встановіть APK»).
         // Прибираємо слово Android з User-Agent — тоді Lampa грає торренти вбудованим плеєром, як у браузері.
-        s.setUserAgentString(s.getUserAgentString().replaceAll("(?i)android", "Linux") + " AlcopacUA/1.3.1");
+        s.setUserAgentString(s.getUserAgentString().replaceAll("(?i)android", "Linux") + " AlcopacUA/1.4.0");
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= 21) CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -72,6 +73,7 @@ public class MainActivity extends Activity {
                     "(function(){function has(n){var a=document.scripts;for(var i=0;i<a.length;i++)if((a[i].src||'').indexOf(n)>=0)return true;return false}" +
                     "function add(id,src){var s=document.createElement('script');s.id=id;s.src=src;document.head.appendChild(s)}" +
                     "if(!window.moi_id_plugin&&!has('moi_id.js'))add('moi_id_js','" + PLUGIN + "');" +
+                    "if(!window.fx_moi_loader&&!has('fx_moi.js'))add('fx_moi_js','" + FILMIX + "');" +
                     /* Стильний інтерфейс: чекаємо, поки Lampa підвантажить свої плагіни, щоб не було двох копій */
                     "setTimeout(function(){if(!window.__sui_extra&&!has('stylish2.js'))add('stylish2_js','" + STYLISH + "')},5000);})()", null);
             }
