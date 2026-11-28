@@ -111,12 +111,12 @@
                 if (a.add) {
                     Lampa.Input.edit({ title: 'ID пристрою (з розділу «ID для сервера» на ньому)', value: '', free: true, nosave: true }, function (v) {
                         v = (v || '').replace(/\s+/g, '').toLowerCase();
-                        if (!v) return Lampa.Controller.toggle('settings_component');
+                        if (!v) return goBack();
                         api('add=' + encodeURIComponent(v), showOwners);
                     });
                 } else if (a.me) {
                     Lampa.Noty.show('Це цей пристрій — його прибрати не можна');
-                    Lampa.Controller.toggle('settings_component');
+                    goBack();
                 } else {
                     Lampa.Select.show({
                         title: 'Прибрати ' + a.id + '?',
@@ -129,7 +129,7 @@
                     });
                 }
             },
-            onBack: function () { Lampa.Controller.toggle('settings_component'); }
+            onBack: function () { goBack(); }
         });
     }
 
@@ -148,6 +148,11 @@
     }
 
     var fxTimer = null;
+    var backTo = 'settings_component';
+
+    function goBack() {
+        try { Lampa.Controller.toggle(backTo); } catch (e) {}
+    }
 
     function fxStatusText(d) {
         if (d && d.server) return 'Працює через серверний Filmix (свій пристрій)';
@@ -168,10 +173,10 @@
                     { title: 'Скасувати', cancel: true }
                 ],
                 onSelect: function (a) {
-                    if (a.cancel) { clearInterval(fxTimer); return Lampa.Controller.toggle('settings_component'); }
+                    if (a.cancel) { clearInterval(fxTimer); return goBack(); }
                     if (a.check) fxCheck(true);
                 },
-                onBack: function () { clearInterval(fxTimer); Lampa.Controller.toggle('settings_component'); }
+                onBack: function () { clearInterval(fxTimer); goBack(); }
             });
             clearInterval(fxTimer);
             fxTimer = setInterval(function () {
@@ -186,7 +191,7 @@
             if (d.ok) {
                 clearInterval(fxTimer);
                 Lampa.Noty.show('Filmix підключено: ' + d.login + (d.pro ? ' (PRO)' : '') + '. Перезапусти Лампу');
-                Lampa.Controller.toggle('settings_component');
+                goBack();
             } else if (loud || !d.wait) {
                 if (!d.wait) clearInterval(fxTimer);
                 Lampa.Noty.show(d.msg || 'Ще не підтверджено');
@@ -203,15 +208,34 @@
                     : [{ title: 'Увійти у свій акаунт Filmix', login: true }],
                 onSelect: function (a) {
                     if (a.login) fxLogin();
-                    if (a.logout) fx('logout', function () { Lampa.Noty.show('Вийшов з Filmix'); Lampa.Controller.toggle('settings_component'); });
+                    if (a.logout) fx('logout', function () { Lampa.Noty.show('Вийшов з Filmix'); goBack(); });
                 },
-                onBack: function () { Lampa.Controller.toggle('settings_component'); }
+                onBack: function () { goBack(); }
             });
         });
     }
 
+    /* ---------- пункт «Мій Filmix» у лівому меню ---------- */
+    var FX_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M10 9l5 3-5 3z" fill="currentColor"/></svg>';
+
+    function addMenu() {
+        try {
+            if (document.querySelector('.menu__item[data-action="moi_fx"]')) return;
+            var list = document.querySelector('.menu .menu__list');
+            if (!list) return;
+            var li = document.createElement('li');
+            li.className = 'menu__item selector';
+            li.setAttribute('data-action', 'moi_fx');
+            li.innerHTML = '<div class="menu__ico">' + FX_ICON + '</div><div class="menu__text">Мій Filmix</div>';
+            var open = function () { backTo = 'menu'; fxMenu(); };
+            if (window.$) $(li).on('hover:enter', open); else li.addEventListener('click', open);
+            list.appendChild(li);
+        } catch (e) {}
+    }
+
     function start() {
         Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'ID для сервера', icon: ICON });
+        addMenu();
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
@@ -238,14 +262,14 @@
                 var d = item.find ? item.find('.settings-param__descr') : null;
                 if (d && d.length) fx('status', function (r) { d.text(fxStatusText(r)); });
             },
-            onChange: fxMenu
+            onChange: function () { backTo = 'settings_component'; fxMenu(); }
         });
 
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
             param: { name: COMPONENT + '_owners', type: 'button' },
             field: { name: 'Свої пристрої', description: 'Додати або прибрати ID (працює лише на своєму пристрої)' },
-            onChange: owners
+            onChange: function () { backTo = 'settings_component'; owners(); }
         });
 
         Lampa.SettingsApi.addParam({
