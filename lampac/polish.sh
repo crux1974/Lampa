@@ -77,19 +77,23 @@ echo "   ок"
 
 echo "2) Загальні трекери (з них беруться лише роздачі з польською озвучкою)"
 if [ ! -f /root/jackett-admin.txt ]; then
-  for ix in thepiratebay limetorrents; do
-    cfg=$(curl -s "$JK/api/v2.0/indexers/$ix/config" || true)
-    code=$(curl -s -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d "$cfg" "$JK/api/v2.0/indexers/$ix/config" || true)
-    echo "   $ix → $code"
-  done
   PASS=$(openssl rand -base64 15 | tr -d '/+=' | cut -c1-16)
-  curl -s -o /dev/null -H 'Content-Type: application/json' -d "\"$PASS\"" "$JK/api/v2.0/server/adminpassword" || true
   printf 'Jackett: https://%s/jackett\nПароль адміністратора: %s\n' "$HOST" "$PASS" > /root/jackett-admin.txt
   chmod 600 /root/jackett-admin.txt
-  echo "   пароль до Jackett збережено в /root/jackett-admin.txt"
-else
-  echo "   вже налаштовано раніше"
 fi
+PASS=$(sed -n 's/^Пароль адміністратора: //p' /root/jackett-admin.txt)
+JAR=$(mktemp)
+# вхід: поки пароля немає, Jackett пускає з будь-яким; далі — з нашим
+curl -s -o /dev/null -c "$JAR" -b "$JAR" --data-urlencode "password=$PASS" "$JK/UI/Dashboard" || true
+for ix in thepiratebay limetorrents; do
+  cfg=$(curl -s -b "$JAR" "$JK/api/v2.0/indexers/$ix/config" || true)
+  case "$cfg" in \[*) ;; *) echo "   $ix: Jackett не пустив (вхід не вдався)"; continue ;; esac
+  code=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -H 'Content-Type: application/json' -d "$cfg" "$JK/api/v2.0/indexers/$ix/config" || true)
+  echo "   $ix → $code (має бути 204)"
+done
+code=$(curl -s -o /dev/null -w '%{http_code}' -b "$JAR" -H 'Content-Type: application/json' -d "\"$PASS\"" "$JK/api/v2.0/server/adminpassword" || true)
+echo "   пароль Jackett → $code (має бути 200 або 204); він у /root/jackett-admin.txt"
+rm -f "$JAR"
 
 echo "3) Злиття результатів (Lampac + польські)"
 curl -fsSL "$RAW/jmerge.py?v=$(date +%s)" -o /opt/jmerge.py
@@ -144,7 +148,7 @@ fi
 
 echo "5) Перевірка"
 sleep 2
-echo "   Jackett:  $(curl -s -o /dev/null -w '%{http_code}' https://$HOST/jackett/UI/Login) (має бути 200)"
+echo "   Jackett:  $(curl -s -o /dev/null -w '%{http_code}' https://$HOST/jackett/UI/Login) (200 або 302 — працює)"
 n=$(curl -s "https://$HOST/api/v2.0/indexers/all/results?apikey=1&Query=Dune&title_original=Dune%20Part%20Two&year=2024" \
   | python3 -c 'import sys,json; r=json.load(sys.stdin).get("Results") or []; print(len(r), "усього,", sum(1 for x in r if "Polski" in str(x.get("Info",{}).get("voices",""))), "польських")' 2>/dev/null)
 echo "   Пошук «Dune Part Two»: ${n:-немає відповіді}"
