@@ -1,6 +1,6 @@
 #!/bin/bash
 # Перевірка польських торрентів: що знаходить сам Jackett
-Q="${1:-Dune Part Two}"
+Q="${1:-Dune Part Two PL}"
 K=$(python3 -c "import json;print(json.load(open('/var/lib/jackett/ServerConfig.json',encoding='utf-8-sig'))['APIKey'])")
 echo "Служби: jackett=$(systemctl is-active jackett) jmerge=$(systemctl is-active jmerge)"
 echo "Шукаю в Jackett: $Q"

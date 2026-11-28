@@ -70,15 +70,31 @@ def polish_results(params):
     key = api_key()
     if not key:
         return []
-    url = "%s/api/v2.0/indexers/all/results?apikey=%s&Query=%s" % (
-        JACKETT, urllib.parse.quote(key), urllib.parse.quote(query))
-    status, _, body = fetch(url, {"Accept-Encoding": "identity"}, 15)
-    if status != 200:
-        return []
-    try:
-        items = json.loads(body.decode("utf-8", "replace")).get("Results") or []
-    except Exception:
-        return []
+    # два пошуки паралельно: звичайний і з «PL» (польські роздачі тонуть серед сотень інших)
+    got = {}
+
+    def search(name, q):
+        url = "%s/api/v2.0/indexers/all/results?apikey=%s&Query=%s" % (
+            JACKETT, urllib.parse.quote(key), urllib.parse.quote(q))
+        status, _, body = fetch(url, {"Accept-Encoding": "identity"}, 15)
+        if status == 200:
+            try:
+                got[name] = json.loads(body.decode("utf-8", "replace")).get("Results") or []
+            except Exception:
+                pass
+
+    ts = [threading.Thread(target=search, args=("a", query)), threading.Thread(target=search, args=("b", query + " PL"))]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    items, seen = [], set()
+    for it in (got.get("b") or []) + (got.get("a") or []):
+        k = (it.get("MagnetUri") or it.get("Link") or it.get("Title") or "")[:200]
+        if k in seen:
+            continue
+        seen.add(k)
+        items.append(it)
 
     year = first(params, "year")
     serial = first(params, "is_serial") not in ("", "0", "1")
