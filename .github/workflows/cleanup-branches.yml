@@ -1,0 +1,58 @@
+name: Порядок у PR і гілках
+
+# 1) Видаляє гілки, PR яких уже злитий або закритий (і немає відкритого PR з цієї гілки).
+# 2) Закриває PR, які висять відкритими довше за 7 днів без руху.
+# Запуск: після кожного злиття/закриття PR, щонеділі о 04:17 UTC і вручну.
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: '17 4 * * 0'
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/cleanup-branches.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: cleanup-branches
+  cancel-in-progress: false
+
+jobs:
+  tidy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Закрити застарілі PR (без руху > 7 днів)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          cutoff=$(date -u -d '7 days ago' +%Y-%m-%dT%H:%M:%SZ)
+          gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" \
+            --jq '.[] | [.number, .updated_at] | @tsv' \
+          | awk -v c="$cutoff" '$2 < c { print $1 }' | while read n; do
+              gh api -X POST "repos/$REPO/issues/$n/comments" -f body='Автоматично закрито: PR без руху понад 7 днів. Якщо ще потрібен — відкрийте знову.' >/dev/null
+              gh api -X PATCH "repos/$REPO/pulls/$n" -f state=closed >/dev/null && echo "закрито #$n"
+            done
+
+      - name: Видалити гілки злитих і закритих PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          MAIN: ${{ github.event.repository.default_branch }}
+        run: |
+          gh api --paginate "repos/$REPO/pulls?state=all&per_page=100" \
+            --jq '.[] | select(.head.repo.full_name == "'"$REPO"'") | [.head.ref, .state] | @tsv' > prs.tsv
+          awk '$2=="open"{print $1}' prs.tsv | sort -u > open.txt
+          awk '$2=="closed"{print $1}' prs.tsv | sort -u > closed.txt
+          gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name' | sort -u > branches.txt
+          n=0
+          comm -12 branches.txt closed.txt | comm -23 - open.txt | while read b; do
+            [ "$b" = "$MAIN" ] && continue
+            gh api -X DELETE "repos/$REPO/git/refs/heads/$b" >/dev/null && echo "видалено гілку $b"
+          done
+          echo "Гілок залишилось: $(gh api --paginate "repos/$REPO/branches?per_page=100" --jq '.[].name' | wc -l)"
