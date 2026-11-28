@@ -57,6 +57,17 @@ try {
   } catch (e) {}
 })();
 
-lampainit_invc.appload = function () {};
+/* 4) Наші плагіни для всіх пристроїв, що відкривають цей сервер:
+ *    «ID для сервера» (свої пристрої) і Filmix (свій акаунт, через свій проксі) */
+lampainit_invc.appload = function () {
+  var list = ['https://crux1974.github.io/Lampa/moi_id.js', 'https://crux1974.github.io/Lampa/fx_moi.js'];
+  function has(n) { var a = document.scripts; for (var i = 0; i < a.length; i++) if ((a[i].src || '').indexOf(n) >= 0) return true; return false; }
+  list.forEach(function (u) {
+    var name = u.split('/').pop();
+    if (has(name)) return;
+    var s = document.createElement('script'); s.src = u; s.async = true;
+    (document.head || document.documentElement).appendChild(s);
+  });
+};
 lampainit_invc.appready = function () {};
 lampainit_invc.first_initiale = function () {};
