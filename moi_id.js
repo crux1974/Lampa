@@ -44,6 +44,8 @@
             if (typeof url !== 'string' || !ours(url)) return url;
             if (/\.(js|css|png|jpe?g|svg|webp|gif|woff2?|ico|json)(\?|$)/i.test(url) && url.indexOf('/api/') < 0 && url.indexOf('/lite/') < 0) return url;
             if (url.indexOf('box_mac=') < 0) url += (url.indexOf('?') < 0 ? '?' : '&') + 'box_mac=' + encodeURIComponent(uid());
+            // token — за ним Lampac бере налаштування саме цього пристрою (свій Filmix)
+            if (!/[?&]token=/.test(url)) url += '&token=' + encodeURIComponent(uid());
         } catch (x) {}
         return url;
     }
@@ -131,6 +133,83 @@
         });
     }
 
+    /* ---------- «Мій Filmix»: вхід у свій акаунт Filmix на цьому пристрої ---------- */
+    function fx(path, ok) {
+        var x = new XMLHttpRequest();
+        x.open('GET', '/jm/filmix/' + path + '?token=' + encodeURIComponent(uid()) + '&box_mac=' + encodeURIComponent(uid()), true);
+        x.timeout = 20000;
+        x.onload = function () {
+            var d = {};
+            try { d = JSON.parse(x.responseText); } catch (e) {}
+            ok(d, x.status);
+        };
+        x.onerror = x.ontimeout = function () { ok({ ok: false, msg: 'Сервер не відповів' }, 0); };
+        x.send();
+    }
+
+    var fxTimer = null;
+
+    function fxStatusText(d) {
+        if (d && d.server) return 'Працює через серверний Filmix (свій пристрій)';
+        if (!d || !d.on) return 'Не виконано вхід';
+        return 'Увійшов: ' + (d.login || '?') + (d.pro ? ' · PRO' : '');
+    }
+
+    function fxLogin() {
+        fx('start', function (d) {
+            if (!d.ok) return Lampa.Noty.show(d.msg || 'Помилка');
+            var tries = 0;
+            Lampa.Select.show({
+                title: 'Код для Filmix: ' + d.user_code,
+                items: [
+                    { title: '1. Відкрий на телефоні filmix.my/consoles', subtitle: 'увійди у свій акаунт Filmix' },
+                    { title: '2. Введи код: ' + d.user_code },
+                    { title: '3. Я ввів код — перевірити', check: true },
+                    { title: 'Скасувати', cancel: true }
+                ],
+                onSelect: function (a) {
+                    if (a.cancel) { clearInterval(fxTimer); return Lampa.Controller.toggle('settings_component'); }
+                    if (a.check) fxCheck(true);
+                },
+                onBack: function () { clearInterval(fxTimer); Lampa.Controller.toggle('settings_component'); }
+            });
+            clearInterval(fxTimer);
+            fxTimer = setInterval(function () {
+                if (++tries > 60) return clearInterval(fxTimer);
+                fxCheck(false);
+            }, 5000);
+        });
+    }
+
+    function fxCheck(loud) {
+        fx('check', function (d) {
+            if (d.ok) {
+                clearInterval(fxTimer);
+                Lampa.Noty.show('Filmix підключено: ' + d.login + (d.pro ? ' (PRO)' : '') + '. Перезапусти Лампу');
+                Lampa.Controller.toggle('settings_component');
+            } else if (loud || !d.wait) {
+                if (!d.wait) clearInterval(fxTimer);
+                Lampa.Noty.show(d.msg || 'Ще не підтверджено');
+            }
+        });
+    }
+
+    function fxMenu() {
+        fx('status', function (d) {
+            Lampa.Select.show({
+                title: 'Мій Filmix — ' + fxStatusText(d),
+                items: d.on
+                    ? [{ title: 'Увійти в інший акаунт', login: true }, { title: 'Вийти з Filmix на цьому пристрої', logout: true }]
+                    : [{ title: 'Увійти у свій акаунт Filmix', login: true }],
+                onSelect: function (a) {
+                    if (a.login) fxLogin();
+                    if (a.logout) fx('logout', function () { Lampa.Noty.show('Вийшов з Filmix'); Lampa.Controller.toggle('settings_component'); });
+                },
+                onBack: function () { Lampa.Controller.toggle('settings_component'); }
+            });
+        });
+    }
+
     function start() {
         Lampa.SettingsApi.addComponent({ component: COMPONENT, name: 'ID для сервера', icon: ICON });
 
@@ -149,6 +228,17 @@
                 if (d && d.length) d.text(uid());
             },
             onChange: function () { copy(uid()); }
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: COMPONENT,
+            param: { name: COMPONENT + '_fx', type: 'button' },
+            field: { name: 'Мій Filmix', description: 'Увійти у свій акаунт Filmix на цьому пристрої' },
+            onRender: function (item) {
+                var d = item.find ? item.find('.settings-param__descr') : null;
+                if (d && d.length) fx('status', function (r) { d.text(fxStatusText(r)); });
+            },
+            onChange: fxMenu
         });
 
         Lampa.SettingsApi.addParam({
