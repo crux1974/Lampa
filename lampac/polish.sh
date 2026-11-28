@@ -11,6 +11,10 @@ RAW=https://raw.githubusercontent.com/crux1974/Lampa/main/lampac
 echo "1) Jackett"
 id jackett >/dev/null 2>&1 || useradd -r -m -d "$DATA" -s /usr/sbin/nologin jackett
 mkdir -p "$DATA" && chown jackett:jackett "$DATA"
+if ! ldconfig -p | grep -q libicuuc; then
+  echo "   ставлю libicu (потрібна Jackett)"
+  DEBIAN_FRONTEND=noninteractive apt-get update -qq >/dev/null && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq libicu-dev >/dev/null
+fi
 if [ ! -x /opt/Jackett/jackett ]; then
   case "$(uname -m)" in
     aarch64|arm64) PKG=Jackett.Binaries.LinuxARM64.tar.gz ;;
@@ -27,7 +31,6 @@ After=network-online.target
 [Service]
 User=jackett
 WorkingDirectory=/opt/Jackett
-Environment=DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1
 ExecStart=/opt/Jackett/jackett --NoRestart --NoUpdates -d $DATA
 Restart=always
 RestartSec=5
