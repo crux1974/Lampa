@@ -317,6 +317,8 @@ class Handler(BaseHTTPRequestHandler):
         params = urllib.parse.parse_qs(qs, keep_blank_values=True)
         if self.path.startswith("/jm/owners"):
             return self.owners_api(params)
+        if self.path.startswith("/fxproxy/"):
+            return self.fxproxy()
         if self.path.startswith("/jm/filmix/"):
             code, data = fx_api(self.path.split("?", 1)[0], params)
             return self.reply(code, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
@@ -357,6 +359,24 @@ class Handler(BaseHTTPRequestHandler):
 
         out = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.reply(200, out, "application/json; charset=utf-8")
+
+    FXP_OK = re.compile(r"^https?://([a-z0-9-]+\.)*(filmix[a-z0-9-]*|fxapp[a-z0-9-]*)\.[a-z]{2,10}(:\d+)?(/|$)", re.I)
+
+    def fxproxy(self):
+        """CORS-проксі лише для Filmix (для плагіна fx.js)."""
+        target = self.path[len("/fxproxy/"):]
+        target = re.sub(r"^(https?):/+", r"\1://", target)
+        if not self.FXP_OK.match(target):
+            return self.reply(403, b"forbidden", "text/plain")
+        req = urllib.request.Request(target, headers={"User-Agent": "okhttp/3.12.12", "Accept-Encoding": "identity"})
+        try:
+            with urllib.request.urlopen(req, timeout=20) as r:
+                body, ctype, code = r.read(), r.headers.get("Content-Type", "application/octet-stream"), r.status
+        except urllib.error.HTTPError as e:
+            body, ctype, code = e.read(), e.headers.get("Content-Type", "text/plain"), e.code
+        except Exception:
+            return self.reply(502, b"bad gateway", "text/plain")
+        self.reply(code, body, ctype)
 
     def reply(self, code, body, ctype):
         self.send_response(code)
