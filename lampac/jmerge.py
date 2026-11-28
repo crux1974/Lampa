@@ -38,7 +38,7 @@ def is_owner(params):
     own = owners()
     if not own:
         return True
-    for k in ("account_email", "uid", "token"):
+    for k in ("box_mac", "account_email", "uid", "token"):
         for v in params.get(k, []):
             if v.strip().lower() in own:
                 return True
