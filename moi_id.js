@@ -76,7 +76,7 @@
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
             param: { name: COMPONENT + '_uid', type: 'button' },
-            field: { name: 'ID пристрою', description: uid() },
+            field: { name: 'ID пристрою (натисни — скопіювати)', description: uid() },
             onRender: function (item) {
                 var d = item.find ? item.find('.settings-param__descr') : null;
                 if (d && d.length) d.text(uid());
@@ -98,7 +98,7 @@
         Lampa.SettingsApi.addParam({
             component: COMPONENT,
             param: { name: COMPONENT + '_tip', type: 'title' },
-            field: { name: 'Акаунт CUB однаковий на всіх твоїх пристроях — зручніше використовувати його' }
+            field: { name: 'ID пристрою свій на кожному пристрої і не переходить через CUB' }
         });
     }
 

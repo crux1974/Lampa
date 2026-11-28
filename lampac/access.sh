@@ -2,6 +2,7 @@
 # «Лише для своїх»: Filmix і польські роздачі бачать тільки вказані ID.
 # Запуск: ... | sudo bash -s -- 'ID1' 'ID2' ...
 #   ID — це «ID пристрою» або «Акаунт CUB» з плагіна «Мій ID».
+# --only перед ID — замінити весь список (старі ID, наприклад пошта CUB, прибираються).
 # Без аргументів — показує, хто зараз у списку.
 set -e
 RAW=https://raw.githubusercontent.com/crux1974/Lampa/main/lampac
@@ -23,9 +24,12 @@ if [ $# -eq 0 ]; then
   exit 0
 fi
 
+ONLY=0
+if [ "$1" = "--only" ]; then ONLY=1; shift; fi
+[ $# -eq 0 ] && { echo "Вкажи хоча б один ID"; exit 1; }
 cp "$CONF" "$CONF.before-access"
-python3 - "$CONF" "$@" <<'PY'
-import json, re, sys
+ONLY=$ONLY python3 - "$CONF" "$@" <<'PY'
+import json, os, re, sys
 p, ids = sys.argv[1], [i.strip().lower() for i in sys.argv[2:] if i.strip()]
 raw = open(p, encoding="utf-8-sig").read()
 try:
@@ -39,7 +43,7 @@ me = next((u for u in users if (u.get("comment") or "") == "свої (Мій ID)
 if me is None:
     me = {"id": ids[0], "ids": [], "group": 1, "expires": "2100-01-01T00:00:00", "comment": "свої (Мій ID)"}
     users.append(me)
-allids = [me.get("id", "").lower()] + [x.lower() for x in me.get("ids") or []]
+allids = [] if os.environ.get("ONLY") == "1" else [x for x in [me.get("id", "").lower()] + [x.lower() for x in me.get("ids") or []] if x]
 for i in ids:
     if i not in allids:
         allids.append(i)
