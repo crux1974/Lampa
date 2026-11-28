@@ -26,7 +26,9 @@ import android.widget.Toast;
 /** Alcopac UA: Lampa з вашого сервера у WebView. Довге «Назад» або «Меню» — зміна адреси. */
 public class MainActivity extends Activity {
     static final String DEFAULT_URL = "http://92-5-178-165.sslip.io";
-    static final String[] PRESETS = { DEFAULT_URL, "https://92-5-178-165.sslip.io", "http://lampa.mx" };
+    static final String HOME_URL = "http://192.168.8.1:8095";
+    static final String[] PRESETS = { DEFAULT_URL, HOME_URL, "https://92-5-178-165.sslip.io", "http://lampa.mx" };
+    static final String[] PRESET_NAMES = { "Сервер (будь-де)", "Вдома через роутер (з TorrServer)", "Сервер https", "lampa.mx" };
     WebView web;
     FrameLayout root;
     View fullView;
@@ -55,7 +57,7 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setAllowFileAccess(false);
         if (Build.VERSION.SDK_INT >= 21) s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-        s.setUserAgentString(s.getUserAgentString() + " AlcopacUA/1.0");
+        s.setUserAgentString(s.getUserAgentString() + " AlcopacUA/1.1");
         CookieManager.getInstance().setAcceptCookie(true);
         if (Build.VERSION.SDK_INT >= 21) CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -122,7 +124,7 @@ public class MainActivity extends Activity {
             })
             .setNeutralButton("Вибрати…", (d, w) -> new AlertDialog.Builder(this)
                 .setTitle("Швидкий вибір")
-                .setItems(PRESETS, (d2, i) -> { prefs.edit().putString("url", PRESETS[i]).apply(); web.loadUrl(PRESETS[i]); })
+                .setItems(PRESET_NAMES, (d2, i) -> { prefs.edit().putString("url", PRESETS[i]).apply(); web.loadUrl(PRESETS[i]); })
                 .show())
             .setNegativeButton("Перезавантажити", (d, w) -> web.reload())
             .show();
